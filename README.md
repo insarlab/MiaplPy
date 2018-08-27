@@ -1,3 +1,3 @@
 # pysqsar
 
-A python package of processing InSAR with SqueeSAR method working with ISCE and PYSAR.
+A python package of InSAR processing with SqueeSAR method working with ISCE and PYSAR.
