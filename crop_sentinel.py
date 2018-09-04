@@ -150,72 +150,75 @@ def main(argv):
     nLines = lrow - frow
     width = lcol - fcol
     #slclist = []
-    for t in slclist:
-        filename = os.path.join(slavedir, t, t + '.slc.full')
+    if os.path.isfile(projdir + '/merged/cropped.npy'):
+      print('Already cropped')
+    else:
+        for t in slclist:
+            filename = os.path.join(slavedir, t, t + '.slc.full')
 
-        ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
-        Inpfile = ds.GetRasterBand(1).ReadAsArray()
-        del ds
+            ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
+            Inpfile = ds.GetRasterBand(1).ReadAsArray()
+            del ds
 
-        outMap = np.memmap(filename, dtype=np.complex64, mode='r+', shape=(nLines, width))
-        outMap[:, :] = Inpfile[frow:lrow, fcol:lcol]
+            outMap = np.memmap(filename, dtype=np.complex64, mode='r+', shape=(nLines, width))
+            outMap[:, :] = Inpfile[frow:lrow, fcol:lcol]
 
-        oimg = isceobj.createSlcImage()
-        oimg.setAccessMode('write')
-        oimg.setFilename(filename)
-        oimg.setWidth(width)
-        oimg.setLength(nLines)
-        oimg.renderVRT()
-        oimg.renderHdr()
+            oimg = isceobj.createSlcImage()
+            oimg.setAccessMode('write')
+            oimg.setFilename(filename)
+            oimg.setWidth(width)
+            oimg.setLength(nLines)
+            oimg.renderVRT()
+            oimg.renderHdr()
 
-        del outMap
-        cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
-        os.system(cmd)
+            del outMap
+            cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
+            os.system(cmd)
 
-    listgeo = ['hgt', 'lat', 'lon', 'los', 'shadowMask']
+            listgeo = ['hgt', 'lat', 'lon', 'los', 'shadowMask']
 
-    for t in listgeo:
-        filename = os.path.join(gmasterdir, t + '.rdr.full')
+        for t in listgeo:
+            filename = os.path.join(gmasterdir, t + '.rdr.full')
 
-        img = isceobj.createImage()
-        img.load(filename + '.xml')
-        bands = img.bands
-        dtype = IML.NUMPY_type(img.dataType)
-        scheme = img.scheme
+            img = isceobj.createImage()
+            img.load(filename + '.xml')
+            bands = img.bands
+            dtype = IML.NUMPY_type(img.dataType)
+            scheme = img.scheme
 
-        ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
-        Inpfile = ds.GetRasterBand(1).ReadAsArray()
-        if bands == 2:
-            Inpfile2 = ds.GetRasterBand(2).ReadAsArray()
-        del ds, img
+            ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
+            Inpfile = ds.GetRasterBand(1).ReadAsArray()
+            if bands == 2:
+                Inpfile2 = ds.GetRasterBand(2).ReadAsArray()
+            del ds, img
 
-        outMap = IML.memmap(filename, mode='r+', nchannels=bands,
+            outMap = IML.memmap(filename, mode='r+', nchannels=bands,
                             nxx=width, nyy=nLines, scheme=scheme, dataType=dtype)
 
-        if bands == 2:
-            outMap.bands[0][:, :] = Inpfile[frow:lrow, fcol:lcol]
-            outMap.bands[1][:, :] = Inpfile2[frow:lrow, fcol:lcol]
-        else:
-            outMap.bands[0][:, :] = Inpfile[frow:lrow, fcol:lcol]
+            if bands == 2:
+                outMap.bands[0][:, :] = Inpfile[frow:lrow, fcol:lcol]
+                outMap.bands[1][:, :] = Inpfile2[frow:lrow, fcol:lcol]
+            else:
+                outMap.bands[0][:, :] = Inpfile[frow:lrow, fcol:lcol]
 
-        IML.renderISCEXML(filename, bands,
-                          nLines, width,
-                          dtype, scheme)
+            IML.renderISCEXML(filename, bands,
+                            nLines, width,
+                            dtype, scheme)
 
-        oimg = isceobj.createImage()
-        oimg.load(filename + '.xml')
-        oimg.imageType = dtype
-        oimg.renderHdr()
-        try:
-            outMap.bands[0].base.base.flush()
-        except:
-            pass
+            oimg = isceobj.createImage()
+            oimg.load(filename + '.xml')
+            oimg.imageType = dtype
+            oimg.renderHdr()
+            try:
+                outMap.bands[0].base.base.flush()
+            except:
+                pass
 
-        cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
-        os.system(cmd)
+            cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
+            os.system(cmd)
 
-        multilook(filename, outname=filename.split('.full')[0], alks=azlks, rlks=rnlks)
-    np.save(projdir + '/merged/cropped.npy', 'True')
+            multilook(filename, outname=filename.split('.full')[0], alks=azlks, rlks=rnlks)
+        np.save(projdir + '/merged/cropped.npy', 'True')
 
 if __name__ == '__main__':
     '''
