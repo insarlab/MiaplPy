@@ -65,16 +65,6 @@ def main(argv):
 
   wra = int(templateContents['squeesar.wsizerange'])
   waz = int(templateContents['squeesar.wsizeazimuth'])
-
-  if os.path.isfile(projdir + '/merged/cropped.npy'):
-      print('Already cropped')
-  else:
-      cmd = 'crop_sentinel.py ' + templateFileString
-      status = subprocess.Popen(cmd, shell=True).wait()
-      if status is not 0:
-          logger.error('ERROR Cropping SLCs')
-          raise Exception('ERROR Cropping SLCs')
-
     
   if not os.path.isdir(sqdir):
     os.mkdir(sqdir)
