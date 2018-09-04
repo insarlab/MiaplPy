@@ -339,6 +339,13 @@ def slcStack(inps, acquisitionDates, stackMasterDate, slaveDates, safe_dict, upd
         runObj.finalize()
     
     if processingmethod=='squeesar':
+        
+        i+=1
+        runObj = run()
+        runObj.configure(inps, 'run_' + str(i))
+        runObj.extractOverlaps()            # will be modified then
+        runObj.finalize()
+        
         i+=1
         runObj = run()
         runObj.configure(inps, 'run_' + str(i))
@@ -460,6 +467,11 @@ def editconfigsq(inps):
     prjn = prn[-1]
     rundir = slcdir.split('SLC')[0]+'run_files'
     rname = rundir+'/run_10'
+    with open(rname,'w+') as z:
+        line = 'crop_sentinel.py '+' $TE/'+prjn+'.template \n'
+        z.write(line)
+    z.close()
+    rname = rundir+'/run_11'
     with open(rname,'w+') as z:
         line = 'sentinel_squeesar.py '+' $TE/'+prjn+'.template \n'
         z.write(line)
