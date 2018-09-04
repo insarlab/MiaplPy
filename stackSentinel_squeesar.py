@@ -41,7 +41,7 @@ Example:
 # slc workflow that produces a coregistered stack of SLCs  
 
 stackSentinel.py -s ../SLC/ -d ../../MexicoCity/demLat_N18_N20_Lon_W100_W097.dem.wgs84 -b '19 20 -99.5 -98.5' -a ../../AuxDir/ -o ../../Orbits -C NESD  -W slc -P squeesar
-
+'''
 ##############################################
 
 class customArgparseAction(argparse.Action):
@@ -583,20 +583,7 @@ def main(iargs=None):
     print ('Coregistration method: ', inps.coregistration )
     print ('Workflow: ', inps.workflow)
     print ('*****************************************')
-    if inps.workflow == 'interferogram':
-        
-        interferogramStack(inps, acquisitionDates, stackMasterDate, slaveDates, safe_dict, pairs, updateStack)  
-
-    elif inps.workflow == 'offset':
-
-        offsetStack(inps, acquisitionDates, stackMasterDate, slaveDates, safe_dict, pairs, updateStack)
-
-    elif inps.workflow == 'correlation':
-
-        correlationStack(inps, acquisitionDates, stackMasterDate, slaveDates, safe_dict, pairs, updateStack)
-
-    elif inps.workflow == 'slc':
-
+    if inps.workflow == 'slc':
         slcStack(inps, acquisitionDates, stackMasterDate, slaveDates, safe_dict, updateStack, pairs, inps.ProcessingMethod, mergeSLC=True)
         if inps.ProcessingMethod == 'squeesar':
                 editconfigsq(inps)
