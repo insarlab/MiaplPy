@@ -140,19 +140,20 @@ def main(argv):
 
     azlks = templateContents['sentinelStack.azimuthLooks']
     rnlks = templateContents['sentinelStack.rangeLooks']
-
-    croparea = np.array(findrowcol(gmasterdir, lat1, lat2, lon1, lon2))
-    frow = np.int(croparea[0])
-    lrow = np.int(croparea[1])
-    fcol = np.int(croparea[2])
-    lcol = np.int(croparea[3])
-
-    nLines = lrow - frow
-    width = lcol - fcol
-    #slclist = []
+    
     if os.path.isfile(projdir + '/merged/cropped.npy'):
       print('Already cropped')
     else:
+        croparea = np.array(findrowcol(gmasterdir, lat1, lat2, lon1, lon2))
+        frow = np.int(croparea[0])
+        lrow = np.int(croparea[1])
+        fcol = np.int(croparea[2])
+        lcol = np.int(croparea[3])
+
+        nLines = lrow - frow
+        width = lcol - fcol
+        #slclist = []
+    
         for t in slclist:
             filename = os.path.join(slavedir, t, t + '.slc.full')
 
