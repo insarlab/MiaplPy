@@ -74,13 +74,13 @@ def main(argv):
   lin = slc.shape[0]
   sam = slc.shape[1]
   del slc
-  pr1 = np.ogrid[0:lin-50:200]
-  pr2 = pr1+200
+  pr1 = np.ogrid[0:lin-50:300]
+  pr2 = pr1+300
   pr2[-1] = lin
   pr1[1::] = pr1[1::] - 2*waz
 
-  pc1 = np.ogrid[0:sam-50:200]
-  pc2 = pc1+200
+  pc1 = np.ogrid[0:sam-50:300]
+  pc2 = pc1+300
   pc2[-1] = sam
   pc1[1::] = pc1[1::] - 2*wra
   pr = [[pr1], [pr2]]
