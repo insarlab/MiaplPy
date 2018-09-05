@@ -5,8 +5,10 @@
 #######################
 
 import os, imp, sys, glob, fnmatch
-sys.path.append('$PARENTDIR/sources/sentinelStack')
-sys.path.append('$SQUEESAR')
+sys.path.insert(0, os.getenv('$PARENTDIR/sources/sentinelStack'))
+sys.path.insert(0, os.getenv('$SQUEESAR'))
+#sys.path.append('$PARENTDIR/sources/sentinelStack')
+#sys.path.append('$SQUEESAR')
 import argparse
 import configparser
 import  datetime
