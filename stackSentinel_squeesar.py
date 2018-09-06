@@ -5,7 +5,8 @@
 #######################
 
 import os, imp, sys, glob, fnmatch
-sys.path.append(os.environ['PARENTDIR']'+'/sources/sentinelStack')
+pathh = os.environ['PARENTDIR']'+'/sources/sentinelStack'
+sys.path.append(pathh)
 import argparse
 import configparser
 import  datetime
