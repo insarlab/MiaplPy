@@ -24,8 +24,6 @@ from pysar.utils import readfile
 
 
 def readim(slcname):
-    objSlc = isceobj.createSlcImage()
-    objSlc.load(slcname +'.xml')
     ds = gdal.Open(slcname + '.vrt', gdal.GA_ReadOnly)
     Im = ds.GetRasterBand(1).ReadAsArray()
     ds = None
