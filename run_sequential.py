@@ -12,7 +12,7 @@ import glob
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 import _process_utilities as putils
 import generate_templates as gt
-
+import _processSteps as prs
 import logging
 
 #################### LOGGERS AND LOGGING SETUP ####################
@@ -71,27 +71,6 @@ def create_ssara_options(custom_template_file):
 		
 	return ssara_options
 
-
-def set_dates(ssara_output):
-	global stored_date, most_recent
-	
-	most_recent_data = ssara_output.split("\n")[-2]
-	most_recent = datetime.strptime(most_recent_data.split(",")[3], date_format)
-
-	# Write Most Recent Date to File
-	with open(inps.work_dir+'/stored_date.date', 'rb') as stored_date_file:
-	
-		try:
-			date_line = subprocess.check_output(['grep', dataset, inps.work_dir+'/stored_date.date']).decode('utf-8')
-			stored_date = datetime.strptime(date_line.split(": ")[1].strip('\n'), date_format)
-		except subprocess.CalledProcessError as e:
-			
-			stored_date = datetime.strptime("1970-01-01T12:00:00.000000", date_format)
-			
-			with open(inps.work_dir+'/stored_date.date', 'a+') as date_file:
-				data = str(dataset + ": "+str(datetime.strftime(most_recent, date_format))+"\n")
-				date_file.write(data)
-				
 				
 def compare_dates(old,new):
 	old_data = old.split('ASF'))[1::]
@@ -113,7 +92,7 @@ def download_new_string(ssara_output):
 		nstored = len(stored_date.split('\n'))
 		nnew = len(ssara_output.split('\n'))
 		if nnew-nstored >= 10:
-			data_to_download = download_new_string(stored_date,ssara_output)		
+			data_to_download = compare_dates(stored_date,ssara_output)		
 	else:
 		stored_date = ''
 		os.mkdir(old_process_dir)
@@ -125,68 +104,43 @@ def download_new_string(ssara_output):
 	return data_to_download
 	
 	
-def run_ssara(down_command, run_number=1):
-    """ Runs ssara_federated_query-cj.py and checks for download issues.
-        Runs ssara_federated_query-cj.py and checks continuously for whether the data download has hung without
-        comleting or exited with an error code. If either of the above occur, the function is run again, for a
-        maxiumum of 10 times.
-        Parameters: run_number: int, the current iteration the wrapper is on (maxiumum 10 before quitting)
-        Returns: status_cod: int, the status of the donwload (0 for failed, 1 for success)
-    """
-    
-    logger.log(loglevel.INFO, "RUN NUMBER: %s", str(run_number))
-    if run_number > 10:
-        return 0
+def generate_files_csv(ssara_output):
+	""" Generates a csv file of the files to download serially.
+	
+		Uses the `awk` command to generate a csv file containing the data files to be download
+		serially. The output csv file is then sent through the `sed` command to remove the first five
+		empty values to eliminate errors in download_ASF_serial.py.
+	
+	"""
+	options = Template(inps.template).get_options()['ssaraopt']
+	options = options.split(' ')
+	
+	filecsv_options = ssara_output+['|', 'awk', "'BEGIN{FS=\",\"; ORS=\",\"}{ print $14}'", '>', 'files.csv']
+	csv_command = ' '.join(filecsv_options)
+	subprocess.Popen(csv_command, shell=True).wait()
+	sed_command = "sed 's/^.\{5\}//' files.csv > new_files.csv"
+	
+	subprocess.Popen(sed_command, shell=True).wait()
+	
+			
+def call_ssara(slcDir):
+        download_command = 'download_ASF_serial.py' + '-username' + password.asfuser + '-password' + password.asfpass + 'new_files.csv'
+        command = 'ssh pegasus.ccs.miami.edu \"s.cgood;cd ' + slcDir + '; ' + os.getenv('PARENTDIR') + '/sources/rsmas_isce/' + download_command + '\"'
+        messageRsmas.log(download_command)
+        messageRsmas.log(command)
+        status = subprocess.Popen(command, shell=True).wait()
+	logger.log(loglevel.INFO, status)
+	return status
+	
 
-
-    # Runs ssara_federated_query-cj.py with proper options
-    ssara_options = data_to_download + ['--parallel', '10', '--print', '--download']
-    ssara_process = subprocess.Popen(ssara_options)
-
-    completion_status = ssara_process.poll()  # the completion status of the process
-    hang_status = False  # whether or not the download has hung
-    wait_time = 10  # wait time in 'minutes' to determine hang status
-    prev_size = -1  # initial download directory size
-    i = 0  # the iteration number (for logging only)
-
-    # while the process has not completed
-    while completion_status is None:
-
-        i = i + 1
-
-        # Computer the current download directory size
-        curr_size = int(subprocess.check_output(['du', '-s', os.getcwd()]).split()[0].decode('utf-8'))
-
-        # Compare the current and previous directory sizes to determine determine hang status
-        if prev_size == curr_size:
-            hang_status = True
-            logger.log(loglevel.WARNING, "SSARA Hung")
-            ssara_process.terminate()  # teminate the process beacause download hung
-            break;  # break the completion loop 
-
-        time.sleep(60 * wait_time)  # wait 'wait_time' minutes before continuing
-        prev_size = curr_size
-        completion_status = ssara_process.poll()
-        logger.log(loglevel.INFO, "{} minutes: {:.1f}GB, completion_status {}".format(i * wait_time, curr_size / 1024 / 1024,
-                                                                        completion_status))
-
-    exit_code = completion_status  # get the exit code of the command
-    logger.log(loglevel.INFO, "EXIT CODE: %s", str(exit_code))
-
-    bad_codes = [137]
-
-    # If the exit code is one that signifies an error, rerun the entire command
-    if exit_code in bad_codes or hang_status:
-        logger.log(loglevel.WARNING, "Something went wrong, running again")
-        run_ssara(run_number=run_number + 1)
-
-    return 1
-				
+def run_process():
+	
+	
 ###############################################################
-stored_date = None			  					            		# previously stored date
-most_recent = None								              		# date parsed from SSARA
-inps = None;				       						            	# command line arguments
-date_format = "%Y-%m-%dT%H:%M:%S.%f"								# date format for reading and writing dates
+stored_date = None			  			# previously stored date
+most_recent = None						# date parsed from SSARA
+inps = None;				       		        # command line arguments
+date_format = "%Y-%m-%dT%H:%M:%S.%f"				# date format for reading and writing dates
 
 
 if __name__ == "__main__":
@@ -202,11 +156,13 @@ if __name__ == "__main__":
     # Run SSARA and check output	
     ssara_output = subprocess.check_output(ssara_options).decode('utf-8');
     down_command = download_new_string(ssara_output)
-    succesful = run_ssara(down_command)
+    generate_files_csv(down_command)
+    succesful = call_ssara(inps.work_dir + '/SLC')
     logger.log(loglevel.INFO, "DOWNLOADING SUCCESS: %s", str(succesful))
     logger.log(loglevel.INFO, "------------------------------------")	
     # Sets date variables for stored and most recent dates
     #set_dates(ssara_output)
-
+    prs.step_runfiles(inps)
+    prs.step_process(inps)
 
 
