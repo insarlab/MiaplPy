@@ -91,29 +91,96 @@ def set_dates(ssara_output):
 			with open(inps.work_dir+'/stored_date.date', 'a+') as date_file:
 				data = str(dataset + ": "+str(datetime.strftime(most_recent, date_format))+"\n")
 				date_file.write(data)
+				
+				
+def compare_dates(old,new):
+	old_data = old.split('ASF'))[1::]
+	all_data = new.split('ASF'))[1::]
+	a = len(all_data) - len(old_data)
+	diffc = ''
+	output_list = [diffc+li for li in all_data[len(old_data)::]]
+	out_string = new.split('\nASF')[0] + '\n' + output_list
+	return out_string
+	 
 
-
-def compare_dates(ssara_output):
+def download_new_string(ssara_output):
 	global stored_date, most_recent
 	
 	old_process_dir = inps.work_dir + '/old_process_dir'
-	if os.path.isdir(old_process_dir) and os.path.isfile(old_process_dir+'/processed_dates.dates'):
+	if os.path.isdir(old_process_dir) and os.path.isfile(old_process_dir+'/downloaded_dates.dates'):
 		with open(old_process_dir+'/processed_dates.dates', 'r') as date_file:
 			stored_date = date_file.read()
+		nstored = len(stored_date.split('\n'))
+		nnew = len(ssara_output.split('\n'))
+		if nnew-nstored >= 10:
+			data_to_download = download_new_string(stored_date,ssara_output)		
 	else:
 		stored_date = ''
 		os.mkdir(old_process_dir)
-		
+		data_to_download = ssara_output
 	        
-        nstored = len(stored_date.split('\n'))
-	nnew = len(ssara_output.split('\n'))
-	if nnew-nstored == 10:
-		ssara_command = 
-		
-	with open(old_process_dir+'/processed_dates.dates', 'a+') as date_file:
-			date_file.write(ssara_output)
+        	
+	with open(old_process_dir+'/downloaded_dates.dates', 'r+') as date_file:
+		date_file.write(ssara_output)
+	return data_to_download
 	
 	
+def run_ssara(down_command, run_number=1):
+    """ Runs ssara_federated_query-cj.py and checks for download issues.
+        Runs ssara_federated_query-cj.py and checks continuously for whether the data download has hung without
+        comleting or exited with an error code. If either of the above occur, the function is run again, for a
+        maxiumum of 10 times.
+        Parameters: run_number: int, the current iteration the wrapper is on (maxiumum 10 before quitting)
+        Returns: status_cod: int, the status of the donwload (0 for failed, 1 for success)
+    """
+    
+    logger.log(loglevel.INFO, "RUN NUMBER: %s", str(run_number))
+    if run_number > 10:
+        return 0
+
+
+    # Runs ssara_federated_query-cj.py with proper options
+    ssara_options = data_to_download + ['--parallel', '10', '--print', '--download']
+    ssara_process = subprocess.Popen(ssara_options)
+
+    completion_status = ssara_process.poll()  # the completion status of the process
+    hang_status = False  # whether or not the download has hung
+    wait_time = 10  # wait time in 'minutes' to determine hang status
+    prev_size = -1  # initial download directory size
+    i = 0  # the iteration number (for logging only)
+
+    # while the process has not completed
+    while completion_status is None:
+
+        i = i + 1
+
+        # Computer the current download directory size
+        curr_size = int(subprocess.check_output(['du', '-s', os.getcwd()]).split()[0].decode('utf-8'))
+
+        # Compare the current and previous directory sizes to determine determine hang status
+        if prev_size == curr_size:
+            hang_status = True
+            logger.log(loglevel.WARNING, "SSARA Hung")
+            ssara_process.terminate()  # teminate the process beacause download hung
+            break;  # break the completion loop 
+
+        time.sleep(60 * wait_time)  # wait 'wait_time' minutes before continuing
+        prev_size = curr_size
+        completion_status = ssara_process.poll()
+        logger.log(loglevel.INFO, "{} minutes: {:.1f}GB, completion_status {}".format(i * wait_time, curr_size / 1024 / 1024,
+                                                                        completion_status))
+
+    exit_code = completion_status  # get the exit code of the command
+    logger.log(loglevel.INFO, "EXIT CODE: %s", str(exit_code))
+
+    bad_codes = [137]
+
+    # If the exit code is one that signifies an error, rerun the entire command
+    if exit_code in bad_codes or hang_status:
+        logger.log(loglevel.WARNING, "Something went wrong, running again")
+        run_ssara(run_number=run_number + 1)
+
+    return 1
 				
 ###############################################################
 stored_date = None			  					            		# previously stored date
@@ -134,7 +201,10 @@ if __name__ == "__main__":
     
     # Run SSARA and check output	
     ssara_output = subprocess.check_output(ssara_options).decode('utf-8');
-    print('ssara_output:',ssara_output)
+    down_command = download_new_string(ssara_output)
+    succesful = run_ssara(down_command)
+    logger.log(loglevel.INFO, "DOWNLOADING SUCCESS: %s", str(succesful))
+    logger.log(loglevel.INFO, "------------------------------------")	
     # Sets date variables for stored and most recent dates
     #set_dates(ssara_output)
 
