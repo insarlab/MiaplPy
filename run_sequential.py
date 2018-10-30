@@ -37,7 +37,7 @@ error_handler = None
 def create_parser():
     """ Creates command line argument parser object. """
 
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, epilog=EXAMPLE)
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, epilog='')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
     parser.add_argument('custom_template_file', nargs='?',
         help='custom template with option settings.\n')
