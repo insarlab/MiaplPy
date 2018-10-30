@@ -9,6 +9,7 @@ from datetime import datetime
 import shutil
 import time
 import glob
+sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 import _process_utilities as putils
 import generate_templates as gt
 
