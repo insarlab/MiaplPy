@@ -9,7 +9,7 @@ from datetime import datetime
 import shutil
 import time
 import glob
-from _process_utilities import get_project_name, get_work_directory
+import _pysqsar_utilities as putils
 import generate_templates as gt
 
 import logging
@@ -103,8 +103,8 @@ if __name__ == "__main__":
     from datetime import datetime
     logger.info("RUN_Sequential for %s:\n", datetime.fromtimestamp(time.time()).strftime(date_format))
     command_line_parse(sys.argv[1:])
-    inps.project_name = get_project_name(custom_template_file=inps.custom_template_file)
-    inps.work_dir = get_work_directory(None, inps.project_name)
+    inps.project_name = putils.get_project_name(custom_template_file=inps.custom_template_file)
+    inps.work_dir = putils.get_work_directory(None, inps.project_name)
     
     # Generate SSARA Options to Use
     ssara_options = create_ssara_options(inps.custom_template_file)
