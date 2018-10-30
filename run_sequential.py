@@ -9,7 +9,7 @@ from datetime import datetime
 import shutil
 import time
 import glob
-import _pysqsar_utilities as putils
+import _process_utilities as putils
 import generate_templates as gt
 
 import logging
