@@ -9,7 +9,7 @@ from datetime import datetime
 import shutil
 import time
 import glob
-
+from _pysqsar_utilities import get_project_name, get_work_directory
 import generate_templates as gt
 
 import logging
@@ -78,16 +78,16 @@ def set_dates(ssara_output):
 	most_recent = datetime.strptime(most_recent_data.split(",")[3], date_format)
 
 	# Write Most Recent Date to File
-	with open(os.getenv('OPERATIONS')+'/stored_date.date', 'rb') as stored_date_file:
+	with open(inps.work_dir+'/stored_date.date', 'rb') as stored_date_file:
 	
 		try:
-			date_line = subprocess.check_output(['grep', dataset, os.getenv('OPERATIONS')+'/stored_date.date']).decode('utf-8')
+			date_line = subprocess.check_output(['grep', dataset, inps.work_dir+'/stored_date.date']).decode('utf-8')
 			stored_date = datetime.strptime(date_line.split(": ")[1].strip('\n'), date_format)
 		except subprocess.CalledProcessError as e:
 			
 			stored_date = datetime.strptime("1970-01-01T12:00:00.000000", date_format)
 			
-			with open(os.getenv('OPERATIONS')+'/stored_date.date', 'a+') as date_file:
+			with open(inps.work_dir+'/stored_date.date', 'a+') as date_file:
 				data = str(dataset + ": "+str(datetime.strftime(most_recent, date_format))+"\n")
 				date_file.write(data)
 
@@ -103,15 +103,17 @@ if __name__ == "__main__":
     from datetime import datetime
     logger.info("RUN_Sequential for %s:\n", datetime.fromtimestamp(time.time()).strftime(date_format))
     command_line_parse(sys.argv[1:])
+    inps.project_name = get_project_name(custom_template_file=inps.custom_template_file)
+    inps.work_dir = get_work_directory(None, inps.project_name)
     
     # Generate SSARA Options to Use
     ssara_options = create_ssara_options(inps.custom_template_file)
     
     # Run SSARA and check output	
-		ssara_output = subprocess.check_output(ssara_options).decode('utf-8');
-
+    ssara_output = subprocess.check_output(ssara_options).decode('utf-8');
+    print('ssara_output:',ssara_output)
     # Sets date variables for stored and most recent dates
-    set_dates(ssara_output)
+    #set_dates(ssara_output)
 
 
 
