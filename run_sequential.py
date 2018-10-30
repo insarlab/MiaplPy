@@ -93,6 +93,28 @@ def set_dates(ssara_output):
 				date_file.write(data)
 
 
+def compare_dates(ssara_output):
+	global stored_date, most_recent
+	
+	old_process_dir = inps.work_dir + '/old_process_dir'
+	if os.path.isdir(old_process_dir) and os.path.isfile(old_process_dir+'/processed_dates.dates'):
+		with open(old_process_dir+'/processed_dates.dates', 'r') as date_file:
+			stored_date = date_file.read()
+	else:
+		stored_date = ''
+		os.mkdir(old_process_dir)
+		
+	        
+        nstored = len(stored_date.split('\n'))
+	nnew = len(ssara_output.split('\n'))
+	if nnew-nstored == 10:
+		ssara_command = 
+		
+	with open(old_process_dir+'/processed_dates.dates', 'a+') as date_file:
+			date_file.write(ssara_output)
+	
+	
+				
 ###############################################################
 stored_date = None			  					            		# previously stored date
 most_recent = None								              		# date parsed from SSARA
