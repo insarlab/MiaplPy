@@ -285,7 +285,7 @@ def patch_slice(lin,sam,waz,wra):
     pr = [[pr1], [pr2]]
     pc = [[pc1], [pc2]]
     patchlist = []
-    for n1 in range(len(pr1):
+    for n1 in range(len(pr1)):
         lin1 = pr2[n1] - pr1[n1]
         for n2 in range(len(pc1)):
             sam1 = pc2[n2] - pc1[n2]
@@ -303,12 +303,12 @@ def comp_matr(x, y):
     return out
 
 
-def phase_link(df, pixelsdict=pixelsdict):          
+def phase_link(df, pixelsdict=dict):          
     nimage = pixelsdict['amp'].shape[0]
     s = df.shape
     for q in range(s[0]):
         mydf = df[q]
-        if mydf.scatterer = 'DS':
+        if mydf.scatterer == 'DS':
             rr = mydf.rows.astype(int)
             cc = mydf.cols.astype(int)
             refr = mydf.refp[0].astype(int)
