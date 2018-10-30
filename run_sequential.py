@@ -9,7 +9,7 @@ from datetime import datetime
 import shutil
 import time
 import glob
-from _pysqsar_utilities import get_project_name, get_work_directory
+from _process_utilities import get_project_name, get_work_directory
 import generate_templates as gt
 
 import logging
