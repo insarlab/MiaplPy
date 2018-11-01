@@ -112,7 +112,10 @@ if __name__ == "__main__":
     
     # Run SSARA and check output	
     ssara_output = subprocess.check_output(ssara_options).decode('utf-8');
-    print('ssara_output:',ssara_output)
+    filecsv_options = ssara_options+['|', 'awk', "'BEGIN{FS=\",\"; ORS=\",\"}{ print $14}'", '>', 'files_test.csv']
+    csv_command = ' '.join(filecsv_options)
+    subprocess.Popen(csv_command, shell=True).wait()
+    #print('ssara_output:',ssara_output.split('ASF')[1::])
     # Sets date variables for stored and most recent dates
     #set_dates(ssara_output)
 
