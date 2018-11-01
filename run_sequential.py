@@ -12,7 +12,7 @@ import glob
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 import _process_utilities as putils
 import generate_templates as gt
-
+import _processSteps as prs
 import logging
 
 #################### LOGGERS AND LOGGING SETUP ####################
@@ -71,33 +71,76 @@ def create_ssara_options(custom_template_file):
 		
 	return ssara_options
 
+				
+def compare_dates(old,new):
+	old_data = old.split('ASF'))[1::]
+	all_data = new.split('ASF'))[1::]
+	a = len(all_data) - len(old_data)
+	diffc = ''
+	output_list = [diffc+li for li in all_data[len(old_data)::]]
+	out_string = new.split('\nASF')[0] + '\n' + output_list
+	return out_string
+	 
 
-def set_dates(ssara_output):
+def download_new_string(ssara_output):
 	global stored_date, most_recent
 	
-	most_recent_data = ssara_output.split("\n")[-2]
-	most_recent = datetime.strptime(most_recent_data.split(",")[3], date_format)
-
-	# Write Most Recent Date to File
-	with open(inps.work_dir+'/stored_date.date', 'rb') as stored_date_file:
+	old_process_dir = inps.work_dir + '/old_process_dir'
+	if os.path.isdir(old_process_dir) and os.path.isfile(old_process_dir+'/downloaded_dates.dates'):
+		with open(old_process_dir+'/processed_dates.dates', 'r') as date_file:
+			stored_date = date_file.read()
+		nstored = len(stored_date.split('\n'))
+		nnew = len(ssara_output.split('\n'))
+		if nnew-nstored >= 10:
+			data_to_download = compare_dates(stored_date,ssara_output)		
+	else:
+		stored_date = ''
+		os.mkdir(old_process_dir)
+		data_to_download = ssara_output
+	        
+        	
+	with open(old_process_dir+'/downloaded_dates.dates', 'r+') as date_file:
+		date_file.write(ssara_output)
+	return data_to_download
 	
-		try:
-			date_line = subprocess.check_output(['grep', dataset, inps.work_dir+'/stored_date.date']).decode('utf-8')
-			stored_date = datetime.strptime(date_line.split(": ")[1].strip('\n'), date_format)
-		except subprocess.CalledProcessError as e:
+	
+def generate_files_csv(ssara_output):
+	""" Generates a csv file of the files to download serially.
+	
+		Uses the `awk` command to generate a csv file containing the data files to be download
+		serially. The output csv file is then sent through the `sed` command to remove the first five
+		empty values to eliminate errors in download_ASF_serial.py.
+	
+	"""
+	options = Template(inps.template).get_options()['ssaraopt']
+	options = options.split(' ')
+	
+	filecsv_options = ssara_output+['|', 'awk', "'BEGIN{FS=\",\"; ORS=\",\"}{ print $14}'", '>', 'files.csv']
+	csv_command = ' '.join(filecsv_options)
+	subprocess.Popen(csv_command, shell=True).wait()
+	sed_command = "sed 's/^.\{5\}//' files.csv > new_files.csv"
+	
+	subprocess.Popen(sed_command, shell=True).wait()
+	
 			
-			stored_date = datetime.strptime("1970-01-01T12:00:00.000000", date_format)
-			
-			with open(inps.work_dir+'/stored_date.date', 'a+') as date_file:
-				data = str(dataset + ": "+str(datetime.strftime(most_recent, date_format))+"\n")
-				date_file.write(data)
+def call_ssara(slcDir):
+        download_command = 'download_ASF_serial.py' + '-username' + password.asfuser + '-password' + password.asfpass + 'new_files.csv'
+        command = 'ssh pegasus.ccs.miami.edu \"s.cgood;cd ' + slcDir + '; ' + os.getenv('PARENTDIR') + '/sources/rsmas_isce/' + download_command + '\"'
+        messageRsmas.log(download_command)
+        messageRsmas.log(command)
+        status = subprocess.Popen(command, shell=True).wait()
+	logger.log(loglevel.INFO, status)
+	return status
+	
 
-
+def run_process():
+	
+	
 ###############################################################
-stored_date = None			  					            		# previously stored date
-most_recent = None								              		# date parsed from SSARA
-inps = None;				       						            	# command line arguments
-date_format = "%Y-%m-%dT%H:%M:%S.%f"								# date format for reading and writing dates
+stored_date = None			  			# previously stored date
+most_recent = None						# date parsed from SSARA
+inps = None;				       		        # command line arguments
+date_format = "%Y-%m-%dT%H:%M:%S.%f"				# date format for reading and writing dates
 
 
 if __name__ == "__main__":
@@ -112,12 +155,14 @@ if __name__ == "__main__":
     
     # Run SSARA and check output	
     ssara_output = subprocess.check_output(ssara_options).decode('utf-8');
-    filecsv_options = ssara_options+['|', 'awk', "'BEGIN{FS=\",\"; ORS=\",\"}{ print $14}'", '>', 'files_test.csv']
-    csv_command = ' '.join(filecsv_options)
-    subprocess.Popen(csv_command, shell=True).wait()
-    #print('ssara_output:',ssara_output.split('ASF')[1::])
+    down_command = download_new_string(ssara_output)
+    generate_files_csv(down_command)
+    succesful = call_ssara(inps.work_dir + '/SLC')
+    logger.log(loglevel.INFO, "DOWNLOADING SUCCESS: %s", str(succesful))
+    logger.log(loglevel.INFO, "------------------------------------")	
     # Sets date variables for stored and most recent dates
     #set_dates(ssara_output)
-
+    prs.step_runfiles(inps)
+    prs.step_process(inps)
 
 
