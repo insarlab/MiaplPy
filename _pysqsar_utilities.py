@@ -127,21 +127,6 @@ def EMI_phase_estimation(coh0):
             print('warning: coherence matric not positive semidifinite, It is switched from EMI to EVD')
             return EVD_phase_estimation(coh0)
             
-        
-
-def unwrap_phase(v):
-    out = np.zeros([len(v),1])
-    K=0
-    increments = np.zeros([len(v),1]);
-    for q in range(len(v)-1):
-        difference = (v[q+1] - v[q])
-        if difference > np.pi:
-            K = K - 2*np.pi
-        elif difference < -np.pi:
-            K = K + 2*np.pi
-        increments[q+1,0] = K
-    out[:,0] = v[:,0] + increments[:,0]
-    return out
 
 def CRLB_cov(gama, L):
     Btheta = np.zeros([len(gama),len(gama)-1])
