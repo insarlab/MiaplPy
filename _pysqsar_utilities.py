@@ -82,7 +82,7 @@ def gam_pta_f(g1, g2):
     gam = np.real(np.dot(np.exp(1j * g11[r, 0]), np.exp(-1j * g22[r, 0]))) * 2 / (n1 ** 2 - n1)
     return gam
 
-def optphase(x0):
+def optphase(x0, igam_c):
     n = len(x0)
     x = np.reshape(np.exp(1j*x0),[n,1])
     x[0,0] = 1+0j
@@ -92,7 +92,6 @@ def optphase(x0):
     return f
 
 def PTA_L_BFGS(xm): 
-    global igam_c
     n = len(xm)
     x0 = np.zeros([n,1])
     x0[:,0] = np.real(xm[:,0])
@@ -102,7 +101,7 @@ def PTA_L_BFGS(xm):
     coh = np.multiply(abscoh,np.exp(1j*np.angle(coh)))
     if np.size(abscoh) == np.size(coh):
         igam_c = np.matrix(np.multiply(LA.pinv(abscoh),coh))
-        res = minimize(optphase, x0, method='L-BFGS-B', tol=1e-6, options={'gtol': 1e-6, 'disp': False})
+        res = minimize(optphase, x0, args = igam_c, method='L-BFGS-B', tol=1e-6, options={'gtol': 1e-6, 'disp': False})
         return res.x
     else:
         print('warning: coherence matric not positive semidifinite, It is switched from PTA to EVD')
