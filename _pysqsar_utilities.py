@@ -104,7 +104,7 @@ def PTA_L_BFGS(xm):
         res = minimize(optphase, x0, args = igam_c, method='L-BFGS-B', tol=1e-6, options={'gtol': 1e-6, 'disp': False})
         return res.x
     else:
-        print('warning: coherence matric not positive semidifinite, It is switched from PTA to EVD')
+        print('warning: coherence matrix not positive semidifinite, It is switched from PTA to EVD')
         return EVD_phase_estimation(coh)
 
 
