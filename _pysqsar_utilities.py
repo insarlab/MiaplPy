@@ -84,25 +84,26 @@ def gam_pta_f(g1, g2):
 
 def optphase(x0, igam_c):
     n = len(x0)
-    x = np.reshape(np.exp(1j*x0),[n,1])
-    x[0,0] = 1+0j
+    x = np.ones([n+1,1])+0j
+    x[1::,0] = np.exp(1j*x0[:])#.reshape(n,1)
     x = np.matrix(x)
-    y = np.matmul(x.getH(), igam_c)
-    f = np.real(np.log(np.matmul(y, x)))
+    y = np.matmul(-x.getH(), igam_c)
+    f = np.abs(np.log(np.matmul(y, x)))
     return f
 
 def PTA_L_BFGS(xm): 
     n = len(xm)
-    x0 = np.zeros([n,1])
-    x0[:,0] = np.real(xm[:,0])
-    coh = np.zeros([n,n])+0j
+    x0 = np.zeros([n-1,1])
+    x0[:,0] = np.real(xm[1::,0])
+    coh = 1j*np.zeros([n,n])
     coh[:,:] = xm[:,1::]
     abscoh = regularize_matrix(np.abs(coh))
-    coh = np.multiply(abscoh,np.exp(1j*np.angle(coh)))
     if np.size(abscoh) == np.size(coh):
-        igam_c = np.matrix(np.multiply(LA.pinv(abscoh),coh))
-        res = minimize(optphase, x0, args = igam_c, method='L-BFGS-B', tol=1e-6, options={'gtol': 1e-6, 'disp': False})
-        return res.x
+        igam_c = np.matrix(np.multiply(LA.inv(abscoh),coh))
+        res = minimize(optphase, x0, args = igam_c, method='L-BFGS-B', tol=None, options={'gtol': 1e-6, 'disp': True})
+        out = np.zeros([n,1])
+        out[1::,0] = -res.x
+        return out
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from PTA to EVD')
         return EVD_phase_estimation(coh)
