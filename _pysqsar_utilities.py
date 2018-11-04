@@ -99,7 +99,7 @@ def PTA_L_BFGS(xm):
     coh[:,:] = xm[:,1::]
     abscoh = regularize_matrix(np.abs(coh))
     if np.size(abscoh) == np.size(coh):
-        igam_c = np.matrix(np.multiply(LA.inv(abscoh),coh))
+        igam_c = np.matrix(np.multiply(LA.pinv(abscoh),coh))
         res = minimize(optphase, x0, args = igam_c, method='L-BFGS-B', tol=None, options={'gtol': 1e-6, 'disp': True})
         out = np.zeros([n,1])
         out[1::,0] = -res.x
