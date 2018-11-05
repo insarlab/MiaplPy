@@ -307,7 +307,7 @@ def phase_link(df, pixelsdict=dict):
             phi = np.angle(cov_m)
             abs_cov = np.abs(cov_m)
             if is_semi_pos_def_chol(abs_cov):
-                coh = corr2cov(abs_cov)
+                coh = cov2corr(abs_cov)
                 gam_c = np.multiply(coh, np.exp(1j * phi))
                 try:
                     ph0 = EMI_phase_estimation(gam_c)
