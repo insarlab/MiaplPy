@@ -219,7 +219,6 @@ def shp_loc(df, pixelsdict=dict):
     s = df.shape
     for q in range(s[0]):
         mydf = df[q]
-        print('mydf:',mydf)
         r = mydf.rows.astype(int)
         c = mydf.cols.astype(int)
         x, y = np.meshgrid(r, c, sparse=True)
