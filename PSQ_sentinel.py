@@ -128,7 +128,7 @@ if __name__ == "__main__":
         time0 = time.time()
         shp_df = pd.read_pickle(inps.work_dir + '/shp.pkl')
         mydf = [shp_df.loc[y] for y in xl]
-        values = [delayed(shp_func)(x) for x in mydf]
+        values = [delayed(phaselink_func)(x) for x in mydf]
         results = compute(*values, scheduler='processes')
         timep = time.time() - time0
         logger.info('time spent to find SHPs in {}: {}'.format(inps.patchDir, timep))
