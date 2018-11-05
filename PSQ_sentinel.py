@@ -56,10 +56,10 @@ def corrcov(x):
 
 def gam_pta_f(g1, g2):
     n1 = g1.shape[0]
-    g11 = g1.reshape(n1 * n1, 1)
-    g22 = g2.reshape(n1 * n1, 1)
-    [r, c] = np.where(g11 != 0)
-    gam = np.real(np.dot(np.exp(1j * g11[r, 0]), np.exp(-1j * g22[r, 0]))) * 2 / (n1 ** 2 - n1)
+    [r, c] = np.where(g1 != 0)
+    g11 = g1[r,c].reshape(len(r))
+    g22 = g2[r,c].reshape(len(r))
+    gam = np.real(np.dot(np.exp(1j * g11), np.exp(-1j * g22))) * 2 / (n1 ** 2 - n1)
     return gam
 
 
