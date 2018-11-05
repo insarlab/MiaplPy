@@ -37,7 +37,7 @@ class Node():
         return self.name  
 
 def corr2cov(A = [],sigma = []):
-    D = np.diag(sigma)
+    D = np.diagflat(sigma)
     cov = D*A*D
     return cov
     
