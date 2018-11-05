@@ -116,11 +116,7 @@ if __name__ == "__main__":
     print('SHP created ...')
     
 #####################################################
-    RSLCamp_ref = np.zeros([nimage, lin, sam])
-    RSLCamp_ref[:,:,:] = RSLCamp[:,:,:]
-    RSLCphase_ref = np.zeros([nimage, lin, sam])
-    RSLCphase_ref[:,:,:] = RSLCphase[:,:,:]
-    pixelsdict = {'amp':RSLCamp,'ph':RSLCphase,'amp_ref':RSLCamp_ref,'ph_ref':RSLCphase_ref}
+    pixelsdict = {'amp':RSLCamp,'ph':RSLCphase}
     
     if os.path.isfile(inps.work_dir + '/Phase_ref.npy'):
         print(inps.patchDir+' is already done' )
@@ -133,15 +129,24 @@ if __name__ == "__main__":
         timep = time.time() - time0
         logger.info('time spent to find SHPs in {}: {}'.format(inps.patchDir, timep))
         
+    RSLCamp_ref = np.zeros([nimage, lin, sam])
+    RSLCamp_ref[:,:,:] = RSLCamp[:,:,:]
+    RSLCphase_ref = np.zeros([nimage, lin, sam])
+    RSLCphase_ref[:,:,:] = RSLCphase[:,:,:]
+    
+    for t in range(lin):
+      for q in range(sam):
+          try:
+              RSLCamp_ref[:,t:t+1,q:q+1] = results[t][q].ampref
+              RSLCphase_ref[:,t:t+1,q:q+1] = results[t][q].phref
+          except:
+              print('not DS')
+    
     np.save(inps.work_dir + '/endflag.npy', 'True')           
-    np.save(inps.work_dir + '/Amplitude_ref.npy', pixelsdict['amp_ref'])
-    np.save(inps.work_dir + '/Phase_ref.npy', pixelsdict['ph_ref'])
+    np.save(inps.work_dir + '/Amplitude_ref.npy', RSLCamp_ref)
+    np.save(inps.work_dir + '/Phase_ref.npy', RSLCphase_ref)
 
 #################################################
-
-
-if __name__ == '__main__':
-    main(sys.argv[:])
 
 
 
