@@ -9,6 +9,7 @@
 
 import os
 import numpy as np
+import cmath
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from numpy import linalg as LA
@@ -295,8 +296,8 @@ def phase_link(df, pixelsdict=dict):
         if mydf.scatterer == 'DS':
             rr = mydf.rows.astype(int)
             cc = mydf.cols.astype(int)
-            refr = mydf.refp[0].astype(int)
-            refc = mydf.refp[1].astype(int)
+            refr = mydf.refp[0]
+            refc = mydf.refp[1]
             dp = np.matrix(1.0 * np.arange(nimage * len(rr)).reshape((nimage, len(rr))))
             dp = np.exp(1j * dp)
             dpamp = pixelsdict['amp'][:, rr, cc]
@@ -334,10 +335,8 @@ def phase_link(df, pixelsdict=dict):
     vv = vv.astype(int)
     pixelsdict['amp_ref'][:, tt, vv] = pixelsdict['amp'][:, tt, vv]
     pixelsdict['ph_ref'][:, tt, vv] = pixelsdict['ph'][:, tt, vv]
-                    
-    np.save(pixelsdict['work_dir'] + '/Amplitude_ref.npy', pixelsdict['amp_ref'])
-    np.save(pixelsdict['work_dir'] + '/Phase_ref.npy', pixelsdict['ph_ref'])
-    return df   
+     
+    return None   
        
         
                     
