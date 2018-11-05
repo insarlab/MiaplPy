@@ -42,7 +42,7 @@ def corr2cov(A = [],sigma = []):
     return cov
     
 def cov2corr(x):                  
-    D = np.diag(1 / np.sqrt(np.diag(x)))
+    D = np.diagflat(1 / np.sqrt(np.diag(x)))
     y = np.matmul(D, x)
     corr = np.matmul(y, np.transpose(D))
     return corr
@@ -306,21 +306,20 @@ def phase_link(df, pixelsdict=dict):
             cov_m = np.matmul(dp, dp.getH()) / (len(rr))
             phi = np.angle(cov_m)
             abs_cov = np.abs(cov_m)
-            if is_semi_pos_def_chol(abs_cov):
-                coh = cov2corr(abs_cov)
-                gam_c = np.multiply(coh, np.exp(1j * phi))
-                try:
-                    ph0 = EMI_phase_estimation(gam_c)
-                    ph0 = ph0 - ph0[0]
-                    xm = np.zeros([len(ph0),len(ph0)+1])+0j
-                    xm[:,0:1] = np.reshape(ph0,[len(ph0),1])
-                    xm[:,1::] = cov_m[:,:]
-                    res_PTA = psq.PTA_L_BFGS(xm)
-                    ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
-                    xn = np.matrix(ph_PTA.reshape(nimage, 1))
-                except:
-                    xn = np.matrix(pixelsdict['ph'][:, refr, refc].reshape(nimage, 1))
-                    xn = xn - xn[0,0]
+            coh = cov2corr(abs_cov)
+            gam_c = np.multiply(coh, np.exp(1j * phi))
+            try:
+                ph0 = EMI_phase_estimation(gam_c)
+                ph0 = ph0 - ph0[0]
+                xm = np.zeros([len(ph0),len(ph0)+1])+0j
+                xm[:,0:1] = np.reshape(ph0,[len(ph0),1])
+                xm[:,1::] = cov_m[:,:]
+                res_PTA = psq.PTA_L_BFGS(xm)
+                ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
+                xn = np.matrix(ph_PTA.reshape(nimage, 1))
+            except:
+                xn = np.matrix(pixelsdict['ph'][:, refr, refc].reshape(nimage, 1))
+                xn = xn - xn[0,0]
             ampn = np.sqrt(np.abs(np.diag(cov_m))) 
             g1 = np.triu(phi)
             g2 = np.matmul(np.exp(1j * xn), (np.exp(1j * xn)).getH())
