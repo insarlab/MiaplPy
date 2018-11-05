@@ -310,36 +310,30 @@ def phase_link(df, pixelsdict=dict):
             gam_c = np.multiply(coh, np.exp(1j * phi))
             try:
                 ph0 = EMI_phase_estimation(gam_c)
-                ph0 = ph0 - ph0[0]
-                xm = np.zeros([len(ph0),len(ph0)+1])+0j
-                xm[:,0:1] = np.reshape(ph0,[len(ph0),1])
-                xm[:,1::] = cov_m[:,:]
-                res_PTA = psq.PTA_L_BFGS(xm)
-                ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
-                xn = np.matrix(ph_PTA.reshape(nimage, 1))
+                ##ph0 = ph0 - ph0[0]
+                #xm = np.zeros([len(ph0),len(ph0)+1])+0j
+                #xm[:,0:1] = np.reshape(ph0,[len(ph0),1])
+                #xm[:,1::] = cov_m[:,:]
+                #res_PTA = psq.PTA_L_BFGS(xm)
+                #ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
+                #xn = np.matrix(ph_PTA.reshape(nimage, 1))
+                xn = np.matrix(ph0.reshape(nimage, 1))
             except:
                 xn = np.matrix(pixelsdict['ph'][:, refr, refc].reshape(nimage, 1))
-                xn = xn - xn[0,0]
+                #xn = xn - xn[0,0]
             ampn = np.sqrt(np.abs(np.diag(cov_m))) 
             g1 = np.triu(phi)
             g2 = np.matmul(np.exp(1j * xn), (np.exp(1j * xn)).getH())
             g2 = np.triu(np.angle(g2), 1)
             gam_pta = gam_pta_f(g1, g2)
             if gam_pta > 0.5 and gam_pta <= 1:
-                pixelsdict['amp_ref'][:, refr:refr + 1, refc:refc + 1] = np.array(ampn).reshape(nimage, 1, 1)
-                pixelsdict['ph_ref'][:, refr:refr + 1, refc:refc + 1] = np.array(xn).reshape(nimage, 1, 1)
+                mydf.ampref = np.array(ampn).reshape(nimage, 1, 1)
+                mydf.phref = np.array(xn).reshape(nimage, 1, 1)
+            else:
+                mydf.ampref = pixelsdict['amp'][:, refr, refc].reshape(nimage, 1, 1)
+                mydf.phref = pixelsdict['ph'][:, refr, refc].reshape(nimage, 1, 1)
     
-    tt, vv = np.where(pixelsdict['amp_ref'][0, :, :] == 0)
-    tt = tt.astype(int)
-    vv = vv.astype(int)
-    pixelsdict['amp_ref'][:, tt, vv] = pixelsdict['amp'][:, tt, vv]
-    pixelsdict['ph_ref'][:, tt, vv] = pixelsdict['ph'][:, tt, vv]
-     
-    return None   
-       
-        
-                    
-                    
+    return df 
                     
                     
                     
