@@ -75,12 +75,13 @@ def regularize_matrix(M):
             t = t+1
     return 0
 
+
 def gam_pta_f(g1, g2):
     n1 = g1.shape[0]
-    g11 = g1.reshape(n1 * n1, 1)
-    g22 = g2.reshape(n1 * n1, 1)
-    [r, c] = np.where(g11 != 0)
-    gam = np.real(np.dot(np.exp(1j * g11[r, 0]), np.exp(-1j * g22[r, 0]))) * 2 / (n1 ** 2 - n1)
+    [r, c] = np.where(g1 != 0)
+    g11 = g1[r,c].reshape(len(r))
+    g22 = g2[r,c].reshape(len(r))
+    gam = np.real(np.dot(np.exp(1j * g11), np.exp(-1j * g22))) * 2 / (n1 ** 2 - n1)
     return gam
 
 def optphase(x0, igam_c):
@@ -309,35 +310,28 @@ def phase_link(df, pixelsdict=dict):
             coh = cov2corr(abs_cov)
             gam_c = np.multiply(coh, np.exp(1j * phi))
             try:
-                ph0 = EMI_phase_estimation(gam_c)
+                ph0 = EVD_phase_estimation(gam_c)
                 ##ph0 = ph0 - ph0[0]
-                #xm = np.zeros([len(ph0),len(ph0)+1])+0j
-                #xm[:,0:1] = np.reshape(ph0,[len(ph0),1])
-                #xm[:,1::] = cov_m[:,:]
-                #res_PTA = psq.PTA_L_BFGS(xm)
-                #ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
-                #xn = np.matrix(ph_PTA.reshape(nimage, 1))
+                xm = np.zeros([len(ph0),len(ph0)+1])+0j
+                xm[:,0:1] = np.reshape(ph0,[len(ph0),1])
+                xm[:,1::] = cov_m[:,:]
+                res_PTA = psq.PTA_L_BFGS(xm)
+                ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
+                xn = np.matrix(ph_PTA.reshape(nimage, 1))
                 xn = np.matrix(ph0.reshape(nimage, 1))
             except:
                 xn = np.matrix(pixelsdict['ph'][:, refr, refc].reshape(nimage, 1))
                 #xn = xn - xn[0,0]
             ampn = np.sqrt(np.abs(np.diag(cov_m))) 
-            g1 = np.triu(phi)
-            g2 = np.matmul(np.exp(1j * xn), (np.exp(1j * xn)).getH())
+            g1 = np.triu(phi,1)
+            g2 = np.matmul(np.exp(-1j * xn), (np.exp(-1j * xn)).getH())
             g2 = np.triu(np.angle(g2), 1)
             gam_pta = gam_pta_f(g1, g2)
-            if gam_pta > 0.5 and gam_pta <= 1:
+            if gam_pta > 0.4 and gam_pta <= 1:
                 mydf.ampref = np.array(ampn).reshape(nimage, 1, 1)
                 mydf.phref = np.array(xn).reshape(nimage, 1, 1)
             else:
                 mydf.ampref = pixelsdict['amp'][:, refr, refc].reshape(nimage, 1, 1)
                 mydf.phref = pixelsdict['ph'][:, refr, refc].reshape(nimage, 1, 1)
-    
     return df 
-                    
-                    
-                    
-                    
-                    
-                    
-                    
+
