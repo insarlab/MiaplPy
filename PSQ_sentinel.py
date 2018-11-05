@@ -107,7 +107,7 @@ if __name__ == "__main__":
     timep = time.time() - time0
     logger.info('time spent to find SHPs: {}'.format(timep))
     
-    for t in range(2):
+    for t in range(lin):
         for q in range(sam):
             shp_df.at[t,q] = results[t][q]
     del results
