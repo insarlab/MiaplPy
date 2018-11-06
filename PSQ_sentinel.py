@@ -69,6 +69,23 @@ def phaselink_func(data):
     return data
 
   
+def sequential_process(mydf,seq_df):
+    ns = seq_df.refp[0]*10
+    values = [delayed(phaselink_func)(x) for x in mydf]
+    results = compute(*values, scheduler='processes')
+    squeezed = np.zeros([lin,sam])+0j
+    for t in range(lin):
+        for q in range(sam):
+            try:
+                RSLCamp_ref[ns:ns+10,t:t+1,q:q+1] = results[t][q].ampref[seq_df.refp[0]::,1,1]
+                RSLCphase_ref[ns:ns+10,t:t+1,q:q+1] = results[t][q].phref[seq_df.refp[0]::,1,1]
+            except:
+                print('pixel({}, {}) is not DS'.format(t,q))
+            Z = np.multiply(pixelsdict['amp'][ns:ns+10,t,q],np.exp(1j*pixelsdict['ph'][ns:ns+10,t,q])).(10,1)
+            Pmap = np.exp(1j*results[t][q].phref[seq_df.refp[0]::,1,1]).reshape(10,1)
+            Pmap = np.matrix(Pmap/LA.norm(Pmap))
+            squeezed(t,q) = np.matmul(Pmap.getH(),Z)           
+    return squeezed  
 
   
 ###################################
@@ -121,24 +138,7 @@ if __name__ == "__main__":
     print('SHP created ...')
     
 #####################################################
-    def sequential_process(mydf,seq_df):
-        ns = seq_df.refp[0]*10
-        values = [delayed(phaselink_func)(x) for x in mydf]
-        results = compute(*values, scheduler='processes')
-        squeezed = np.zeros([lin,sam])+0j
-        for t in range(lin):
-            for q in range(sam):
-                try:
-                    RSLCamp_ref[ns:ns+10,t:t+1,q:q+1] = results[t][q].ampref[seq_df.refp[0]::,1,1]
-                    RSLCphase_ref[ns:ns+10,t:t+1,q:q+1] = results[t][q].phref[seq_df.refp[0]::,1,1]
-                except:
-                    print('not DS')
-                Z = np.multiply(pixelsdict['amp'][ns:ns+10,t,q],np.exp(1j*pixelsdict['ph'][ns:ns+10,t,q])).(10,1)
-                Pmap = np.exp(1j*results[t][q].phref[seq_df.refp[0]::,1,1]).reshape(10,1)
-                Pmap = np.matrix(Pmap/LA.norm(Pmap))
-                squeezed(t,q) = np.matmul(Pmap.getH(),Z)           
-        return squeezed
-  
+    
     RSLCamp_ref = np.zeros([nimage, lin, sam])
     RSLCamp_ref[:,:,:] = RSLCamp[:,:,:]
     RSLCphase_ref = np.zeros([nimage, lin, sam])
