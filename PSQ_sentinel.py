@@ -69,24 +69,7 @@ def phaselink_func(data):
     return data
 
   
-def sequential_process(mydf,seq_df):
-    ns = seq_df.refp[0]*10
-    values = [delayed(phaselink_func)(x) for x in mydf]
-    results = compute(*values, scheduler='processes')
-    squeezed = np.zeros([lin,sam])+0j
-    for t in range(lin):
-        for q in range(sam):
-            try:
-                RSLCamp_ref[ns:ns:10,t:t+1,q:q+1] = results[t][q].ampref[seq_df.refp[0]::,1,1]
-                RSLCphase_ref[ns:ns:10,t:t+1,q:q+1] = results[t][q].phref[seq_df.refp[0]::,1,1]
-            except:
-                print('not DS')
-            Z = np.multiply(pixelsdict['amp'][ns:ns:10,t,q],np.exp(1j*pixelsdict['ph'][ns:ns:10,t,q])).(10,1)
-            Pmap = np.exp(1j*results[t][q].phref[seq_df.refp[0]::,1,1]).reshape(10,1)
-            Pmap = np.matrix(Pmap/LA.norm(Pmap))
-            squeezed(t,q) = np.matmul(Pmap.getH(),Z)           
-    return squeezed
-  
+
   
 ###################################
 if __name__ == "__main__":
@@ -138,50 +121,74 @@ if __name__ == "__main__":
     print('SHP created ...')
     
 #####################################################
+    def sequential_process(mydf,seq_df):
+        ns = seq_df.refp[0]*10
+        values = [delayed(phaselink_func)(x) for x in mydf]
+        results = compute(*values, scheduler='processes')
+        squeezed = np.zeros([lin,sam])+0j
+        for t in range(lin):
+            for q in range(sam):
+                try:
+                    RSLCamp_ref[ns:ns+10,t:t+1,q:q+1] = results[t][q].ampref[seq_df.refp[0]::,1,1]
+                    RSLCphase_ref[ns:ns+10,t:t+1,q:q+1] = results[t][q].phref[seq_df.refp[0]::,1,1]
+                except:
+                    print('not DS')
+                Z = np.multiply(pixelsdict['amp'][ns:ns+10,t,q],np.exp(1j*pixelsdict['ph'][ns:ns+10,t,q])).(10,1)
+                Pmap = np.exp(1j*results[t][q].phref[seq_df.refp[0]::,1,1]).reshape(10,1)
+                Pmap = np.matrix(Pmap/LA.norm(Pmap))
+                squeezed(t,q) = np.matmul(Pmap.getH(),Z)           
+        return squeezed
+  
     RSLCamp_ref = np.zeros([nimage, lin, sam])
     RSLCamp_ref[:,:,:] = RSLCamp[:,:,:]
     RSLCphase_ref = np.zeros([nimage, lin, sam])
     RSLCphase_ref[:,:,:] = RSLCphase[:,:,:]
 
-    pixelsdict = {'amp':RSLCamp,'ph':RSLCphase}
     num_seq = np.floor(inps.nimage/10)
     sequential_df = pd.DataFrame(np.zeros(shape=[num_seq, 1]))
     psq.seqobj(sequential_df)
+    shp_df = pd.read_pickle(inps.work_dir + '/shp.pkl')
+    mydf = [shp_df.loc[y] for y in xl]
     
+    time0 = time.time()
     for t in range(num_seq):
         seq_df = sequential_df.at[t,0]
-        if t == 0:
-            
+        sl = t*10
+        if seq_df = num_seq:
+            el = inps.nimage
         else:
-          
-    
-    if os.path.isfile(inps.work_dir + '/Phase_ref.npy'):
-        print(inps.patchDir+' is already done' )
-    else:
-        time0 = time.time()
-        shp_df = pd.read_pickle(inps.work_dir + '/shp.pkl')
-        mydf = [shp_df.loc[y] for y in xl]
-        values = [delayed(phaselink_func)(x) for x in mydf]
-        results = compute(*values, scheduler='processes')
-        timep = time.time() - time0
-        logger.info('time spent to find SHPs in {}: {}'.format(inps.patchDir, timep))
-        
-    RSLCamp_ref = np.zeros([nimage, lin, sam])
-    RSLCamp_ref[:,:,:] = RSLCamp[:,:,:]
-    RSLCphase_ref = np.zeros([nimage, lin, sam])
-    RSLCphase_ref[:,:,:] = RSLCphase[:,:,:]
-    
-    for t in range(lin):
-      for q in range(sam):
-          try:
-              RSLCamp_ref[:,t:t+1,q:q+1] = results[t][q].ampref
-              RSLCphase_ref[:,t:t+1,q:q+1] = results[t][q].phref
-          except:
-              print('not DS')
+            el = sl+10
+        if t == 0:
+            AMP = RSLCamp[sl:el,:,:]
+            PHAS = RSLCphase[sl:el,:,:]
+            pixelsdict = {'amp':AMP,'ph':PHAS}
+            squeezed_image = sequential_process(mydf,seq_df)
+            sequential_df.at[t,0].squeezed = squeezed_image
+        else:
+            AMP = np.zeros([t+10,lin,sam])
+            AMP[0:t,:,:] = np.abs(sequential_df.at[t-1,0].squeezed)
+            AMP[t::,:,:] = RSLCamp[sl:el,:,:]
+            PHAS = np.zeros([t+10,lin,sam])
+            PHAS[0:t,:,:] = np.angle(sequential_df.at[t-1,0].squeezed)
+            PHAS[t::,:,:] = RSLCphase[sl:el,:,:]
+            pixelsdict = {'amp':AMP,'ph':PHAS}
+            squeezed_image = np.dstack(sequential_df.at[t-1,0].squeezed.T,sequential_process(mydf,seq_df).T).T
+            sequential_df.at[t,0].squeezed = squeezed_image
+            
+    timep = time.time() - time0
+    logger.info('time spent to find SHPs in {}: {}'.format(inps.patchDir, timep))      
     
     np.save(inps.work_dir + '/endflag.npy', 'True')           
     np.save(inps.work_dir + '/Amplitude_ref.npy', RSLCamp_ref)
     np.save(inps.work_dir + '/Phase_ref.npy', RSLCphase_ref)
+    sequential_df.to_pickle(inps.work_dir + '/sequential_df.pkl')
+    
+    #if os.path.isfile(inps.work_dir + '/Phase_ref.npy'):
+    #    print(inps.patchDir+' is already done' )
+    #else:
+        
+    
+    
 
 #################################################
 
