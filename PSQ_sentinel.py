@@ -14,6 +14,7 @@ from pysar.utils import utils
 from pysar.utils import readfile
 import subprocess
 import cmath
+from numpy import linalg as LA
 from scipy import linalg
 import numpy as np
 from numpy.linalg import pinv
@@ -67,9 +68,31 @@ def phaselink_func(data):
     data = psq.phase_link(data, pixelsdict=pixelsdict)
     return data
 
+  
+def sequential_process(mydf,seq_df):
+    ns = seq_df.refp[0]*10
+    values = [delayed(phaselink_func)(x) for x in mydf]
+    results = compute(*values, scheduler='processes')
+    squeezed = np.zeros([lin,sam])+0j
+    for t in range(lin):
+        for q in range(sam):
+            try:
+                RSLCamp_ref[ns:ns:10,t:t+1,q:q+1] = results[t][q].ampref[seq_df.refp[0]::,1,1]
+                RSLCphase_ref[ns:ns:10,t:t+1,q:q+1] = results[t][q].phref[seq_df.refp[0]::,1,1]
+            except:
+                print('not DS')
+            Z = np.multiply(pixelsdict['amp'][ns:ns:10,t,q],np.exp(1j*pixelsdict['ph'][ns:ns:10,t,q])).(10,1)
+            Pmap = np.exp(1j*results[t][q].phref[seq_df.refp[0]::,1,1]).reshape(10,1)
+            Pmap = np.matrix(Pmap/LA.norm(Pmap))
+            squeezed(t,q) = np.matmul(Pmap.getH(),Z)           
+    return squeezed
+  
+  
 ###################################
 if __name__ == "__main__":
-                                            
+    
+    global pixelsdict, RSLCamp_ref, RSLCamp_ref
+    
     command_line_parse(sys.argv[1:])
     inps.project_name = putils.get_project_name(custom_template_file=inps.custom_template_file)
     inps.work_dir = putils.get_work_directory(None, inps.project_name)
@@ -92,7 +115,6 @@ if __name__ == "__main__":
     
 ###################
 
-    global pixelsdict
     pixelsdict = {'amp':RSLCamp}
 
     shp_df = pd.DataFrame(np.zeros(shape=[inps.lin, inps.sam]))    
@@ -116,7 +138,22 @@ if __name__ == "__main__":
     print('SHP created ...')
     
 #####################################################
+    RSLCamp_ref = np.zeros([nimage, lin, sam])
+    RSLCamp_ref[:,:,:] = RSLCamp[:,:,:]
+    RSLCphase_ref = np.zeros([nimage, lin, sam])
+    RSLCphase_ref[:,:,:] = RSLCphase[:,:,:]
+
     pixelsdict = {'amp':RSLCamp,'ph':RSLCphase}
+    num_seq = np.floor(inps.nimage/10)
+    sequential_df = pd.DataFrame(np.zeros(shape=[num_seq, 1]))
+    psq.seqobj(sequential_df)
+    
+    for t in range(num_seq):
+        seq_df = sequential_df.at[t,0]
+        if t == 0:
+            
+        else:
+          
     
     if os.path.isfile(inps.work_dir + '/Phase_ref.npy'):
         print(inps.patchDir+' is already done' )
