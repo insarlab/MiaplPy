@@ -115,6 +115,7 @@ def EVD_phase_estimation(coh0):
     w,v = LA.eig(coh0)
     f = np.where(w == np.sort(w)[len(coh0)-1])
     x0 = np.reshape(-np.angle(v[:,f]),[len(coh0),1])
+    x0 = x0 - x0[0,0]
     return x0
 
 
@@ -125,7 +126,9 @@ def EMI_phase_estimation(coh0):
             w,v = LA.eig(M)
             f = np.where(w == np.sort(w)[0])
             x0 = np.reshape((v[:,f]),[len(v),1])
-            return -np.angle(x0)
+            out = -np.angle(x0)
+            out = out - out[0,0]
+            return out
         else:
             print('warning: coherence matric not positive semidifinite, It is switched from EMI to EVD')
             return EVD_phase_estimation(coh0)
@@ -155,8 +158,6 @@ def simulate_corr(Ip, days_mat,gam0=0.6,gamf=0.2,decorr_days=50):
     return corr_mat
     
 def est_corr(CCGsam):
-    #corr_mat = np.matmul(np.conj(CCGsam),CCGsam.T)\
-    #/np.sqrt(np.matmul(L2norm_rowwis(CCGsam)**2,(L2norm_rowwis(CCGsam)**2).T))
     CCGS = np.matrix(CCGsam)
     corr_mat = np.matmul(CCGS,CCGS.getH())/CCGS.shape[1]
     f = np.angle(corr_mat)
@@ -318,7 +319,6 @@ def phase_link(df, pixelsdict=dict):
             gam_c = np.multiply(coh, np.exp(1j * phi))
             try:
                 ph0 = EVD_phase_estimation(gam_c)
-                ##ph0 = ph0 - ph0[0]
                 xm = np.zeros([len(ph0),len(ph0)+1])+0j
                 xm[:,0:1] = np.reshape(ph0,[len(ph0),1])
                 xm[:,1::] = cov_m[:,:]
@@ -328,7 +328,7 @@ def phase_link(df, pixelsdict=dict):
                 xn = np.matrix(ph0.reshape(nimage, 1))
             except:
                 xn = np.matrix(pixelsdict['ph'][:, refr, refc].reshape(nimage, 1))
-                #xn = xn - xn[0,0]
+                xn = xn - xn[0,0]
             ampn = np.sqrt(np.abs(np.diag(cov_m))) 
             g1 = np.triu(phi,1)
             g2 = np.matmul(np.exp(-1j * xn), (np.exp(-1j * xn)).getH())
@@ -339,6 +339,8 @@ def phase_link(df, pixelsdict=dict):
                 mydf.phref = np.array(xn).reshape(nimage, 1, 1)
             else:
                 mydf.ampref = pixelsdict['amp'][:, refr, refc].reshape(nimage, 1, 1)
-                mydf.phref = pixelsdict['ph'][:, refr, refc].reshape(nimage, 1, 1)
+                xn = np.matrix(pixelsdict['ph'][:, refr, refc].reshape(nimage, 1))
+                xn = xn - xn[0,0]
+                mydf.phref = np.array(xn).reshape(nimage, 1, 1)
     return df 
 
