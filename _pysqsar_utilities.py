@@ -196,6 +196,13 @@ def shpobj(df):
             df.at[i,j] = Node(i,j)
     return df
 
+def seqobj(df):
+    n = df.shape
+    for i in range(n[0]):
+        for j in range(n[1]):
+            df.at[i,j] = Node(i,j)
+    return df
+
 def win_loc(mydf, wra=21, waz=15, nimage=54, lin=330, sam=342):
     r0 = mydf.refp[0]
     c0 = mydf.refp[1]
