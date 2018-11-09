@@ -148,7 +148,7 @@ if __name__ == "__main__":
 
     num_seq = np.floor(inps.nimage / 10)
     sequential_df = pd.DataFrame(np.zeros(shape=[num_seq, 1]))
-    psq.seqobj(sequential_df)
+    psq.shpobj(sequential_df)
     shp_df = pd.read_pickle(inps.work_dir + '/shp.pkl')
     mydf = [shp_df.loc[y] for y in xl]
 
