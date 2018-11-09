@@ -301,20 +301,9 @@ def shpobj(df):
 ###############################################################################
 
 
-def seqobj(df):
-    """ create an object for each pixel in a dataframe."""
-    
-    n = df.shape
-    for i in range(n[0]):
-        for j in range(n[1]):
-            df.at[i,j] = Node(i,j)
-            
-    return df
-
-###############################################################################
-
-
 def win_loc(mydf, wra=21, waz=15, nimage=54, lin=330, sam=342):
+    """ Extract the pixels in multilook window based on image dimensions and pixel location."""
+    
     r0 = mydf.refp[0]
     c0 = mydf.refp[1]
     r = np.ogrid[r0 - ((waz - 1) / 2):r0 + ((waz - 1) / 2) + 1]
@@ -330,12 +319,15 @@ def win_loc(mydf, wra=21, waz=15, nimage=54, lin=330, sam=342):
     mydf.refp0 = [refr,refc]
     mydf.rows = r
     mydf.cols = c
+    
     return mydf
     
 ###############################################################################
 
 
 def shp_loc(df, pixelsdict=dict):
+    """ Find statistical homogeneous pixels in a window based on Anderson Darling similarity test."""
+    
     amp = pixelsdict['amp']
     nimage = amp.shape[0]
     s = df.shape
@@ -375,12 +367,15 @@ def shp_loc(df, pixelsdict=dict):
             mydf.scatterer = 'DS'
         else:
             mydf.scatterer = 'PS'
+            
     return df  
 
 ###############################################################################
 
 
 def patch_slice(lin,sam,waz,wra):
+    """ Devides an image into patches of size 300 by 300 by considering the overlay of the size of multilook window."""
+    
     pr1 = np.ogrid[0:lin-50:300]
     pr2 = pr1+300
     pr2[-1] = lin
@@ -398,24 +393,30 @@ def patch_slice(lin,sam,waz,wra):
         for n2 in range(len(pc1)):
             sam1 = pc2[n2] - pc1[n2]
             patchlist.append(str(n1) + '_' + str(n2))
+            
     return pr,pc,patchlist
 
 ###############################################################################
 
 
 def comp_matr(x, y):
+    """ Returns a complex matrix given the amplitude and phase."""
+    
     a1 = np.size(x, axis=0)
     a2 = np.size(x, axis=1)
     out = np.empty((a1, a2), dtype=complex)
     for a in range(a1):
         for b in range(a2):
             out[a, b] = cmath.rect(x[a, b], y[a, b])
+            
     return out
 
 ###############################################################################
 
 
-def phase_link(df, pixelsdict=dict):          
+def phase_link(df, pixelsdict=dict): 
+    """ Runs the phase linking algorithm over each DS.""" 
+    
     nimage = pixelsdict['amp'].shape[0]
     s = df.shape
     for q in range(s[0]):
