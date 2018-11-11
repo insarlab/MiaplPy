@@ -5,16 +5,19 @@
 #######################
 
 import os, imp, sys, glob, fnmatch
-pathh = os.environ['PARENTDIR']+'/sources/sentinelStack'
-sys.path.append(pathh)
 import argparse
 import configparser
 import  datetime
+import time
 import numpy as np
 import isce
 import isceobj
 from isceobj.Sensor.TOPS.Sentinel1 import Sentinel1
+sys.path.insert(0, os.getenv('SENTINEL_STACK'))
 from Stack import config, run, sentinelSLC
+from itertools import chain
+import re
+
 
 helpstr= '''
 
@@ -61,6 +64,9 @@ def createParser():
 
     parser.add_argument('-H', '--hh', nargs=0, action=customArgparseAction,
                         help='Display detailed help information.')
+
+    parser.add_argument('-P', '--processingmethod', dest='ProcessingMethod', type=str, default='sbas'
+                        , help='The InSAR processing method : (sbas, squeesar, ps)')
 
     parser.add_argument('-s', '--slc_directory', dest='slc_dirname', type=str, required=True,
                         help='Directory with all Sentinel SLCs')
@@ -607,7 +613,7 @@ def squeesarStack(inps, acquisitionDates, stackMasterDate, slaveDates, safe_dict
         i+=1
         runObj = run()
         runObj.configure(inps, 'run_' + str(i) + "_generate_igram")
-        runObj.burstIgram_mergeBurst(acquisitionDates, safe_dict, pairs)
+        runObj.burstIgram_mergeBurst(acquisitionDates, safe_dict, pairs, inps) ###SSS 7/2018: clean-up fine*int, if specified.
         runObj.finalize()
     
         i+=1
@@ -755,12 +761,13 @@ def editconfigsq(inps):
     prn = pn[0].split('/')
     prjn = prn[-1]
     rundir = slcdir.split('SLC')[0]+'run_files'
-    rname = rundir+'/run_10_crop_merged_slc'
+    rname = glob.glob(rundir+'/run_*_crop_merged_slc')[0]
+    print(rname)
     with open(rname,'w+') as z:
         line = 'crop_sentinel.py '+' $TE/'+prjn+'.template \n'
         z.write(line)
     z.close()
-    rname = rundir+'/run_11_phase_linking'
+    rname = glob.glob(rundir+'/run_*_phase_linking')[0]
     with open(rname,'w+') as z:
         line = 'sentinel_squeesar.py '+' $TE/'+prjn+'.template \n'
         z.write(line)
@@ -850,7 +857,8 @@ def main(iargs=None):
         print('')
         sys.exit(1)
 
-    acquisitionDates, stackMasterDate, slaveDates, safe_dict, updateStack = checkCurrentStatus(inps)
+    acquisitionDates, stackMasterDate, slaveDates, safe_dict, updateStack, allSLCs = checkCurrentStatus(
+        inps)  ###SSS 8/2018: later update for custom list of pairs
 
     if updateStack:
         print('')
