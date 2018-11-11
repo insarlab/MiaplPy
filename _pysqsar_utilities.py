@@ -7,27 +7,28 @@
 #
 ###############################################################################
 
-import os
 import numpy as np
 import cmath
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from numpy import linalg as LA
 from scipy.optimize import minimize
 from scipy.stats import anderson_ksamp
 from skimage.measure import label
-import time
-from dask import compute, delayed
-import dask.multiprocessing
+
 
 def readim(slcname):
+    """ Reads images from isce. """
+    
     ds = gdal.Open(slcname + '.vrt', gdal.GA_ReadOnly)
     Im = ds.GetRasterBand(1).ReadAsArray()
     ds = None
+    
     return Im
+
+###############################################################################
 
 
 class Node():
+    """ Creates an object for each pixel. """
     #cols = 3, rows = 4, nodes = [[Node(i,j) for j in range(cols)] for i in range(rows)]
       def __init__(self, i,j):
         self.name = "%s_%s" % (str(i),str(j))
@@ -36,31 +37,57 @@ class Node():
       def __repr__(self):
         return self.name  
 
+###############################################################################
+    
+    
 def corr2cov(A = [],sigma = []):
+    """ Converts correlation matrix to covariance matrix if std of variables are known. """
+    
     D = np.diagflat(sigma)
     cov = D*A*D
-    return cov
     
-def cov2corr(x):                  
+    return cov
+
+###############################################################################
+    
+    
+def cov2corr(x):  
+    """ Converts covariance matrix to correlation/coherence matrix. """
+    
     D = np.diagflat(1 / np.sqrt(np.diag(x)))
     y = np.matmul(D, x)
     corr = np.matmul(y, np.transpose(D))
+    
     return corr
 
+###############################################################################
+
+
 def is_semi_pos_def_chol(x):
+    """ Checks the positive semi definitness of a matrix. """
+    
     try:
         np.linalg.cholesky(x)
         return True
     except np.linalg.linalg.LinAlgError:
+        
         return False
     
+###############################################################################    
+
 
 def L2norm_rowwis(M):
+    """ Returns L2 norm of a matrix rowwise. """
+    
     s = np.shape(M)
     return (LA.norm(M, axis=1)).reshape(s[0],1)
 
+###############################################################################
+
 
 def regularize_matrix(M):
+    """ Regularizes a matrix to make it positive semi definite. """ 
+    
     sh = np.shape(M)
     N = np.zeros([sh[0], sh[1]])
     N[:,:] = M[:,:]
@@ -73,27 +100,44 @@ def regularize_matrix(M):
             N[:,:] = N[:,:] + en*np.identity(len(N))
             en = 2*en
             t = t+1
+            
     return 0
+
+###############################################################################
 
 
 def gam_pta_f(g1, g2):
+    """ Returns squeesar PTA coherence between the initial and estimated phase vectors. """
+    
     n1 = g1.shape[0]
     [r, c] = np.where(g1 != 0)
     g11 = g1[r,c].reshape(len(r))
     g22 = g2[r,c].reshape(len(r))
     gam = np.real(np.dot(np.exp(1j * g11), np.exp(-1j * g22))) * 2 / (n1 ** 2 - n1)
+    
     return gam
 
+###############################################################################
+
+
 def optphase(x0, igam_c):
+    """ Returns the PTA maximum likelihood function value. """ 
+    
     n = len(x0)
     x = np.ones([n+1,1])+0j
     x[1::,0] = np.exp(1j*x0[:])#.reshape(n,1)
     x = np.matrix(x)
     y = np.matmul(-x.getH(), igam_c)
     f = np.abs(np.log(np.matmul(y, x)))
+    
     return f
 
+###############################################################################
+
+
 def PTA_L_BFGS(xm): 
+    """ Uses L-BFGS method to optimize PTA function and estimate phase values. """ 
+    
     n = len(xm)
     x0 = np.zeros([n-1,1])
     x0[:,0] = np.real(xm[1::,0])
@@ -110,16 +154,25 @@ def PTA_L_BFGS(xm):
         print('warning: coherence matrix not positive semidifinite, It is switched from PTA to EVD')
         return EVD_phase_estimation(coh)
 
+###############################################################################
+
 
 def EVD_phase_estimation(coh0):
+    """ Estimates the phase values based on eigen value decomosition """
+    
     w,v = LA.eig(coh0)
     f = np.where(w == np.sort(w)[len(coh0)-1])
     x0 = np.reshape(-np.angle(v[:,f]),[len(coh0),1])
     x0 = x0 - x0[0,0]
+    
     return x0
+
+###############################################################################
 
 
 def EMI_phase_estimation(coh0):
+    """ Estimates the phase values based on EMI decomosition (Homa Ansari paper) """
+    
         abscoh = regularize_matrix(np.abs(coh0))
         if np.size(abscoh) == np.size(coh0):
             M = np.multiply(LA.pinv(abscoh),coh0)
@@ -133,78 +186,124 @@ def EMI_phase_estimation(coh0):
             print('warning: coherence matric not positive semidifinite, It is switched from EMI to EVD')
             return EVD_phase_estimation(coh0)
             
+###############################################################################
+
 
 def CRLB_cov(gama, L):
+    """ Estimates the Cramer Rao Lowe Bound based on coherence=gam and ensemble size = L """
+    
     Btheta = np.zeros([len(gama),len(gama)-1])
     Btheta[1::,:] = np.identity(len(gama)-1)
     X = 2*L*(np.multiply(np.abs(gama),LA.pinv(np.abs(gama)))-np.identity(len(gama)))
     cov_out = LA.pinv(np.matmul(np.matmul(Btheta.T,(X+np.identity(len(X)))),Btheta))
+    
     return cov_out
 
-    
+###############################################################################
+
+
 def daysmat(n_img,tmp_bl):
+    """ Builds a temporal baseline matrix """
+    
     ddays = np.matrix(np.exp(1j*np.arange(n_img)*tmp_bl/10000))
     days_mat = np.round((np.angle(np.matmul(ddays.getH(),ddays)))*10000)
+    
     return days_mat
 
+###############################################################################
+
+
 def simulate_phase(n_img=100,tmp_bl=6,deformation_rate=1,lamda=56):
+    """ Simulate Interferogram with constant velocity deformation rate """
+    
     days_mat = daysmat(n_img,tmp_bl)
     Ip = days_mat*4*np.pi*deformation_rate/(lamda*365)
     np.fill_diagonal(Ip, 0)
+    
     return Ip, days_mat
 
+###############################################################################
+
+
 def simulate_corr(Ip, days_mat,gam0=0.6,gamf=0.2,decorr_days=50):
+    """ Simulate Correlation matrix."""
+    
     corr_mat = np.multiply((gam0-gamf)*np.exp(-np.abs(days_mat/decorr_days))+gamf,np.exp(1j*Ip))
     return corr_mat
-    
+
+###############################################################################
+
+
 def est_corr(CCGsam):
+     """ Estimate Correlation matrix from an ensemble."""
+        
     CCGS = np.matrix(CCGsam)
     corr_mat = np.matmul(CCGS,CCGS.getH())/CCGS.shape[1]
     f = np.angle(corr_mat)
     corr_mat = np.multiply(np.abs(corr_mat),np.exp(-1j*f))
+    
     return corr_mat
     
+###############################################################################
+
 
 def custom_cmap(vmin=0,vmax=1):
+    """ create a custom colormap based on visible portion of electromagnetive wave."""
+    
     from spectrumRGB import rgb
     ww=np.arange(380.,781.)
     rgb=rgb()
     import matplotlib as mpl
     cmap = mpl.colors.ListedColormap(rgb)
     norm = mpl.colors.Normalize(vmin, vmax)
+    
     return cmap, norm
    
+###############################################################################
+
 
 def EST_rms(x):
+    """ Estimate Root mean square error."""
+    
     z = np.matrix(np.reshape(x,[len(x),1]))
     out = (np.matmul(z,z.getH()))/len(x)
+    
     return out
           
-    
+###############################################################################
+
+
 def trwin(x):
+    """ Transpose each layer of a 3 dimentional array."""
+    
     n1 = np.size(x, axis=0)
     n2 = np.size(x, axis=1)
     n3 = np.size(x, axis=2)
     x1 = np.zeros((n1, n3, n2))
     for t in range(n1):
         x1[t, :, :] = x[t, :, :].transpose()
+        
     return x1
 
+###############################################################################
+
+
 def shpobj(df):
+    """ create an object for each pixel in a dataframe."""
+    
     n = df.shape
     for i in range(n[0]):
         for j in range(n[1]):
             df.at[i,j] = Node(i,j)
+            
     return df
 
-def seqobj(df):
-    n = df.shape
-    for i in range(n[0]):
-        for j in range(n[1]):
-            df.at[i,j] = Node(i,j)
-    return df
+###############################################################################
+
 
 def win_loc(mydf, wra=21, waz=15, nimage=54, lin=330, sam=342):
+    """ Extract the pixels in multilook window based on image dimensions and pixel location."""
+    
     r0 = mydf.refp[0]
     c0 = mydf.refp[1]
     r = np.ogrid[r0 - ((waz - 1) / 2):r0 + ((waz - 1) / 2) + 1]
@@ -220,10 +319,15 @@ def win_loc(mydf, wra=21, waz=15, nimage=54, lin=330, sam=342):
     mydf.refp0 = [refr,refc]
     mydf.rows = r
     mydf.cols = c
+    
     return mydf
     
-    
+###############################################################################
+
+
 def shp_loc(df, pixelsdict=dict):
+    """ Find statistical homogeneous pixels in a window based on Anderson Darling similarity test."""
+    
     amp = pixelsdict['amp']
     nimage = amp.shape[0]
     s = df.shape
@@ -263,10 +367,15 @@ def shp_loc(df, pixelsdict=dict):
             mydf.scatterer = 'DS'
         else:
             mydf.scatterer = 'PS'
+            
     return df  
+
+###############################################################################
 
 
 def patch_slice(lin,sam,waz,wra):
+    """ Devides an image into patches of size 300 by 300 by considering the overlay of the size of multilook window."""
+    
     pr1 = np.ogrid[0:lin-50:300]
     pr2 = pr1+300
     pr2[-1] = lin
@@ -284,20 +393,30 @@ def patch_slice(lin,sam,waz,wra):
         for n2 in range(len(pc1)):
             sam1 = pc2[n2] - pc1[n2]
             patchlist.append(str(n1) + '_' + str(n2))
+            
     return pr,pc,patchlist
 
-                    
+###############################################################################
+
+
 def comp_matr(x, y):
+    """ Returns a complex matrix given the amplitude and phase."""
+    
     a1 = np.size(x, axis=0)
     a2 = np.size(x, axis=1)
     out = np.empty((a1, a2), dtype=complex)
     for a in range(a1):
         for b in range(a2):
             out[a, b] = cmath.rect(x[a, b], y[a, b])
+            
     return out
 
+###############################################################################
 
-def phase_link(df, pixelsdict=dict):          
+
+def phase_link(df, pixelsdict=dict): 
+    """ Runs the phase linking algorithm over each DS.""" 
+    
     nimage = pixelsdict['amp'].shape[0]
     s = df.shape
     for q in range(s[0]):

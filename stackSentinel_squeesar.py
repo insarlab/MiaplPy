@@ -174,6 +174,9 @@ def createParser():
 
     parser.add_argument('-force', '--force', action='store_true', dest='force'
                         , help='Force new acquisition override')
+    
+    parser.add_argument('-P', '--processingmethod', dest='ProcessingMethod', type=str, default='sbas'
+        , help='The InSAR processing method : (sbas, squeesar, ps)')
 
     return parser
 
