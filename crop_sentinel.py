@@ -69,29 +69,62 @@ def readim(slcname, frow, lrow, fcol, lcol):
     return out
 
 
-def multilook(infile, outname=None, alks=5, rlks=15):
+def multilook(infile, outname=None, alks=5, rlks=15, multilook_tool="isce", no_data=None):
     '''
     Take looks.
     '''
+    
+    if multilook_tool=="gdal":
 
-    from mroipac.looks.Looks import Looks
+        from osgeo import gdal
 
-    print('Multilooking {0} ...'.format(infile))
+        print("multi looking using gdal ...")
+        if outname is None:
+            spl = os.path.splitext(infile)
+            ext = '.{0}alks_{1}rlks'.format(alks, rlks)
+            outname = spl[0] + ext + spl[1]
 
-    inimg = isceobj.createImage()
-    inimg.load(infile + '.xml')
+        print(infile)
+        ds = gdal.Open(infile + ".vrt", gdal.GA_ReadOnly)
 
-    if outname is None:
-        spl = os.path.splitext(inimg.filename)
-        ext = '.{0}alks_{1}rlks'.format(alks, rlks)
-        outname = spl[0] + ext + spl[1]
+        xSize = ds.RasterXSize
+        ySize = ds.RasterYSize
 
-    lkObj = Looks()
-    lkObj.setDownLooks(alks)
-    lkObj.setAcrossLooks(rlks)
-    lkObj.setInputImage(inimg)
-    lkObj.setOutputFilename(outname)
-    lkObj.looks()
+        outXSize = xSize/int(rlks)
+        outYSize = ySize/int(alks)
+        
+        if no_data:
+            gdalTranslateOpts = gdal.TranslateOptions(format="ENVI", width=outXSize, height=outYSize, noData=no_data)
+        else:
+            gdalTranslateOpts = gdal.TranslateOptions(format="ENVI", width=outXSize, height=outYSize)
+
+        gdal.Translate(outname, ds, options=gdalTranslateOpts)
+        ds = None
+
+
+        ds = gdal.Open(outname, gdal.GA_ReadOnly)
+        gdal.Translate(outname+".vrt", ds, options=gdal.TranslateOptions(format="VRT"))
+        ds = None
+        
+    else:
+        from mroipac.looks.Looks import Looks
+
+        print('Multilooking {0} ...'.format(infile))
+
+        inimg = isceobj.createImage()
+        inimg.load(infile + '.xml')
+
+        if outname is None:
+            spl = os.path.splitext(inimg.filename)
+            ext = '.{0}alks_{1}rlks'.format(alks, rlks)
+            outname = spl[0] + ext + spl[1]
+
+        lkObj = Looks()
+        lkObj.setDownLooks(alks)
+        lkObj.setAcrossLooks(rlks)
+        lkObj.setInputImage(inimg)
+        lkObj.setOutputFilename(outname)
+        lkObj.looks()
 
     return outname
 
@@ -218,6 +251,14 @@ def main(argv):
 
             cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
             os.system(cmd)
+            
+            print(inps.multilook)
+            if inps.multilook:
+                multilook(inps.outfile+suffix, outname = inps.outfile,
+                          alks = inps.numberAzimuthLooks, rlks=inps.numberRangeLooks,
+                          multilook_tool=inps.multilookTool, no_data=inps.noData)
+            else:
+                print('Skipping multi-looking ....')
 
             multilook(filename, outname=filename.split('.full')[0], alks=azlks, rlks=rnlks)
         np.save(projdir + '/merged/cropped.npy', 'True')
