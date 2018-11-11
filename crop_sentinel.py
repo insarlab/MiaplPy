@@ -132,6 +132,7 @@ def main(argv):
     slavedir = projdir + '/merged/SLC'
     gmasterdir = projdir + '/merged/geom_master'
     slclist = os.listdir(slavedir)
+    
 
     lon1 = float(templateContents['lon1'])
     lon2 = float(templateContents['lon2'])
@@ -176,7 +177,7 @@ def main(argv):
             cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
             os.system(cmd)
 
-            listgeo = ['hgt', 'lat', 'lon', 'los', 'shadowMask']
+            listgeo = ['hgt', 'lat', 'lon', 'los', 'shadowMask','incLocal']
 
         for t in listgeo:
             filename = os.path.join(gmasterdir, t + '.rdr.full')
