@@ -13,16 +13,77 @@ from numpy import linalg as LA
 from scipy.optimize import minimize
 from scipy.stats import anderson_ksamp
 from skimage.measure import label
+import gdal
+import isceobj
+sys.path.insert(0, os.getenv('RSMAS_ISCE'))
+from rsmas_logging import rsmas_logger, loglevel
+
+logfile_name = os.getenv('OPERATIONS') + '/LOGS/squeesar.log'
+logger = rsmas_logger(file_name=logfile_name)
 
 
-def readim(slcname):
+def send_logger_squeesar():
+    return logger
+
+################################################################################
+
+
+def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
+    """ Finds the corresponding line and sample based on geographical coordinates. """
+
+    obj_lat = isceobj.createIntImage()
+    obj_lat.load(geo_master_dir + '/lat.rdr.full.xml')
+    obj_lon = isceobj.createIntImage()
+    obj_lon.load(geo_master_dir + '/lon.rdr.full.xml')
+    width = obj_lon.getWidth()
+    length = obj_lon.getLength()
+    center_sample = int(width / 2)
+    center_line = int(length / 2)
+    ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
+    lat = ds.GetRasterBand(1).ReadAsArray()
+    del ds
+    ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
+    lon = ds.GetRasterBand(1).ReadAsArray()
+    del ds
+    lat_center_sample = lat[:, center_sample]
+    lon_center_line = lon[center_line, :]
+    lat_min = lat_center_sample - lat_south
+    lat_max = lat_center_sample - lat_north
+    lon_min = lon_center_line - lon_west
+    lon_max = lon_center_line - lon_east
+    first_row = [index for index in range(len(lat_min)) if np.abs(lat_min[index]) == np.min(np.abs(lat_min))]
+    last_row = [index for index in range(len(lat_max)) if np.abs(lat_max[index]) == np.min(np.abs(lat_max))]
+    first_col = [index for index in range(len(lon_min)) if np.abs(lon_min[index]) == np.min(np.abs(lon_min))]
+    last_col = [index for index in range(len(lon_max)) if np.abs(lon_max[index]) == np.min(np.abs(lon_max))]
+    image_coord = [first_row, last_row, first_col, last_col]
+
+    return image_coord
+
+################################################################################
+
+
+def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
+    """ Read SLC file and return crop. """
+
+    obj_slc = isceobj.createSlcImage()
+    obj_slc.load(slc_file + '.xml')
+    ds = gdal.Open(slc_file + '.vrt', gdal.GA_ReadOnly)
+    slc_image = ds.GetRasterBand(1).ReadAsArray()
+    del ds
+    out = slc_image[first_row:last_row, first_col:last_col]
+    return out
+
+################################################################################
+
+
+def read_image(image_file):
     """ Reads images from isce. """
     
-    ds = gdal.Open(slcname + '.vrt', gdal.GA_ReadOnly)
-    Im = ds.GetRasterBand(1).ReadAsArray()
-    ds = None
+    ds = gdal.Open(image_file + '.vrt', gdal.GA_ReadOnly)
+    image = ds.GetRasterBand(1).ReadAsArray()
+    del ds
     
-    return Im
+    return image
 
 ###############################################################################
 
@@ -30,35 +91,35 @@ def readim(slcname):
 class Node():
     """ Creates an object for each pixel. """
     #cols = 3, rows = 4, nodes = [[Node(i,j) for j in range(cols)] for i in range(rows)]
-      def __init__(self, i,j):
+    def __init__(self, i,j):
         self.name = "%s_%s" % (str(i),str(j))
-        self.refp = [i,j]
+        self.ref_pixel = [i,j]
         return None
-      def __repr__(self):
-        return self.name  
+    def __repr__(self):
+        return self.name
 
 ###############################################################################
     
     
-def corr2cov(A = [],sigma = []):
+def corr2cov(corr_matrix = [],sigma = []):
     """ Converts correlation matrix to covariance matrix if std of variables are known. """
     
     D = np.diagflat(sigma)
-    cov = D*A*D
+    cov_matrix = D*corr_matrix*D
     
-    return cov
+    return cov_matrix
 
 ###############################################################################
     
     
-def cov2corr(x):  
+def cov2corr(cov_matrix):
     """ Converts covariance matrix to correlation/coherence matrix. """
     
-    D = np.diagflat(1 / np.sqrt(np.diag(x)))
-    y = np.matmul(D, x)
-    corr = np.matmul(y, np.transpose(D))
+    D = np.diagflat(1 / np.sqrt(np.diag(cov_matrix)))
+    y = np.matmul(D, cov_matrix)
+    corr_matrix = np.matmul(y, np.transpose(D))
     
-    return corr
+    return corr_matrix
 
 ###############################################################################
 
@@ -173,19 +234,19 @@ def EVD_phase_estimation(coh0):
 def EMI_phase_estimation(coh0):
     """ Estimates the phase values based on EMI decomosition (Homa Ansari paper) """
     
-        abscoh = regularize_matrix(np.abs(coh0))
-        if np.size(abscoh) == np.size(coh0):
-            M = np.multiply(LA.pinv(abscoh),coh0)
-            w,v = LA.eig(M)
-            f = np.where(w == np.sort(w)[0])
-            x0 = np.reshape((v[:,f]),[len(v),1])
-            out = -np.angle(x0)
-            out = out - out[0,0]
-            return out
-        else:
-            print('warning: coherence matric not positive semidifinite, It is switched from EMI to EVD')
-            return EVD_phase_estimation(coh0)
-            
+    abscoh = regularize_matrix(np.abs(coh0))
+    if np.size(abscoh) == np.size(coh0):
+        M = np.multiply(LA.pinv(abscoh),coh0)
+        w,v = LA.eig(M)
+        f = np.where(w == np.sort(w)[0])
+        x0 = np.reshape((v[:,f]),[len(v),1])
+        out = -np.angle(x0)
+        out = out - out[0,0]
+        return out
+    else:
+        print('warning: coherence matric not positive semidifinite, It is switched from EMI to EVD')
+        return EVD_phase_estimation(coh0)
+
 ###############################################################################
 
 
@@ -235,7 +296,7 @@ def simulate_corr(Ip, days_mat,gam0=0.6,gamf=0.2,decorr_days=50):
 
 
 def est_corr(CCGsam):
-     """ Estimate Correlation matrix from an ensemble."""
+    """ Estimate Correlation matrix from an ensemble."""
         
     CCGS = np.matrix(CCGsam)
     corr_mat = np.matmul(CCGS,CCGS.getH())/CCGS.shape[1]
@@ -251,7 +312,6 @@ def custom_cmap(vmin=0,vmax=1):
     """ create a custom colormap based on visible portion of electromagnetive wave."""
     
     from spectrumRGB import rgb
-    ww=np.arange(380.,781.)
     rgb=rgb()
     import matplotlib as mpl
     cmap = mpl.colors.ListedColormap(rgb)
@@ -304,8 +364,8 @@ def shpobj(df):
 def win_loc(mydf, wra=21, waz=15, nimage=54, lin=330, sam=342):
     """ Extract the pixels in multilook window based on image dimensions and pixel location."""
     
-    r0 = mydf.refp[0]
-    c0 = mydf.refp[1]
+    r0 = mydf.ref_pixel[0]
+    c0 = mydf.ref_pixel[1]
     r = np.ogrid[r0 - ((waz - 1) / 2):r0 + ((waz - 1) / 2) + 1]
     refr = np.array([(waz - 1) / 2]) 
     r = r[r >= 0]
@@ -316,7 +376,7 @@ def win_loc(mydf, wra=21, waz=15, nimage=54, lin=330, sam=342):
     c = c[c >= 0]
     c = c[c < sam]
     refc = refc - (wra - len(c))
-    mydf.refp0 = [refr,refc]
+    mydf.ref_pixel_in_window = [refr,refc]
     mydf.rows = r
     mydf.cols = c
     
@@ -336,10 +396,10 @@ def shp_loc(df, pixelsdict=dict):
         r = mydf.rows.astype(int)
         c = mydf.cols.astype(int)
         x, y = np.meshgrid(r, c, sparse=True)
-        refr = mydf.refp[0] 
-        refc = mydf.refp[1] 
-        refr0 = mydf.refp0[0] 
-        refc0 = mydf.refp0[1] 
+        refr = mydf.ref_pixel[0]
+        refc = mydf.ref_pixel[1]
+        refr0 = mydf.ref_pixel_in_window[0]
+        refc0 = mydf.ref_pixel_in_window[1]
         win = amp[:, x, y]
         win = trwin(win)
         testvec = win.reshape(nimage, len(r) * len(c))
@@ -424,8 +484,8 @@ def phase_link(df, pixelsdict=dict):
         if mydf.scatterer == 'DS':
             rr = mydf.rows.astype(int)
             cc = mydf.cols.astype(int)
-            refr = mydf.refp[0]
-            refc = mydf.refp[1]
+            refr = mydf.ref_pixel[0]
+            refc = mydf.ref_pixel[1]
             dp = np.matrix(1.0 * np.arange(nimage * len(rr)).reshape((nimage, len(rr))))
             dp = np.exp(1j * dp)
             dpamp = pixelsdict['amp'][:, rr, cc]
