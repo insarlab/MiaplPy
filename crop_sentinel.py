@@ -4,11 +4,11 @@
 ############################################################
 import numpy as np
 import os
-import isceobj
-
-from isceobj.Util.ImageUtil import ImageLib as IML
 import sys
 import gdal
+import isce
+import isceobj
+from isceobj.Util.ImageUtil import ImageLib as IML
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 import _pysqsar_utilities as squeesar
 from rsmas_logging import loglevel
