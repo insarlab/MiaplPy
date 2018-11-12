@@ -164,4 +164,4 @@ if __name__ == '__main__':
     '''
     Crop SLCs.
     '''
-    main(iargs)
+    main(sys.argv[:])
