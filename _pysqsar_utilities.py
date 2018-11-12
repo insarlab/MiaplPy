@@ -8,7 +8,7 @@
 ###############################################################################
 
 import numpy as np
-import sys
+import sys, os
 import cmath
 from numpy import linalg as LA
 from scipy.optimize import minimize
