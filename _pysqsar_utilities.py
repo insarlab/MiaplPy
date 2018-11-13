@@ -15,6 +15,7 @@ from scipy.optimize import minimize
 from scipy.stats import anderson_ksamp
 from skimage.measure import label
 import gdal
+import isce
 import isceobj
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 from rsmas_logging import rsmas_logger, loglevel
