@@ -124,14 +124,17 @@ if __name__ == "__main__":
         results = compute(*values, scheduler='processes')
         np.save(inps.sqdir + '/flag.npy', 'patchlist_created')
     timep = time.time() - time0
-    logger.info("Done Creating PATCH. time:{}".format(timpep)  
+    logger.info("Done Creating PATCH. time:{}".format(timpep))
+
+
+    run_PSQ_sentinel = inps.sqdir + "/run_PSQ_sentinel"
+
+    with open(run_PSQ_sentinel, 'w') as f:
+        for patch in inps.patchlist:
+            cmd_coreg = 'PSQ_sentinel.py ' + templateFileString + '\t' + patch + ' \n'
+            f.write(cmd_coreg)
     
-    
-    cmd = '$SQUEESAR/patchlist_sentinel.py ' + inps.custom_template_file
-    status = subprocess.Popen(cmd, shell=True).wait()
-    if status is not 0:
-        logger.error('ERROR patchlist not found')
-        raise Exception('ERROR patchlist not found')
+
            
 ###########################################
     flag = np.load(inps.sqdir + '/flag.npy')
