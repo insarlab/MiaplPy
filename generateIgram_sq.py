@@ -14,6 +14,7 @@ sys.path.insert(0, os.getenv('SENTINEL_STACK'))
 from mergeBursts import multilook
 
 
+
 def createParser():
     parser = argparse.ArgumentParser( description='Use polynomial offsets and create burst by burst interferograms')
 
