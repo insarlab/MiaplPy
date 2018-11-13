@@ -11,13 +11,13 @@ import isce
 import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
-import _pysqsar_utilities as squeesar
+from _pysqsar_utilities import send_logger_squeesar, convert_geo2image_coord
 from rsmas_logging import loglevel
 from dataset_template import Template
 sys.path.insert(0, os.getenv('SENTINEL_STACK'))
 from mergeBursts import multilook
 
-logger  = squeesar.send_logger_squeesar()
+logger  = send_logger_squeesar()
 
 ##############################################################################
 EXAMPLE = """example:
@@ -73,7 +73,7 @@ def main(iargs=None):
     if os.path.isfile(project_dir + '/merged/cropped.npy'):
       print('Already cropped')
     else:
-        crop_area = np.array(squeesar.convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east))
+        crop_area = np.array(convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east))
         first_row = np.int(crop_area[0])
         last_row = np.int(crop_area[1])
         first_col = np.int(crop_area[2])
