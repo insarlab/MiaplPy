@@ -6,9 +6,8 @@
 # Created: 10/2018
 #
 ###############################################################################
-
-import numpy as np
 import sys, os
+import numpy as np
 import cmath
 from numpy import linalg as LA
 from scipy.optimize import minimize
@@ -92,11 +91,11 @@ def read_image(image_file):
 
 class Node():
     """ Creates an object for each pixel. """
-    #cols = 3, rows = 4, nodes = [[Node(i,j) for j in range(cols)] for i in range(rows)]
+
     def __init__(self, i,j):
         self.name = "%s_%s" % (str(i),str(j))
         self.ref_pixel = [i,j]
-        return None
+
     def __repr__(self):
         return self.name
 
@@ -183,14 +182,14 @@ def gam_pta_f(g1, g2):
 ###############################################################################
 
 
-def optphase(x0, igam_c):
+def optphase(x0, inverse_gam):
     """ Returns the PTA maximum likelihood function value. """ 
     
     n = len(x0)
     x = np.ones([n+1,1])+0j
     x[1::,0] = np.exp(1j*x0[:])#.reshape(n,1)
     x = np.matrix(x)
-    y = np.matmul(-x.getH(), igam_c)
+    y = np.matmul(-x.getH(), inverse_gam)
     f = np.abs(np.log(np.matmul(y, x)))
     
     return f
@@ -206,10 +205,10 @@ def PTA_L_BFGS(xm):
     x0[:,0] = np.real(xm[1::,0])
     coh = 1j*np.zeros([n,n])
     coh[:,:] = xm[:,1::]
-    abscoh = regularize_matrix(np.abs(coh))
-    if np.size(abscoh) == np.size(coh):
-        igam_c = np.matrix(np.multiply(LA.pinv(abscoh),coh))
-        res = minimize(optphase, x0, args = igam_c, method='L-BFGS-B', tol=None, options={'gtol': 1e-6, 'disp': True})
+    abs_coh = regularize_matrix(np.abs(coh))
+    if np.size(abs_coh) == np.size(coh):
+        inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh),coh))
+        res = minimize(optphase, x0, args = inverse_gam, method='L-BFGS-B', tol=None, options={'gtol': 1e-6, 'disp': True})
         out = np.zeros([n,1])
         out[1::,0] = -res.x
         return out
@@ -255,10 +254,10 @@ def EMI_phase_estimation(coh0):
 def CRLB_cov(gama, L):
     """ Estimates the Cramer Rao Lowe Bound based on coherence=gam and ensemble size = L """
     
-    Btheta = np.zeros([len(gama),len(gama)-1])
-    Btheta[1::,:] = np.identity(len(gama)-1)
+    B_theta = np.zeros([len(gama),len(gama)-1])
+    B_theta[1::,:] = np.identity(len(gama)-1)
     X = 2*L*(np.multiply(np.abs(gama),LA.pinv(np.abs(gama)))-np.identity(len(gama)))
-    cov_out = LA.pinv(np.matmul(np.matmul(Btheta.T,(X+np.identity(len(X)))),Btheta))
+    cov_out = LA.pinv(np.matmul(np.matmul(B_theta.T,(X+np.identity(len(X)))),B_theta))
     
     return cov_out
 
@@ -363,22 +362,22 @@ def shpobj(df):
 ###############################################################################
 
 
-def win_loc(mydf, wra=21, waz=15, nimage=54, lin=330, sam=342):
+def win_loc(mydf, wra=21, waz=15, lin=330, sam=342):
     """ Extract the pixels in multilook window based on image dimensions and pixel location."""
     
     r0 = mydf.ref_pixel[0]
     c0 = mydf.ref_pixel[1]
     r = np.ogrid[r0 - ((waz - 1) / 2):r0 + ((waz - 1) / 2) + 1]
-    refr = np.array([(waz - 1) / 2]) 
+    ref_r = np.array([(waz - 1) / 2])
     r = r[r >= 0]
     r = r[r < lin]
-    refr = refr - (waz - len(r))
+    ref_r = ref_r - (waz - len(r))
     c = np.ogrid[c0 - ((wra - 1) / 2):c0 + ((wra - 1) / 2) + 1]
-    refc = np.array([(wra - 1) / 2])
+    ref_c = np.array([(wra - 1) / 2])
     c = c[c >= 0]
     c = c[c < sam]
-    refc = refc - (wra - len(c))
-    mydf.ref_pixel_in_window = [refr,refc]
+    ref_c = ref_c - (wra - len(c))
+    mydf.ref_pixel_in_window = [ref_r,ref_c]
     mydf.rows = r
     mydf.cols = c
     
@@ -387,7 +386,7 @@ def win_loc(mydf, wra=21, waz=15, nimage=54, lin=330, sam=342):
 ###############################################################################
 
 
-def shp_loc(df, pixels_dict=dict):
+def shp_loc(df, pixels_dict={}):
     """ Find statistical homogeneous pixels in a window based on Anderson Darling similarity test."""
     
     amp = pixels_dict['amp']
@@ -474,7 +473,7 @@ def comp_matr(x, y):
 ###############################################################################
 
 
-def phase_link(df, pixels_dict=dict):
+def phase_link(df, pixels_dict={}):
     """ Runs the phase linking algorithm over each DS.""" 
     
     nimage = pixels_dict['amp'].shape[0]
@@ -490,7 +489,7 @@ def phase_link(df, pixels_dict=dict):
             dp = np.exp(1j * dp)
             dpamp = pixels_dict['amp'][:, rr, cc]
             dpph = pixels_dict['ph'][:, rr, cc]
-            dp = np.matrix(comp_matr(dpamp, dpph)) 
+            dp[:,:,:] = np.matrix(comp_matr(dpamp, dpph))
             cov_m = np.matmul(dp, dp.getH()) / (len(rr))
             phi = np.angle(cov_m)
             abs_cov = np.abs(cov_m)
@@ -504,7 +503,7 @@ def phase_link(df, pixels_dict=dict):
                 res_PTA = psq.PTA_L_BFGS(xm)
                 ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
                 xn = np.matrix(ph_PTA.reshape(nimage, 1))
-                xn = np.matrix(ph0.reshape(nimage, 1))
+                #xn = np.matrix(ph0.reshape(nimage, 1))
             except:
                 xn = np.matrix(pixels_dict['ph'][:, refr, refc].reshape(nimage, 1))
                 xn = xn - xn[0,0]
@@ -513,7 +512,7 @@ def phase_link(df, pixels_dict=dict):
             g2 = np.matmul(np.exp(-1j * xn), (np.exp(-1j * xn)).getH())
             g2 = np.triu(np.angle(g2), 1)
             gam_pta = gam_pta_f(g1, g2)
-            if gam_pta > 0.4 and gam_pta <= 1:
+            if 0.4 < gam_pta <= 1:
                 mydf.ampref = np.array(ampn).reshape(nimage, 1, 1)
                 mydf.phref = np.array(xn).reshape(nimage, 1, 1)
             else:
