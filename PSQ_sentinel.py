@@ -56,7 +56,7 @@ def command_line_parse(args):
 #    return data
 
 
-def sequential_process(df_chunk, sequential_df_chunk, inps, pixels_dict=dict, pixels_dict_ref=dict):
+def sequential_process(df_chunk, sequential_df_chunk, inps, pixels_dict={}, pixels_dict_ref={}):
     seq_n = sequential_df_chunk.ref_pixel[0]   # sequence number
     n_lines = np.shape(pixels_dict_ref['amp'])[0]
     values = [delayed(pysq.phase_link)(x,pixelsdict=pixels_dict) for x in df_chunk]
@@ -109,8 +109,8 @@ def main(iargs=None):
 
     shp_df = pd.DataFrame(np.zeros(shape=[inps.lin, inps.sam]))
     pysq.shpobj(shp_df)
-    shp_df = shp_df.apply(np.vectorize(pysq.win_loc), wra=inps.range_win, waz=inps.azimuth_win, nimage=inps.nimage, lin=inps.lin,
-                          sam=inps.sam)
+    shp_df = shp_df.apply(np.vectorize(pysq.win_loc), wra=inps.range_win,
+                          waz=inps.azimuth_win, lin=inps.lin, sam=inps.sam)
 
     time0 = time.time()
     xl = np.arange(inps.lin)
@@ -158,7 +158,7 @@ def main(iargs=None):
             pixels_dict_ref = {'amp': RSLCamp_ref[first_line:last_line, :, :], 'ph': RSLCphase_ref[first_line:last_line, :, :]}
             squeezed_image, pixels_dict_ref = \
                 sequential_process(shp_df_chunk, seq_df,inps,
-                                   pixels_dict=pixels_dict,pixels_dict_ref=pixels_dict_ref)
+                                   pixels_dict=pixels_dict, pixels_dict_ref=pixels_dict_ref)
             sequential_df.at[step, 0].squeezed = squeezed_image
         else:
             AMP = np.zeros([step + 10, lin, sam])
