@@ -27,7 +27,7 @@ logger = rsmas_logger(file_name=logfile_name)
 def send_logger_squeesar():
     return logger
 
-################################################################################
+######################################################################################
 
 
 def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
@@ -387,10 +387,10 @@ def win_loc(mydf, wra=21, waz=15, nimage=54, lin=330, sam=342):
 ###############################################################################
 
 
-def shp_loc(df, pixelsdict=dict):
+def shp_loc(df, pixels_dict=dict):
     """ Find statistical homogeneous pixels in a window based on Anderson Darling similarity test."""
     
-    amp = pixelsdict['amp']
+    amp = pixels_dict['amp']
     nimage = amp.shape[0]
     s = df.shape
     for q in range(s[0]):
@@ -451,9 +451,7 @@ def patch_slice(lin,sam,waz,wra):
     pc = [[pc1], [pc2]]
     patchlist = []
     for n1 in range(len(pr1)):
-        lin1 = pr2[n1] - pr1[n1]
         for n2 in range(len(pc1)):
-            sam1 = pc2[n2] - pc1[n2]
             patchlist.append(str(n1) + '_' + str(n2))
             
     return pr,pc,patchlist
@@ -476,10 +474,10 @@ def comp_matr(x, y):
 ###############################################################################
 
 
-def phase_link(df, pixelsdict=dict): 
+def phase_link(df, pixels_dict=dict):
     """ Runs the phase linking algorithm over each DS.""" 
     
-    nimage = pixelsdict['amp'].shape[0]
+    nimage = pixels_dict['amp'].shape[0]
     s = df.shape
     for q in range(s[0]):
         mydf = df[q]
@@ -490,8 +488,8 @@ def phase_link(df, pixelsdict=dict):
             refc = mydf.ref_pixel[1]
             dp = np.matrix(1.0 * np.arange(nimage * len(rr)).reshape((nimage, len(rr))))
             dp = np.exp(1j * dp)
-            dpamp = pixelsdict['amp'][:, rr, cc]
-            dpph = pixelsdict['ph'][:, rr, cc]
+            dpamp = pixels_dict['amp'][:, rr, cc]
+            dpph = pixels_dict['ph'][:, rr, cc]
             dp = np.matrix(comp_matr(dpamp, dpph)) 
             cov_m = np.matmul(dp, dp.getH()) / (len(rr))
             phi = np.angle(cov_m)
@@ -508,7 +506,7 @@ def phase_link(df, pixelsdict=dict):
                 xn = np.matrix(ph_PTA.reshape(nimage, 1))
                 xn = np.matrix(ph0.reshape(nimage, 1))
             except:
-                xn = np.matrix(pixelsdict['ph'][:, refr, refc].reshape(nimage, 1))
+                xn = np.matrix(pixels_dict['ph'][:, refr, refc].reshape(nimage, 1))
                 xn = xn - xn[0,0]
             ampn = np.sqrt(np.abs(np.diag(cov_m))) 
             g1 = np.triu(phi,1)
@@ -519,8 +517,8 @@ def phase_link(df, pixelsdict=dict):
                 mydf.ampref = np.array(ampn).reshape(nimage, 1, 1)
                 mydf.phref = np.array(xn).reshape(nimage, 1, 1)
             else:
-                mydf.ampref = pixelsdict['amp'][:, refr, refc].reshape(nimage, 1, 1)
-                xn = np.matrix(pixelsdict['ph'][:, refr, refc].reshape(nimage, 1))
+                mydf.ampref = pixels_dict['amp'][:, refr, refc].reshape(nimage, 1, 1)
+                xn = np.matrix(pixels_dict['ph'][:, refr, refc].reshape(nimage, 1))
                 xn = xn - xn[0,0]
                 mydf.phref = np.array(xn).reshape(nimage, 1, 1)
     return df 
