@@ -52,7 +52,7 @@ def create_patch(inps, name):
     sample = inps.patch_cols[1][0][patch_col] - inps.patch_cols[0][0][patch_col]
     if not os.path.isdir(patch_name) or not os.path.isfile(patch_name + '/count.npy'):
         os.mkdir(patch_name)
-        logger_ph_lnk.info("Making PATCH" + str(patch_row) + '_' + str(patch_col))
+        logger_ph_lnk.log(loglevel.INFO, "Making PATCH" + str(patch_row) + '_' + str(patch_col))
         amplitude = np.empty((inps.nimage, line, sample))
         phase = np.empty((inps.nimage, line, sample))
         count = 0
@@ -117,7 +117,7 @@ def main(iargs=None):
         compute(*values, scheduler='processes')
         np.save(inps.sq_dir + '/flag.npy', 'patchlist_created')
     timep = time.time() - time0
-    logger_ph_lnk.info("Done Creating PATCH. time:{}".format(timep))
+    logger_ph_lnk.log(loglevel.INFO, "Done Creating PATCH. time:{}".format(timep))
 
 
     run_PSQ_sentinel = inps.sq_dir + "/run_PSQ_sentinel"
@@ -136,7 +136,7 @@ def main(iargs=None):
         cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
         status = subprocess.Popen(cmd, shell=True).wait()
         if status is not 0:
-            logger_ph_lnk.error('ERROR running PSQ_sentinel.py')
+            logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
             raise Exception('ERROR running PSQ_sentinel.py')
 
     for patch in inps.patch_list:
@@ -160,7 +160,7 @@ def main(iargs=None):
     cmd = 'createBatch.pl ' + inps.project_dir + '/merged/run_write_SLC' + ' memory=' + '5000' + ' walltime=' + '1:00'
     status = subprocess.Popen(cmd, shell=True).wait()
     if status is not 0:
-        logger_ph_lnk.error('ERROR writing SLCs')
+        logger_ph_lnk.log(loglevel.ERROR, 'ERROR writing SLCs')
         raise Exception('ERROR writing SLCs')
 
 
