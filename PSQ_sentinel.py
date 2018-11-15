@@ -208,6 +208,6 @@ if __name__ == '__main__':
     '''
     Phase linking process.
     '''
-    main(sys.argv[:])
+    main()
 
 #################################################
