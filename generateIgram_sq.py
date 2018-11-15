@@ -138,6 +138,6 @@ if __name__ == '__main__':
     '''
     Main driver.
     '''
-    main(sys.argv[:])
+    main()
 
 
