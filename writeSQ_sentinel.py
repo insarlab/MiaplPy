@@ -150,7 +150,7 @@ if __name__ == '__main__':
         Overwrite filtered SLC images.
     """
 
-    main(sys.argv[:])
+    main()
 
 
 
