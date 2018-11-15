@@ -28,8 +28,8 @@ def create_parser():
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
     parser.add_argument('custom_template_file', nargs='?',
                         help='custom template with option settings.\n')
-    parser.add_argument('SLCdir', dest='slc_dir', action='store_true',
-                        help='slc file directory (date/date.slc.full)')
+    parser.add_argument('-s','--slcdir', dest='slc_dir', type=str, required=True, help='slc file directory (date/date.slc.full)')
+
 
     return parser
 
