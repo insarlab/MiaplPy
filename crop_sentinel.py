@@ -50,7 +50,7 @@ def main(iargs=None):
     Crops SLC images from Isce merged/SLC directory.
     """
 
-    inps = command_line_parse(iargs)
+    inps = command_line_parse(sys.argv[:])
 
     logger_crop.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1])
     inps.template = Template(inps.custom_template_file).get_options()
