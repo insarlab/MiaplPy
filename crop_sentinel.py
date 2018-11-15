@@ -17,7 +17,7 @@ from dataset_template import Template
 sys.path.insert(0, os.getenv('SENTINEL_STACK'))
 from mergeBursts import multilook
 
-logger  = send_logger_squeesar()
+logger_crop  = send_logger_squeesar()
 
 ##############################################################################
 EXAMPLE = """example:
@@ -52,7 +52,7 @@ def main(iargs=None):
 
     inps = command_line_parse(iargs)
 
-    logger.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1])
+    logger_crop.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1])
     inps.template = Template(inps.custom_template_file).get_options()
 
     project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
