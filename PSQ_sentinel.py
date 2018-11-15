@@ -33,7 +33,7 @@ def create_parser():
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
     parser.add_argument('custom_template_file', nargs='?',
                         help='custom template with option settings.\n')
-    parser.add_argument('-p','--patchdir', dest='patchDir', type=str, required=True, help='patch file directory')
+    parser.add_argument('-p','--patchdir', dest='patch_dir', type=str, required=True, help='patch file directory')
 
     return parser
 
@@ -92,7 +92,7 @@ def main(iargs=None):
     inps.sq_dir = inps.project_dir + '/SqueeSAR'
     inps.list_slv = os.listdir(inps.slave_dir)
     inps.n_image = len(inps.list_slv)
-    inps.work_dir = inps.sq_dir +'/'+ inps.patchDir
+    inps.work_dir = inps.sq_dir +'/'+ inps.patch_dir
 
     RSLCamp = np.load(inps.work_dir + '/Amplitude.npy')
     RSLCphase = np.load(inps.work_dir + '/Phase.npy')
