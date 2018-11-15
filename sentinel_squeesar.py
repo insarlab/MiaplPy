@@ -170,4 +170,4 @@ if __name__ == '__main__':
     
     Process for each patch is done sequentially.
     '''
-    main(sys.argv[:])
+    main()
