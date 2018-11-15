@@ -92,7 +92,7 @@ def main(iargs=None):
     inps.sq_dir = inps.project_dir + '/SqueeSAR'
     inps.list_slv = os.listdir(inps.slave_dir)
     inps.n_image = len(inps.list_slv)
-    inps.work_dir = inps.sq_dir + inps.patchDir
+    inps.work_dir = inps.sq_dir +'/'+ inps.patchDir
 
     RSLCamp = np.load(inps.work_dir + '/Amplitude.npy')
     RSLCphase = np.load(inps.work_dir + '/Phase.npy')
