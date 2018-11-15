@@ -50,8 +50,9 @@ def create_patch(inps, name):
     patch_name = inps.patch_dir + str(patch_row) + '_' + str(patch_col)
     line = inps.patch_rows[1][0][patch_row] - inps.patch_rows[0][0][patch_row]
     sample = inps.patch_cols[1][0][patch_col] - inps.patch_cols[0][0][patch_col]
-    if not os.path.isdir(patch_name) or not os.path.isfile(patch_name + '/count.npy'):
-        os.mkdir(patch_name)
+    if  not os.path.isfile(patch_name + '/count.npy'):
+        if not os.path.isdir(patch_name):
+            os.mkdir(patch_name)
         logger_ph_lnk.log(loglevel.INFO, "Making PATCH" + str(patch_row) + '_' + str(patch_col))
         amplitude = np.empty((inps.n_image, line, sample))
         phase = np.empty((inps.n_image, line, sample))
