@@ -154,7 +154,7 @@ def main(iargs=None):
 
     with open(run_write_slc, 'w') as f:
         for date in inps.list_slv:
-            cmd = 'writeSQ_sentinel.py ' + inps.custom_template_file + '\t' + date + '/' + date + '.slc.full' + ' \n'
+            cmd = 'writeSQ_sentinel.py ' + inps.custom_template_file + ' -s ' + date + '/' + date + '.slc.full' + ' \n'
             f.write(cmd)
 
     print ("job file created: " + " run_write_SLC")
