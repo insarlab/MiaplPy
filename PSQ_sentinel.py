@@ -18,7 +18,7 @@ import pandas as pd
 from dask import compute, delayed
 
 
-logger = pysq.send_logger_squeesar()
+logger_PSQ = pysq.send_logger_squeesar()
 
 #################################
 EXAMPLE = """example:
@@ -82,7 +82,7 @@ def sequential_process(df_chunk, sequential_df_chunk, inps, pixels_dict={}, pixe
 def main(iargs=None):
     inps = command_line_parse(iargs)
 
-    logger.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1]+ " " + sys.argv[2])
+    logger_PSQ.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1]+ " " + sys.argv[2])
 
     inps.project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
     inps.project_dir = os.getenv('SCRATCHDIR') + '/' + inps.project_name
@@ -118,7 +118,7 @@ def main(iargs=None):
     values = [delayed(pysq.shp_loc)(x,pixels_dict=pixels_dict) for x in shp_df_chunk]
     results = compute(*values, scheduler='processes')
     timep = time.time() - time0
-    logger.log(loglevel.INFO, 'time spent to find SHPs: {}'.format(timep))
+    logger_PSQ.log(loglevel.INFO, 'time spent to find SHPs: {}'.format(timep))
 
     for lin in range(inps.lin):
         for sam in range(inps.sam):
@@ -197,7 +197,7 @@ def main(iargs=None):
         RSLCphase_ref[first_line:last_line, :, :] = RSLCphase_ref[first_line:last_line, :, :] + datum_connect[step, :, :]
 
     timep = time.time() - time0
-    logger.log(loglevel.INFO, 'time spent to do sequential phase linking {}: {}'.format(timep))
+    logger_PSQ.log(loglevel.INFO, 'time spent to do sequential phase linking {}: {}'.format(timep))
 
     np.save(inps.work_dir + '/endflag.npy', 'True')
     np.save(inps.work_dir + '/Amplitude_ref.npy', RSLCamp_ref)
