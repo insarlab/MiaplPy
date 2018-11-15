@@ -36,11 +36,11 @@ def create_parser():
     return parser
 
 
-def command_line_parse(args):
+def command_line_parse(iargs=None):
     """ Parses command line agurments into inps variable. """
 
     parser = create_parser()
-    inps = parser.parse_args(args)
+    inps = parser.parse_args(args=iargs)
 
     return inps
 
@@ -50,7 +50,7 @@ def main(iargs=None):
     Crops SLC images from Isce merged/SLC directory.
     """
 
-    inps = command_line_parse(sys.argv[:])
+    inps = command_line_parse(iargs)
 
     logger_crop.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1])
     inps.template = Template(inps.custom_template_file).get_options()
@@ -156,4 +156,4 @@ if __name__ == '__main__':
     '''
     Crop SLCs.
     '''
-    main(sys.argv[:])
+    main()
