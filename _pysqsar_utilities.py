@@ -20,11 +20,11 @@ sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 from rsmas_logging import rsmas_logger, loglevel
 
 logfile_name = os.getenv('OPERATIONS') + '/LOGS/squeesar.log'
-logger = rsmas_logger(file_name=logfile_name)
+logger_pysq = rsmas_logger(file_name=logfile_name)
 
 
 def send_logger_squeesar():
-    return logger
+    return logger_pysq
 
 ######################################################################################
 
