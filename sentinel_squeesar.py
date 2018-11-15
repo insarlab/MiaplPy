@@ -53,8 +53,8 @@ def create_patch(inps, name):
     if not os.path.isdir(patch_name) or not os.path.isfile(patch_name + '/count.npy'):
         os.mkdir(patch_name)
         logger_ph_lnk.log(loglevel.INFO, "Making PATCH" + str(patch_row) + '_' + str(patch_col))
-        amplitude = np.empty((inps.nimage, line, sample))
-        phase = np.empty((inps.nimage, line, sample))
+        amplitude = np.empty((inps.n_image, line, sample))
+        phase = np.empty((inps.n_image, line, sample))
         count = 0
         for dirs in inps.list_slv:
             data_name = inps.slave_dir + '/' + dirs + '/' + dirs + '.slc.full'
