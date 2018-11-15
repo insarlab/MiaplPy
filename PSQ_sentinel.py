@@ -33,7 +33,7 @@ def create_parser():
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
     parser.add_argument('custom_template_file', nargs='?',
                         help='custom template with option settings.\n')
-    parser.add_argument('Patch_file', dest='patchDir', action='store_true', help='patch file directory')
+    parser.add_argument('-p','--patchdir', dest='patchDir', action='store_true', help='patch file directory')
 
     return parser
 
