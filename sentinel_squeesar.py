@@ -125,7 +125,7 @@ def main(iargs=None):
 
     with open(run_PSQ_sentinel, 'w') as f:
         for patch in inps.patch_list:
-            cmd = 'PSQ_sentinel.py ' + inps.custom_template_file + '\t' +'PATCH' + patch + ' \n'
+            cmd = 'PSQ_sentinel.py ' + inps.custom_template_file + ' -p ' +'PATCH' + patch + ' \n'
             f.write(cmd)
     
 
