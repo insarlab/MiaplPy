@@ -13,7 +13,7 @@ from _pysqsar_utilities import send_logger_squeesar, comp_matr
 from rsmas_logging import loglevel
 from dataset_template import Template
 
-logger = send_logger_squeesar()
+logger_write = send_logger_squeesar()
 
 ##############################################################################
 EXAMPLE = """example:
@@ -51,7 +51,7 @@ def main(iargs=None):
 
     inps = command_line_parse(iargs)
 
-    logger.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1] + " " + sys.argv[2])
+    logger_write.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1] + " " + sys.argv[2])
     inps.template = Template(inps.custom_template_file).get_options()
 
     project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
