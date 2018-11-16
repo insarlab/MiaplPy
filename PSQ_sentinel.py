@@ -105,10 +105,10 @@ def main(iargs=None):
 
     ################### Finding Statistical homogeneous pixels ################
     xl = np.arange(inps.lin)
+    pixels_dict = {'amp': RSLCamp[0:20,:,:]}
     
     if not os.path.isfile(inps.work_dir + '/shp.pkl'):
-        pixels_dict = {'amp': RSLCamp[0:20,:,:]}
-
+        
         shp_df = pd.DataFrame(np.zeros(shape=[inps.lin, inps.sam]))
         pysq.shpobj(shp_df)
         shp_df = shp_df.apply(np.vectorize(pysq.win_loc), wra=inps.range_win,
