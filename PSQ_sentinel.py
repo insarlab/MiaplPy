@@ -139,7 +139,7 @@ def main(iargs=None):
     RSLCphase_ref = np.zeros([inps.n_image, inps.lin, inps.sam])
     RSLCphase_ref[:, :, :] = RSLCphase[:, :, :]
 
-    num_seq = np.floor(inps.n_image / 10)
+    num_seq = np.int(np.floor(inps.n_image / 10))
     sequential_df = pd.DataFrame(np.zeros(shape=[num_seq, 1]))
     pysq.shpobj(sequential_df)
     shp_df = pd.read_pickle(inps.work_dir + '/shp.pkl')
