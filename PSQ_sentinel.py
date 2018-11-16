@@ -147,8 +147,13 @@ def main(iargs=None):
 
     time0 = time.time()
     for step in range(num_seq):
-        if pixels_dict:
+      
+        try: 
             del pixels_dict
+            print('Next Sequence...')
+        except:
+            print('Next Sequence...')
+            
         seq_df = sequential_df.at[step, 0]
         first_line = step  * 10
         if seq_df == num_seq:
