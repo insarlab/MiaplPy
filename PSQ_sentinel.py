@@ -104,29 +104,33 @@ def main(iargs=None):
     inps.azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
 
     ################### Finding Statistical homogeneous pixels ################
-
-    pixels_dict = {'amp': RSLCamp}
-
-    shp_df = pd.DataFrame(np.zeros(shape=[inps.lin, inps.sam]))
-    pysq.shpobj(shp_df)
-    shp_df = shp_df.apply(np.vectorize(pysq.win_loc), wra=inps.range_win,
-                          waz=inps.azimuth_win, lin=inps.lin, sam=inps.sam)
-
-    time0 = time.time()
     xl = np.arange(inps.lin)
-    shp_df_chunk = [shp_df.loc[y] for y in xl]
-    values = [delayed(pysq.shp_loc)(x,pixels_dict=pixels_dict) for x in shp_df_chunk]
-    results = compute(*values, scheduler='processes')
-    timep = time.time() - time0
-    logger_PSQ.log(loglevel.INFO, 'time spent to find SHPs: {}'.format(timep))
+    
+    if not os.path.isfile(inps.work_dir + '/shp.pkl'):
+        pixels_dict = {'amp': RSLCamp}
 
-    for lin in range(inps.lin):
-        for sam in range(inps.sam):
-            shp_df.at[lin, sam] = results[lin][sam]
-    del results
-    shp_df.to_pickle(inps.work_dir + '/shp.pkl')
+        shp_df = pd.DataFrame(np.zeros(shape=[inps.lin, inps.sam]))
+        pysq.shpobj(shp_df)
+        shp_df = shp_df.apply(np.vectorize(pysq.win_loc), wra=inps.range_win,
+                              waz=inps.azimuth_win, lin=inps.lin, sam=inps.sam)
 
-    print('SHP created ...')
+        time0 = time.time()
+    
+        shp_df_chunk = [shp_df.loc[y] for y in xl]
+        values = [delayed(pysq.shp_loc)(x,pixels_dict=pixels_dict) for x in shp_df_chunk]
+        results = compute(*values, scheduler='processes')
+        timep = time.time() - time0
+        logger_PSQ.log(loglevel.INFO, 'time spent to find SHPs: {}'.format(timep))
+
+        for lin in range(inps.lin):
+            for sam in range(inps.sam):
+                shp_df.at[lin, sam] = results[lin][sam]
+        del results
+        shp_df.to_pickle(inps.work_dir + '/shp.pkl')
+
+        print('SHP created ...')
+    else:
+        print('SHP Exists...')
 
     ###################### Sequential Phase linking ###############################
 
