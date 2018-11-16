@@ -107,7 +107,7 @@ def main(iargs=None):
     xl = np.arange(inps.lin)
     
     if not os.path.isfile(inps.work_dir + '/shp.pkl'):
-        pixels_dict = {'amp': RSLCamp}
+        pixels_dict = {'amp': RSLCamp[0:20,:,:]}
 
         shp_df = pd.DataFrame(np.zeros(shape=[inps.lin, inps.sam]))
         pysq.shpobj(shp_df)
