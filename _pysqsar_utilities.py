@@ -386,48 +386,45 @@ def win_loc(mydf, wra=21, waz=15, lin=330, sam=342):
 ###############################################################################
 
 
-def shp_loc(df, pixels_dict={}):
+def shp_loc(mydf, pixels_dict={}):
     """ Find statistical homogeneous pixels in a window based on Anderson Darling similarity test."""
     
     amp = pixels_dict['amp']
     nimage = amp.shape[0]
-    s = df.shape
-    for q in range(s[0]):
-        mydf = df[q]
-        r = mydf.rows.astype(int)
-        c = mydf.cols.astype(int)
-        x, y = np.meshgrid(r, c, sparse=True)
-        refr = mydf.ref_pixel[0]
-        refc = mydf.ref_pixel[1]
-        refr0 = mydf.ref_pixel_in_window[0]
-        refc0 = mydf.ref_pixel_in_window[1]
-        win = amp[:, x, y]
-        win = trwin(win)
-        testvec = win.reshape(nimage, len(r) * len(c))
-        ksres = np.ones(len(r) * len(c))
-        S1 = amp[:, refr, refc]
-        for m in range(len(testvec[0])):
-            S2 = testvec[:, m]
-            try:
-                test = anderson_ksamp([S1, S2])
-                if test.significance_level > 0.05:
-                    ksres[m] = 1
-                else:
-                    ksres[m] = 0
-            except:
+    r = mydf.rows.astype(int)
+    c = mydf.cols.astype(int)
+    x, y = np.meshgrid(r, c, sparse=True)
+    refr = mydf.ref_pixel[0]
+    refc = mydf.ref_pixel[1]
+    refr0 = mydf.ref_pixel_in_window[0]
+    refc0 = mydf.ref_pixel_in_window[1]
+    win = amp[:, x, y]
+    win = trwin(win)
+    testvec = win.reshape(nimage, len(r) * len(c))
+    ksres = np.ones(len(r) * len(c))
+    S1 = amp[:, refr, refc]
+    for m in range(len(testvec[0])):
+        S2 = testvec[:, m]
+        try:
+            test = anderson_ksamp([S1, S2])
+            if test.significance_level > 0.05:
+                ksres[m] = 1
+            else:
                 ksres[m] = 0
-        ks_res = ksres.reshape(len(r), len(c))
-        ks_label = label(ks_res, background=False, connectivity=2)
-        reflabel = ks_label[refr0.astype(int), refc0.astype(int)]
-        rr, cc = np.where(ks_label == reflabel)
-        rr = rr + r[0]
-        cc = cc + c[0]
-        mydf.rows = rr
-        mydf.cols = cc
-        if len(rr)>20:
-            mydf.scatterer = 'DS'
-        else:
-            mydf.scatterer = 'PS'
+        except:
+            ksres[m] = 0
+    ks_res = ksres.reshape(len(r), len(c))
+    ks_label = label(ks_res, background=False, connectivity=2)
+    reflabel = ks_label[refr0.astype(int), refc0.astype(int)]
+    rr, cc = np.where(ks_label == reflabel)
+    rr = rr + r[0]
+    cc = cc + c[0]
+    mydf.rows = rr
+    mydf.cols = cc
+    if len(rr)>20:
+        mydf.scatterer = 'DS'
+    else:
+        mydf.scatterer = 'PS'
             
     return df  
 
