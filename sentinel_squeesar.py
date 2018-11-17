@@ -132,10 +132,14 @@ def main(iargs=None):
            
 ###########################################
     flag = np.load(inps.sq_dir + '/flag.npy')
+    try:
+      jobqueue = inps.template['job_queue']
+    except:
+      jobqueue = 'general'
 
     if flag == 'patchlist_created':
         #cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
-        cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 4:00 -r 3000 -q '+ inps.template['job_queue'] 
+        cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 4:00 -r 3000 -q '+ jobqueue 
         status = subprocess.Popen(cmd, shell=True).wait()
         if status is not 0:
             logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
@@ -159,7 +163,7 @@ def main(iargs=None):
 
     print ("job file created: " + " run_write_SLC")
 
-    cmd = '$INT_SCR/split_jobs.py -f ' + inps.project_dir + '/merged/run_write_SLC -w 5:00 -r 5000 -q '+ inps.template['job_queue'] 
+    cmd = '$INT_SCR/split_jobs.py -f ' + inps.project_dir + '/merged/run_write_SLC -w 5:00 -r 5000 -q '+ jobqueue 
     #cmd = 'createBatch.pl ' + inps.project_dir + '/merged/run_write_SLC' + ' memory=' + '5000' + ' walltime=' + '1:00'
     status = subprocess.Popen(cmd, shell=True).wait()
     if status is not 0:
