@@ -106,7 +106,7 @@ def main(iargs=None):
         shp_df = shp_df.apply(np.vectorize(pysq.win_loc), wra=inps.range_win,
                               waz=inps.azimuth_win, lin=inps.lin, sam=inps.sam)
         shp_df_chunk = [shp_df.loc[y].at[0] for y in range(inps.lin*inps.sam)]
-        values = [delayed(pysq.shp_loc_new)(x,pixels_dict) for x in shp_df_chunk]
+        values = [delayed(pysq.shp_loc)(x,pixels_dict) for x in shp_df_chunk]
         shp_df = pd.DataFrame(list(compute(*values, scheduler='processes')))
 
         shp_df.to_pickle(inps.work_dir + '/shp.pkl')
