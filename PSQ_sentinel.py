@@ -46,35 +46,26 @@ def command_line_parse(args):
     return inps
 
 
-#def shp_func(data):
-#    data = pysq.shp_loc(data, pixelsdict=pixelsdict)
-#    return data
-
-
-#def phaselink_func(data):
-#    data = pysq.phase_link(data, pixelsdict=pixelsdict)
-#    return data
-
-
 def sequential_process(df_chunk, sequential_df_chunk, inps, pixels_dict={}, pixels_dict_ref={}):
     seq_n = sequential_df_chunk.ref_pixel[0]   # sequence number
     n_lines = np.shape(pixels_dict_ref['amp'])[0]
-    values = [delayed(pysq.phase_link)(x,pixelsdict=pixels_dict) for x in df_chunk]
-    results = compute(*values, scheduler='processes')
+    values = [delayed(pysq.phase_link)(x,pixels_dict=pixels_dict) for x in df_chunk]
+    results = pd.DataFrame(list(compute(*values, scheduler='processes')))
     squeezed = np.zeros([inps.lin, inps.sam]) + 0j
     pixels_dict_ref_new = pixels_dict_ref
-    for lin in range(inps.lin):
-        for sam in range(inps.sam):
-            try:
-                pixels_dict_ref_new['amp'][:, lin:lin + 1, sam:sam + 1] = results[lin][sam].ampref[seq_n::, 1, 1]
-                pixels_dict_ref_new['ph'][:, lin:lin + 1, sam:sam + 1] = results[lin][sam].phref[seq_n::, 1, 1]
-            except:
-                print('pixel({}, {}) is not DS'.format(lin, sam))
-            org_pixel = np.multiply(pixels_dict['amp'][seq_n::, lin, sam],
-                            np.exp(1j * pixels_dict['ph'][seq_n::, lin, sam])).reshape(10, 1)
-            map_pixel = np.exp(1j * results[lin][sam].phref[seq_n::, 1, 1]).reshape(n_lines, 1)
-            map_pixel = np.matrix(map_pixel / LA.norm(map_pixel))
-            squeezed[lin, sam] = np.matmul(map_pixel.getH(), org_pixel)
+    mydf = [results.loc[y].at[0] for y in range(lin*sam)]
+    for item in mydf:
+        lin,sam = item.refp[0],item.refp[1]
+        try:
+            pixels_dict_ref_new['amp'][:, lin:lin + 1, sam:sam + 1] = item.ampref[seq_n::, 1, 1]
+            pixels_dict_ref_new['ph'][:, lin:lin + 1, sam:sam + 1] = item.phref[seq_n::, 1, 1]
+        except:
+            print('pixel({}, {}) is not DS'.format(lin, sam))
+        org_pixel = np.multiply(pixels_dict['amp'][seq_n::, lin, sam],
+                                np.exp(1j * pixels_dict['ph'][seq_n::, lin, sam])).reshape(n_lines, 1)
+        map_pixel = np.exp(1j * item.phref[seq_n::, 0, 0]).reshape(n_lines, 1)
+        map_pixel = np.matrix(map_pixel / LA.norm(map_pixel))
+        squeezed[lin, sam] = np.matmul(map_pixel.getH(), org_pixel)
     return squeezed, pixels_dict_ref_new
 
 
@@ -104,28 +95,20 @@ def main(iargs=None):
     inps.azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
 
     ################### Finding Statistical homogeneous pixels ################
-    xl = np.arange(inps.lin)
     pixels_dict = {'amp': RSLCamp[0:20,:,:]}
     
     if not os.path.isfile(inps.work_dir + '/shp.pkl'):
         
+        time0 = time.time()
         shp_df = pd.DataFrame(np.zeros(shape=[inps.lin, inps.sam]))
         pysq.shpobj(shp_df)
+        shp_df = pd.DataFrame(shp_df.values.reshape(inps.lin*inps.sam,1))
         shp_df = shp_df.apply(np.vectorize(pysq.win_loc), wra=inps.range_win,
                               waz=inps.azimuth_win, lin=inps.lin, sam=inps.sam)
+        shp_df_chunk = [shp_df.loc[y].at[0] for y in range(inps.lin*inps.sam)]
+        values = [delayed(pysq.shp_loc_new)(x,pixels_dict) for x in shp_df_chunk]
+        shp_df = pd.DataFrame(list(compute(*values, scheduler='processes')))
 
-        time0 = time.time()
-    
-        shp_df_chunk = [shp_df.loc[y] for y in xl]
-        values = [delayed(pysq.shp_loc)(x,pixels_dict=pixels_dict) for x in shp_df_chunk]
-        results = compute(*values, scheduler='processes')
-        timep = time.time() - time0
-        logger_PSQ.log(loglevel.INFO, 'time spent to find SHPs: {}'.format(timep))
-
-        for lin in range(inps.lin):
-            for sam in range(inps.sam):
-                shp_df.at[lin, sam] = results[lin][sam]
-        del results
         shp_df.to_pickle(inps.work_dir + '/shp.pkl')
 
         print('SHP created ...')
@@ -142,8 +125,9 @@ def main(iargs=None):
     num_seq = np.int(np.floor(inps.n_image / 10))
     sequential_df = pd.DataFrame(np.zeros(shape=[num_seq, 1]))
     pysq.shpobj(sequential_df)
+    
     shp_df = pd.read_pickle(inps.work_dir + '/shp.pkl')
-    shp_df_chunk = [shp_df.loc[y] for y in xl]
+    shp_df_chunk = [shp_df.loc[y].at[0] for y in range(inps.lin*inps.sam)]
 
     time0 = time.time()
     for step in range(num_seq):
@@ -164,7 +148,8 @@ def main(iargs=None):
             AMP = RSLCamp[first_line:last_line, :, :]
             PHAS = RSLCphase[first_line:last_line, :, :]
             pixels_dict = {'amp': AMP, 'ph': PHAS}
-            pixels_dict_ref = {'amp': RSLCamp_ref[first_line:last_line, :, :], 'ph': RSLCphase_ref[first_line:last_line, :, :]}
+            pixels_dict_ref = {'amp': RSLCamp_ref[first_line:last_line, :, :], 
+                               'ph': RSLCphase_ref[first_line:last_line, :, :]}
             squeezed_image, pixels_dict_ref = \
                 sequential_process(shp_df_chunk, seq_df,inps,
                                    pixels_dict=pixels_dict, pixels_dict_ref=pixels_dict_ref)
@@ -173,15 +158,15 @@ def main(iargs=None):
             AMP = np.zeros([step + 10, lin, sam])
             AMP[0:step, :, :] = np.abs(sequential_df.at[step - 1, 0].squeezed)
             AMP[step::, :, :] = RSLCamp[first_line:last_line, :, :]
-            PHAS = np.zeros([t + 10, lin, sam])
+            PHAS = np.zeros([step + 10, lin, sam])
             PHAS[0:step, :, :] = np.angle(sequential_df.at[step - 1, 0].squeezed)
             PHAS[step::, :, :] = RSLCphase[first_line:last_line, :, :]
             pixels_dict = {'amp': AMP, 'ph': PHAS}
             pixels_dict_ref = {'amp': RSLCamp_ref[first_line:last_line, :, :], 'ph': RSLCphase_ref[first_line:last_line, :, :]}
-            squeezed_image, pixels_dict_ref = \
-                np.dstack((sequential_df.at[step - 1, 0].squeezed.T,
-                           sequential_process(shp_df_chunk, seq_df,
-                                              inps,pixels_dict=pixels_dict,pixels_dict_ref=pixels_dict_ref).T)).T
+            squeezed_im, pixels_dict_ref = sequential_process(shp_df_chunk, seq_df,
+                                                              inps,pixels_dict=pixels_dict,
+                                                              pixels_dict_ref=pixels_dict_ref)
+            squeezed_image = np.dstack((sequential_df.at[step - 1, 0].squeezed.T,squeezed_im.T)).T
             sequential_df.at[step, 0].squeezed = squeezed_image
             
         np.save(inps.work_dir + '/Amplitude_ref.npy', RSLCamp_ref)
@@ -196,12 +181,14 @@ def main(iargs=None):
                   'ph': np.angle(sequential_df.at[num_seq - 1, 0].squeezed)}
 
     values = [delayed(pysq.phase_link)(x,pixels_dict=pixels_dict) for x in shp_df_chunk]
-    results = compute(*values, scheduler='processes')
+    results = pd.DataFrame(list(compute(*values, scheduler='processes')))
     datum_connect = np.zeros([num_seq, inps.lin, inps.sam])
-    for lin in range(inps.lin):
-        for sam in range(inps.sam):
-            datum_connect[:, lin, sam] = results[lin][sam].phref[:, 1, 1].reshape(num_seq, 1, 1)
-
+    mydf = [results.loc[y].at[0] for y in range(inps.lin*inps.sam)]
+    
+    for item in mydf:
+       lin,sam = item.refp[0],item.refp[1]
+       datum_connect[:, lin:lin+1, sam:sam+1] = item.phref[:, 0, 0].reshape(num_seq, 1, 1)
+    
     for step in range(num_seq):
         first_line = step * 10
         if seq_df == num_seq:
@@ -211,7 +198,7 @@ def main(iargs=None):
         RSLCphase_ref[first_line:last_line, :, :] = RSLCphase_ref[first_line:last_line, :, :] + datum_connect[step, :, :]
 
     timep = time.time() - time0
-    logger_PSQ.log(loglevel.INFO, 'time spent to do sequential phase linking {}: {}'.format(timep))
+    logger_PSQ.log(loglevel.INFO, 'time spent to do sequential phase linking {}: min'.format(timep/60))
 
     np.save(inps.work_dir + '/endflag.npy', 'True')
     np.save(inps.work_dir + '/Amplitude_ref.npy', RSLCamp_ref)
