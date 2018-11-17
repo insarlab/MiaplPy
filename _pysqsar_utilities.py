@@ -479,11 +479,11 @@ def phase_link(mydf, pixels_dict={}):
     refr = mydf.ref_pixel[0]
     refc = mydf.ref_pixel[1]
     if mydf.scatterer == 'DS':
-        dp = np.matrix(1.0 * np.arange(nimage * len(rr)).reshape((nimage, len(rr))))
+        dp = np.matrix(1.0 * np.arange(nimage * len(rr)).reshape(nimage, len(rr)))
         dp = np.exp(1j * dp)
         dpamp = pixels_dict['amp'][:, rr, cc]
         dpph = pixels_dict['ph'][:, rr, cc]
-        dp[:,:,:] = np.matrix(comp_matr(dpamp, dpph))
+        dp[:,:] = np.matrix(comp_matr(dpamp, dpph))
         cov_m = np.matmul(dp, dp.getH()) / (len(rr))
         phi = np.angle(cov_m)
         abs_cov = np.abs(cov_m)
