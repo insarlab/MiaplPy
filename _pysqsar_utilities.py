@@ -426,7 +426,7 @@ def shp_loc(mydf, pixels_dict={}):
     else:
         mydf.scatterer = 'PS'
             
-    return df  
+    return mydf  
 
 ###############################################################################
 
@@ -518,5 +518,5 @@ def phase_link(mydf, pixels_dict={}):
         xn = np.matrix(pixels_dict['ph'][:, refr, refc].reshape(nimage, 1))
         xn = xn - xn[0,0]
         mydf.phref = np.array(xn).reshape(nimage, 1, 1)
-    return df 
+    return mydf 
 
