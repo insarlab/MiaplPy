@@ -55,7 +55,7 @@ def sequential_process(df_chunk, sequential_df_chunk, inps, pixels_dict={}, pixe
     pixels_dict_ref_new = pixels_dict_ref
     mydf = [results.loc[y].at[0] for y in range(inps.lin*inps.sam)]
     for item in mydf:
-        lin,sam = item.refp[0],item.refp[1]
+        lin,sam = item.ref_pixel[0],item.ref_pixel[1]
         try:
             pixels_dict_ref_new['amp'][:, lin:lin + 1, sam:sam + 1] = item.ampref[seq_n::, 1, 1]
             pixels_dict_ref_new['ph'][:, lin:lin + 1, sam:sam + 1] = item.phref[seq_n::, 1, 1]
@@ -186,7 +186,7 @@ def main(iargs=None):
     mydf = [results.loc[y].at[0] for y in range(inps.lin*inps.sam)]
     
     for item in mydf:
-       lin,sam = item.refp[0],item.refp[1]
+       lin,sam = item.ref_pixel[0],item.ref_pixel[1]
        datum_connect[:, lin:lin+1, sam:sam+1] = item.phref[:, 0, 0].reshape(num_seq, 1, 1)
     
     for step in range(num_seq):
