@@ -473,52 +473,53 @@ def comp_matr(x, y):
 ###############################################################################
 
 
-def phase_link(df, pixels_dict={}):
+def phase_link(mydf, pixels_dict={}):
     """ Runs the phase linking algorithm over each DS.""" 
     
     nimage = pixels_dict['amp'].shape[0]
-    s = df.shape
-    for q in range(s[0]):
-        mydf = df[q]
-        if mydf.scatterer == 'DS':
-            rr = mydf.rows.astype(int)
-            cc = mydf.cols.astype(int)
-            refr = mydf.ref_pixel[0]
-            refc = mydf.ref_pixel[1]
-            dp = np.matrix(1.0 * np.arange(nimage * len(rr)).reshape((nimage, len(rr))))
-            dp = np.exp(1j * dp)
-            dpamp = pixels_dict['amp'][:, rr, cc]
-            dpph = pixels_dict['ph'][:, rr, cc]
-            dp[:,:,:] = np.matrix(comp_matr(dpamp, dpph))
-            cov_m = np.matmul(dp, dp.getH()) / (len(rr))
-            phi = np.angle(cov_m)
-            abs_cov = np.abs(cov_m)
-            coh = cov2corr(abs_cov)
-            gam_c = np.multiply(coh, np.exp(1j * phi))
-            try:
-                ph0 = EVD_phase_estimation(gam_c)
-                xm = np.zeros([len(ph0),len(ph0)+1])+0j
-                xm[:,0:1] = np.reshape(ph0,[len(ph0),1])
-                xm[:,1::] = cov_m[:,:]
-                res_PTA = psq.PTA_L_BFGS(xm)
-                ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
-                xn = np.matrix(ph_PTA.reshape(nimage, 1))
-                #xn = np.matrix(ph0.reshape(nimage, 1))
-            except:
-                xn = np.matrix(pixels_dict['ph'][:, refr, refc].reshape(nimage, 1))
-                xn = xn - xn[0,0]
-            ampn = np.sqrt(np.abs(np.diag(cov_m))) 
-            g1 = np.triu(phi,1)
-            g2 = np.matmul(np.exp(-1j * xn), (np.exp(-1j * xn)).getH())
-            g2 = np.triu(np.angle(g2), 1)
-            gam_pta = gam_pta_f(g1, g2)
-            if 0.4 < gam_pta <= 1:
-                mydf.ampref = np.array(ampn).reshape(nimage, 1, 1)
-                mydf.phref = np.array(xn).reshape(nimage, 1, 1)
-            else:
-                mydf.ampref = pixels_dict['amp'][:, refr, refc].reshape(nimage, 1, 1)
-                xn = np.matrix(pixels_dict['ph'][:, refr, refc].reshape(nimage, 1))
-                xn = xn - xn[0,0]
-                mydf.phref = np.array(xn).reshape(nimage, 1, 1)
+    rr = mydf.rows.astype(int)
+    cc = mydf.cols.astype(int)
+    refr = mydf.ref_pixel[0]
+    refc = mydf.ref_pixel[1]
+    if mydf.scatterer == 'DS':
+        dp = np.matrix(1.0 * np.arange(nimage * len(rr)).reshape((nimage, len(rr))))
+        dp = np.exp(1j * dp)
+        dpamp = pixels_dict['amp'][:, rr, cc]
+        dpph = pixels_dict['ph'][:, rr, cc]
+        dp[:,:,:] = np.matrix(comp_matr(dpamp, dpph))
+        cov_m = np.matmul(dp, dp.getH()) / (len(rr))
+        phi = np.angle(cov_m)
+        abs_cov = np.abs(cov_m)
+        coh = cov2corr(abs_cov)
+        gam_c = np.multiply(coh, np.exp(1j * phi))
+        try:
+            ph0 = EVD_phase_estimation(gam_c)
+            xm = np.zeros([len(ph0),len(ph0)+1])+0j
+            xm[:,0:1] = np.reshape(ph0,[len(ph0),1])
+            xm[:,1::] = cov_m[:,:]
+            res_PTA = psq.PTA_L_BFGS(xm)
+            ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
+            xn = np.matrix(ph_PTA.reshape(nimage, 1))
+        except:
+            xn = np.matrix(pixels_dict['ph'][:, refr, refc].reshape(nimage, 1))
+            xn = xn - xn[0,0]
+        ampn = np.sqrt(np.abs(np.diag(cov_m))) 
+        g1 = np.triu(phi,1)
+        g2 = np.matmul(np.exp(-1j * xn), (np.exp(-1j * xn)).getH())
+        g2 = np.triu(np.angle(g2), 1)
+        gam_pta = gam_pta_f(g1, g2)
+        if 0.4 < gam_pta <= 1:
+            mydf.ampref = np.array(ampn).reshape(nimage, 1, 1)
+            mydf.phref = np.array(xn).reshape(nimage, 1, 1)
+        else:
+            mydf.ampref = pixels_dict['amp'][:, refr, refc].reshape(nimage, 1, 1)
+            xn = np.matrix(pixels_dict['ph'][:, refr, refc].reshape(nimage, 1))
+            xn = xn - xn[0,0]
+            mydf.phref = np.array(xn).reshape(nimage, 1, 1)
+    else:
+        mydf.ampref = pixels_dict['amp'][:, refr, refc].reshape(nimage, 1, 1)
+        xn = np.matrix(pixels_dict['ph'][:, refr, refc].reshape(nimage, 1))
+        xn = xn - xn[0,0]
+        mydf.phref = np.array(xn).reshape(nimage, 1, 1)
     return df 
 
