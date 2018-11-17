@@ -53,7 +53,7 @@ def sequential_process(df_chunk, sequential_df_chunk, inps, pixels_dict={}, pixe
     results = pd.DataFrame(list(compute(*values, scheduler='processes')))
     squeezed = np.zeros([inps.lin, inps.sam]) + 0j
     pixels_dict_ref_new = pixels_dict_ref
-    mydf = [results.loc[y].at[0] for y in range(lin*sam)]
+    mydf = [results.loc[y].at[0] for y in range(inps.lin*inps.sam)]
     for item in mydf:
         lin,sam = item.refp[0],item.refp[1]
         try:
