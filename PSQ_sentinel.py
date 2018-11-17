@@ -155,7 +155,7 @@ def main(iargs=None):
                                    pixels_dict=pixels_dict, pixels_dict_ref=pixels_dict_ref)
             sequential_df.at[step, 0].squeezed = squeezed_image
         else:
-            AMP = np.zeros([step + 10, lin, sam])
+            AMP = np.zeros([step + 10, inps.lin, inps.sam])
             AMP[0:step, :, :] = np.abs(sequential_df.at[step - 1, 0].squeezed)
             AMP[step::, :, :] = RSLCamp[first_line:last_line, :, :]
             PHAS = np.zeros([step + 10, lin, sam])
