@@ -61,7 +61,9 @@ def main(iargs=None):
     slave_dir = project_dir + '/merged/SLC'
     sq_dir = project_dir + '/SqueeSAR'
     slc_list = os.listdir(slave_dir)
+    
     patch_list = glob.glob(sq_dir+'/PATCH*')
+    patch_list = list(map(x.split('/')[-1], for x in patch_list))
     
     range_win = int(inps.template['squeesar.wsizerange'])
     azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
