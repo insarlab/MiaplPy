@@ -490,7 +490,8 @@ def phase_link(mydf, pixels_dict={}):
         coh = cov2corr(abs_cov)
         gam_c = np.multiply(coh, np.exp(1j * phi))
         try:
-            ph0 = EVD_phase_estimation(gam_c)
+            #ph0 = EVD_phase_estimation(gam_c)
+            ph0 = phi[0,:].reshape(len(phi),1)
             xm = np.zeros([len(ph0),len(ph0)+1])+0j
             xm[:,0:1] = np.reshape(ph0,[len(ph0),1])
             xm[:,1::] = cov_m[:,:]
