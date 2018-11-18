@@ -64,9 +64,6 @@ def main(iargs=None):
     range_win = int(inps.template['squeesar.wsizerange'])
     azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
 
-    patch_list = list(map(lambda x:'PATCH'+ x, np.load(sq_dir + '/patchlist.npy')))
-
-
     patch_rows = np.load(sq_dir + '/rowpatch.npy')
     patch_cols = np.load(sq_dir + '/colpatch.npy')
 
