@@ -165,8 +165,9 @@ def main(iargs=None):
 
     print ("job file created: " + " run_write_SLC")
 
-    cmd = '$INT_SCR/split_jobs.py -f ' + inps.project_dir + '/merged/run_write_SLC -w 1:00 -r 5000 -q '+ jobqueue 
-    #cmd = 'createBatch.pl ' + inps.project_dir + '/merged/run_write_SLC' + ' memory=' + '5000' + ' walltime=' + '1:00'
+    #cmd = '$INT_SCR/split_jobs.py -f ' + inps.project_dir + '/merged/run_write_SLC -w 1:00 -r 5000 -q '+ jobqueue 
+    cmd = 'createBatch.pl ' + inps.project_dir + '/merged/run_write_SLC' + ' memory=' + '5000' + 
+          ' walltime=' + '1:00' + ' QUEUENAME=bigmem'
     status = subprocess.Popen(cmd, shell=True).wait()
     if status is not 0:
         logger_ph_lnk.log(loglevel.ERROR, 'ERROR writing SLCs')
