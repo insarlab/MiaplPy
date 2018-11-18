@@ -138,7 +138,7 @@ def main(iargs=None):
 
     if flag == 'patchlist_created':
         #cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
-        cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 10:00 -r 6000 -q '+ jobqueue 
+        cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 10:00 -r 6000 -p vdm -q '+ jobqueue 
         status = subprocess.Popen(cmd, shell=True).wait()
         if status is not 0:
             logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
