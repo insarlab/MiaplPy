@@ -108,7 +108,6 @@ def main(iargs=None):
                                             
     np.save(inps.sq_dir+'/rowpatch.npy',inps.patch_rows)
     np.save(inps.sq_dir+'/colpatch.npy',inps.patch_cols)
-    np.save(inps.sq_dir + '/patchlist.npy', inps.patch_list)
     
     time0 = time.time()                                        
     if os.path.isfile(inps.sq_dir + '/flag.npy'):
@@ -116,7 +115,7 @@ def main(iargs=None):
     else:
         values = [delayed(create_patch)(inps, x) for x in inps.patch_list]
         compute(*values, scheduler='processes')
-        np.save(inps.sq_dir + '/flag.npy', 'patchlist_created')
+    np.save(inps.sq_dir + '/flag.npy', 'patchlist_created')
     timep = time.time() - time0
     logger_ph_lnk.log(loglevel.INFO, "Done Creating PATCH. time:{}".format(timep))
 
