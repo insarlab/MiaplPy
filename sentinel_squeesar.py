@@ -145,13 +145,14 @@ def main(iargs=None):
             logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
             raise Exception('ERROR running PSQ_sentinel.py')
 
-    #for patch in inps.patch_list:
-    #    patch = patch[2:-1]
-    #    if os.path.isfile(inps.patch_dir + patch + '/endflag.npy'):
-    #        print('phase linking done sucessfully')
-    #    else:
-    #        print('PATCH'+patch + ' was not processed')
-    #        sys.exit(1)
+    for patch in inps.patch_list:
+        #patch = patch[2:-1]
+        print(inps.patch_dir + patch + '/endflag.npy')
+        if os.path.isfile(inps.patch_dir + patch + '/endflag.npy'):
+            print('phase linking done sucessfully')
+        else:
+            print('PATCH'+patch + ' was not processed')
+            sys.exit(1)
 
 
     run_write_slc = inps.project_dir + '/merged/run_write_SLC'
