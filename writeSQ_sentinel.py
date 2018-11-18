@@ -8,6 +8,7 @@ import isce
 import isceobj
 import sys
 import argparse
+import glob
 
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 from _pysqsar_utilities import send_logger_squeesar, comp_matr
@@ -60,7 +61,8 @@ def main(iargs=None):
     slave_dir = project_dir + '/merged/SLC'
     sq_dir = project_dir + '/SqueeSAR'
     slc_list = os.listdir(slave_dir)
-
+    patch_list = glob.glob(sq_dir+'/PATCH*')
+    
     range_win = int(inps.template['squeesar.wsizerange'])
     azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
 
