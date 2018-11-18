@@ -135,8 +135,16 @@ def main(iargs=None):
       jobqueue = inps.template['job_queue']
     except:
       jobqueue = 'general'
-
-    if flag == 'patchlist_created':
+    
+    PSQ = False
+    for patch in inps.patch_list:
+        if os.path.isfile(inps.patch_dir + patch + '/endflag.npy'):
+            print('phase linking done sucessfully')
+        else:
+            print('PATCH'+patch + ' was not processed')
+            PSQ = True
+    
+    if flag == 'patchlist_created' and PSQ == True:
         #cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
         cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 10:00 -r 6000 -q '+ jobqueue 
         status = subprocess.Popen(cmd, shell=True).wait()
@@ -145,14 +153,7 @@ def main(iargs=None):
             logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
             raise Exception('ERROR running PSQ_sentinel.py')
 
-    for patch in inps.patch_list:
-        #patch = patch[2:-1]
-        print(inps.patch_dir + patch + '/endflag.npy')
-        if os.path.isfile(inps.patch_dir + patch + '/endflag.npy'):
-            print('phase linking done sucessfully')
-        else:
-            print('PATCH'+patch + ' was not processed')
-            sys.exit(1)
+    
 
 
     run_write_slc = inps.project_dir + '/merged/run_write_SLC'
