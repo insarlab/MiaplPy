@@ -63,7 +63,7 @@ def main(iargs=None):
     slc_list = os.listdir(slave_dir)
     
     patch_list = glob.glob(sq_dir+'/PATCH*')
-    patch_list = list(map(x.split('/')[-1], for x in patch_list))
+    patch_list = list(map(x.split('/')[-1] for x in patch_list))
     
     range_win = int(inps.template['squeesar.wsizerange'])
     azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
