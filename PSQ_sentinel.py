@@ -168,13 +168,15 @@ def main(iargs=None):
                                                               pixels_dict_ref=pixels_dict_ref)
             squeezed_image = np.dstack((sequential_df.at[step - 1, 0].squeezed.T,squeezed_im.T)).T
             sequential_df.at[step, 0].squeezed = squeezed_image
-            
+        
+        RSLCamp_ref[first_line:last_line, :, :] = pixels_dict_ref['amp']
+        RSLCphase_ref[first_line:last_line, :, :] = pixels_dict_ref['ph']
+        
         np.save(inps.work_dir + '/Amplitude_ref.npy', RSLCamp_ref)
         np.save(inps.work_dir + '/Phase_ref.npy', RSLCphase_ref)
         sequential_df.to_pickle(inps.work_dir + '/sequential_df.pkl')
     
-        RSLCamp_ref[first_line:last_line, :, :] = pixels_dict_ref['amp']
-        RSLCphase_ref[first_line:last_line, :, :] = pixels_dict_ref['ph']
+        
 
     ############## Datum Connection ##############################
     pixels_dict = {'amp': np.abs(sequential_df.at[num_seq - 1, 0].squeezed),
