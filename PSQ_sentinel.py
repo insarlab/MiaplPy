@@ -13,12 +13,9 @@ import numpy as np
 import _pysqsar_utilities as pysq
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 from dataset_template import Template
-from rsmas_logging import loglevel
 import pandas as pd
 from dask import compute, delayed
 
-
-logger_PSQ = pysq.send_logger_squeesar()
 
 #################################
 EXAMPLE = """example:
@@ -73,8 +70,6 @@ def sequential_process(df_chunk, sequential_df_chunk, inps, pixels_dict={}, pixe
 def main(iargs=None):
     inps = command_line_parse(iargs)
 
-    logger_PSQ.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1]+ " " + sys.argv[2])
-
     inps.project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
     inps.project_dir = os.getenv('SCRATCHDIR') + '/' + inps.project_name
     inps.template = Template(inps.custom_template_file).get_options()
@@ -108,8 +103,11 @@ def main(iargs=None):
         shp_df_chunk = [shp_df.loc[y].at[0] for y in range(inps.lin*inps.sam)]
         values = [delayed(pysq.shp_loc)(x,pixels_dict) for x in shp_df_chunk]
         shp_df = pd.DataFrame(list(compute(*values, scheduler='processes')))
-
+        
         shp_df.to_pickle(inps.work_dir + '/shp.pkl')
+        
+        timep = time.time() - time0
+        print('time spent to find SHPs {}: min'.format(timep/60))
 
         print('SHP created ...')
     else:
@@ -200,13 +198,13 @@ def main(iargs=None):
                 last_line = first_line + 10
             RSLCphase_ref[first_line:last_line, :, :] = RSLCphase_ref[first_line:last_line, :, :] + datum_connect[step, :, :]
 
-        timep = time.time() - time0
-        logger_PSQ.log(loglevel.INFO, 'time spent to do sequential phase linking {}: min'.format(timep/60))
-
         np.save(inps.work_dir + '/endflag.npy', 'True')
         np.save(inps.work_dir + '/Amplitude_ref.npy', RSLCamp_ref)
         np.save(inps.work_dir + '/Phase_ref.npy', RSLCphase_ref)
         sequential_df.to_pickle(inps.work_dir + '/sequential_df.pkl')
+        
+        timep = time.time() - time0
+        print('time spent to do sequential phase linking {}: min'.format(timep/60))
 
 if __name__ == '__main__':
     '''
