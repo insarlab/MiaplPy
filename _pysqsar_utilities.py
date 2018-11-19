@@ -116,7 +116,7 @@ def corr2cov(corr_matrix = [],sigma = []):
 def cov2corr(cov_matrix):
     """ Converts covariance matrix to correlation/coherence matrix. """
     
-    D = np.diagflat(1 / np.sqrt(np.diag(cov_matrix)))
+    D = np.diagflat(np.pinv(np.sqrt(np.diag(cov_matrix))))
     y = np.matmul(D, cov_matrix)
     corr_matrix = np.matmul(y, np.transpose(D))
     
