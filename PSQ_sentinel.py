@@ -53,19 +53,22 @@ def sequential_process(shp_df_chunk, sequential_df_chunk, inps, pixels_dict={}, 
     results = pd.DataFrame(list(compute(*values, scheduler='processes')))
     squeezed = np.zeros([inps.lin, inps.sam]) + 0j
     pixels_dict_ref_new = pixels_dict_ref
-    mydf = [results.loc[y] for y in range(len(results))]
-    for item in mydf:
+    results_df = [results.loc[y] for y in range(len(results))]
+
+    for item in results_df:
         lin,sam = item['ref_pixel'][0],item['ref_pixel'][1]
-        try:
-            pixels_dict_ref_new['amp'][:, lin:lin + 1, sam:sam + 1] = item['amp_ref'][seq_n::, 0, 0]
-            pixels_dict_ref_new['ph'][:, lin:lin + 1, sam:sam + 1] = item['phase_ref'][seq_n::, 0, 0]
-        except:
-            print('pixel({}, {}) is not DS'.format(lin, sam))
+
+        pixels_dict_ref_new['amp'][:, lin:lin + 1, sam:sam + 1] = item['amp_ref'][seq_n::, 0, 0]
+        pixels_dict_ref_new['ph'][:, lin:lin + 1, sam:sam + 1] = item['phase_ref'][seq_n::, 0, 0]
+
         org_pixel = np.multiply(pixels_dict['amp'][seq_n::, lin, sam],
                                 np.exp(1j * pixels_dict['ph'][seq_n::, lin, sam])).reshape(n_lines, 1)
+
         map_pixel = np.exp(1j * item['phase_ref'][seq_n::, 0, 0]).reshape(n_lines, 1)
         map_pixel = np.matrix(map_pixel / LA.norm(map_pixel))
+
         squeezed[lin, sam] = np.matmul(map_pixel.getH(), org_pixel)
+
     return squeezed, pixels_dict_ref_new
 
 
@@ -173,12 +176,6 @@ def main(iargs=None):
 
         time0 = time.time()
         for step in range(num_seq):
-      
-            try: 
-                del pixels_dict
-                print('Next Sequence...')
-            except:
-                print('Next Sequence...')
 
             first_line = step  * 10
             if step == num_seq-1:
