@@ -114,7 +114,7 @@ def main(iargs=None):
                 ref_col = ref_col - (inps.range_win - len(c))
                 x, y = np.meshgrid(r.astype(int), c.astype(int), sparse=True)
                 win = RSLCamp[:, x, y]
-                win = psq.trwin(win)
+                win = pysq.trwin(win)
                 test_vec = win.reshape(inps.n_image, len(r) * len(c))
                 ks_res = np.zeros(len(r) * len(c))
                 ref_scatterer = RSLCamp[:, lin, sam]
