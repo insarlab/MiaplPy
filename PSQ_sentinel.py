@@ -90,13 +90,28 @@ def main(iargs=None):
     inps.azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
 
     ################### Finding Statistical homogeneous pixels ################
-    pixels_dict = {'amp': RSLCamp[0:20,:,:]}
+    pixels_dict = {'amp': RSLCamp}
     
     if not os.path.isfile(inps.work_dir + '/shp.pkl'):
         
         time0 = time.time()
-        shp_df = pd.DataFrame(np.zeros(shape=[inps.lin, inps.sam]))
-        pysq.shpobj(shp_df)
+        shp_df = pd.DataFrame(columns=['refp','rows','cols'])
+        t1 = 0
+        while t1 < lin:  # rows
+            r = np.ogrid[t1 - ((waz - 1) / 2):t1 + ((waz - 1) / 2) + 1]
+            refr = np.array([(waz - 1) / 2])
+            r = r[r >= 0]
+            r = r[r < lin]
+            refr = refr - (waz - len(r))
+            t2i = 0
+            while t2i < sam:
+                c = np.ogrid[t2i - ((wra - 1) / 2):t2i + ((wra - 1) / 2) + 1]
+                refc = np.array([(wra - 1) / 2])
+                c = c[c >= 0]
+                c = c[c < sam]
+                refc = refc - (wra - len(c))
+            
+            
         shp_df = pd.DataFrame(shp_df.values.reshape(inps.lin*inps.sam,1))
         shp_df = shp_df.apply(np.vectorize(pysq.win_loc), wra=inps.range_win,
                               waz=inps.azimuth_win, lin=inps.lin, sam=inps.sam)
