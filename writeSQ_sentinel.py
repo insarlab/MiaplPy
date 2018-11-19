@@ -6,172 +6,153 @@ import numpy as np
 import os
 import isce
 import isceobj
-import datetime
-import logging
-import argparse
-from isceobj.Util.ImageUtil import ImageLib as IML
-from isceobj.Util.decorators import use_api
-import glob
 import sys
-import gdal
-import subprocess
-import cmath
-import scipy.io
+import argparse
+import glob
 
-import logging
+sys.path.insert(0, os.getenv('RSMAS_ISCE'))
+from _pysqsar_utilities import send_logger_squeesar, comp_matr
+from rsmas_logging import loglevel
+from dataset_template import Template
 
-import pysar
-from pysar.utils import utils
-from pysar.utils import readfile
-from pysar.utils import writefile
+logger_write = send_logger_squeesar()
 
-logger = logging.getLogger("process_sentinel")
+##############################################################################
+EXAMPLE = """example:
+  writeSQ_sentinel.py LombokSenAT156VV.template 20170823/20170823.slc.full
+"""
 
 
-#######################################
-def comp_matr(x, y):
-    a1 = np.size(x, axis=0)
-    a2 = np.size(x, axis=1)
-    out = np.empty((a1, a2), dtype=complex)
-    for a in range(a1):
-        for b in range(a2):
-            out[a, b] = cmath.rect(x[a, b], y[a, b])
-    return out
+def create_parser():
+    """ Creates command line argument parser object. """
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, epilog=EXAMPLE)
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
+    parser.add_argument('custom_template_file', nargs='?',
+                        help='custom template with option settings.\n')
+    parser.add_argument('-s','--slcdir', dest='slc_dir', type=str, required=True, help='slc file directory (date/date.slc.full)')
+
+
+    return parser
+
+
+def command_line_parse(args):
+    """ Parses command line agurments into inps variable. """
+
+    parser = create_parser()
+    inps = parser.parse_args(args)
+
+    return inps
 
 
 ########################################
-def main(argv):
-    try:
-        templateFileString = argv[1]
-        slcname = argv[2]
-    except:
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        print (" ")
-        print ("  Replace SLC images with squeezed values")
-        print (" ")
-        print ("  Usage: writeSQ_sentinel.py templatefile slcfile")
-        print (" ")
-        print ("  Example: ")
-        print ("       writeSQ_sentinel.py $TE/NMerapiSenAT127VV.template 20180402/20180402.slc.full")
-        print (" ")
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        sys.exit(1)
+def main(iargs=None):
+    """
+        Overwrite filtered SLC images in Isce merged/SLC directory.
+    """
 
-    logger.info(os.path.basename(sys.argv[0]) + " " + sys.argv[1])
-    templateContents = readfile.read_template(templateFileString)
+    inps = command_line_parse(iargs)
 
-    projectName = os.path.basename(templateFileString).partition('.')[0]
-    scratchDir = os.getenv('SCRATCHDIR')
-    projdir = scratchDir + '/' + projectName
-    slavedir = projdir + '/merged/SLC'
-    sqdir = projdir + '/SqueeSAR'
-    patchlistfile = sqdir + "/run_PSQ_sentinel"
-    slclist = os.listdir(slavedir)
+    logger_write.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1] + " " + sys.argv[2])
+    inps.template = Template(inps.custom_template_file).get_options()
 
-    wra = int(templateContents['squeesar.wsizerange'])
-    waz = int(templateContents['squeesar.wsizeazimuth'])
+    project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
+    project_dir = os.getenv('SCRATCHDIR') + '/' + project_name
+    slave_dir = project_dir + '/merged/SLC'
+    sq_dir = project_dir + '/SqueeSAR'
+    slc_list = os.listdir(slave_dir)
+    
+    patch_list = glob.glob(sq_dir+'/PATCH*')
+    patch_list = list(map(lambda x: x.split('/')[-1], patch_list))
+    
+    range_win = int(inps.template['squeesar.wsizerange'])
+    azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
 
-    plist = []
+    patch_rows = np.load(sq_dir + '/rowpatch.npy')
+    patch_cols = np.load(sq_dir + '/colpatch.npy')
 
-    f = open(patchlistfile, "r")
-    while 1:
-        line = f.readline()
-        if not line: break
-        plist.append(line.split(" ")[-2].split('\t')[1])
-    f.close()
+    patch_rows_overlap = np.load(sq_dir + '/rowpatch.npy')
+    patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win + 1
+    patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + azimuth_win + 1
+    patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - azimuth_win + 1
+    patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + azimuth_win - 1
 
-    pr0 = np.load(sqdir + '/rowpatch.npy')
-    pc0 = np.load(sqdir + '/colpatch.npy')
+    patch_cols_overlap = np.load(sq_dir + '/colpatch.npy')
+    patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - range_win + 1
+    patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win + 1
+    patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win + 1
+    patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + range_win - 1
 
-    pr = np.load(sqdir + '/rowpatch.npy')
-    pr[1, 0, 0] = pr[1, 0, 0] - waz + 1
-    pr[0, 0, 1::] = pr[0, 0, 1::] + waz + 1
-    pr[1, 0, 1::] = pr[1, 0, 1::] - waz + 1
-    pr[1, 0, -1] = pr[1, 0, -1] + waz - 1
+    first_row = patch_rows_overlap[0, 0, 0]
+    last_row = patch_rows_overlap[1, 0, -1]
+    first_col = patch_cols_overlap[0, 0, 0]
+    last_col = patch_cols_overlap[1, 0, -1]
 
-    pc = np.load(sqdir + '/colpatch.npy')
-    pc[1, 0, 0] = pc[1, 0, 0] - wra + 1
-    pc[0, 0, 1::] = pc[0, 0, 1::] + wra + 1
-    pc[1, 0, 1::] = pc[1, 0, 1::] - wra + 1
-    pc[1, 0, -1] = pc[1, 0, -1] + wra - 1
+    n_line = last_row - first_row
+    width = last_col - first_col
 
-    frow = pr[0, 0, 0]
-    lrow = pr[1, 0, -1]
-    fcol = pc[0, 0, 0]
-    lcol = pc[1, 0, -1]
+    g = inps.slc_dir
+    image_ind = [i for (i, val) in enumerate(slc_list) if val == g.split('/')[0]]
 
-    lin = lrow - frow
-    sam = lcol - fcol
-    print(lin, sam)
-    g = slcname
-    imind = [i for (i, val) in enumerate(slclist) if val == g.split('/')[0]]
+    while g == inps.slc_dir:
 
-    while g == slcname:
+        RSLCamp = np.zeros([int(n_line), int(width)])
+        RSLCphase = np.zeros([int(n_line), int(width)])
 
-        RSLCamp = np.zeros([np.int(lin), np.int(sam)])
-        RSLCphase = np.zeros([np.int(lin), np.int(sam)])
+        for patch in patch_list:
 
-        for t in plist:
+            row = int(patch.split('PATCH')[-1].split('_')[0])
+            col = int(patch.split('PATCH')[-1].split('_')[1])
+            row1 = patch_rows_overlap[0, 0, row]
+            row2 = patch_rows_overlap[1, 0, row]
+            col1 = patch_cols_overlap[0, 0, col]
+            col2 = patch_cols_overlap[1, 0, col]
+            amp = np.load(sq_dir + '/' + patch + '/Amplitude_ref.npy')
+            ph = np.load(sq_dir + '/' + patch + '/Phase_ref.npy')
 
-            r = int(t.split('PATCH')[-1].split('_')[0])
-            c = int(t.split('PATCH')[-1].split('_')[1])
-            r1 = pr[0, 0, r]
-            r2 = pr[1, 0, r]
-            c1 = pc[0, 0, c]
-            c2 = pc[1, 0, c]
-            amp = np.load(sqdir + '/' + t + '/Amplitude_ref.npy')
-            ph = np.load(sqdir + '/' + t + '/Phase_ref.npy')
+            f_row = (row1 - patch_rows[0, 0, row])
+            l_row = np.size(amp, axis=1) - (patch_rows[1, 0, row] - row2)
+            f_col = (col1 - patch_cols[0, 0, col])
+            l_col = np.size(amp, axis=2) - (patch_cols[1, 0, col] - col2)
 
-            fr = (r1 - pr0[0, 0, r])
-            lr = np.size(amp, axis=1) - (pr0[1, 0, r] - r2)
-            fc = (c1 - pc0[0, 0, c])
-            lc = np.size(amp, axis=2) - (pc0[1, 0, c] - c2)
-
-            RSLCamp[r1:r2 + 1, c1:c2 + 1] = amp[imind, fr:lr + 1, fc:lc + 1]  # ampw.reshape(s1,s2)
-            RSLCphase[r1:r2 + 1, c1:c2 + 1] = ph[imind, fr:lr + 1, fc:lc + 1]  # phw.reshape(s1,s2)
+            RSLCamp[row1:row2 + 1, col1:col2 + 1] = \
+                amp[image_ind, f_row:l_row + 1, f_col:l_col + 1]  # ampw.reshape(s1,s2)
+            RSLCphase[row1:row2 + 1, col1:col2 + 1] = \
+                ph[image_ind, f_row:l_row + 1, f_col:l_col + 1]  # phw.reshape(s1,s2)
 
         data = comp_matr(RSLCamp, RSLCphase)
-        slcf = slavedir + '/' + slcname
+        slc_file = slave_dir + '/' + inps.slc_dir
 
-        with open(slcf + '.xml', 'r') as fid:
-            vrtf = fid.readlines()
+        #with open(slc_file + '.xml', 'r') as fid:
+        #    xml_lines = fid.readlines()
 
-        nLines = lin
-        width = sam
 
-        outMap = np.memmap(slcf, dtype=np.complex64, mode='r+', shape=(nLines, width))
-        outMap[:, :] = data
+        out_map = np.memmap(slc_file, dtype=np.complex64, mode='r+', shape=(n_line, width))
+        out_map[:, :] = data
 
-        oimg = isceobj.createSlcImage()
-        oimg.setAccessMode('write')
-        oimg.setFilename(slcf)
-        oimg.setWidth(width)
-        oimg.setLength(nLines)
-        oimg.renderVRT()
-        oimg.renderHdr()
+        out_img = isceobj.createSlcImage()
+        out_img.setAccessMode('write')
+        out_img.setFilename(slc_file)
+        out_img.setWidth(width)
+        out_img.setLength(n_line)
+        out_img.renderVRT()
+        out_img.renderHdr()
 
-        del outMap
+        del out_map
 
-        with open(slcf + '.xml', 'w') as fid:
-            for line in vrtf:
-                fid.write(line)
-        fid.close()
+        #with open(slc_file + '.xml', 'w') as fid:
+        #    for line in xml_lines:
+        #        fid.write(line)
 
         g = 0
 
 
 if __name__ == '__main__':
-    main(sys.argv[:])
+    """
+        Overwrite filtered SLC images.
+    """
+
+    main()
 
 
 

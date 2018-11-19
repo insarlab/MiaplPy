@@ -3,167 +3,180 @@
 # Author: Sara Mirzaee
 
 
-import isce
-import isceobj
 import numpy as np
 import argparse
 import os
-import copy
-
-import gdal
 import subprocess
 import sys
-import glob
+import time
+import argparse
+sys.path.insert(0, os.getenv('RSMAS_ISCE'))
+from rsmas_logging import loglevel
+from dataset_template import Template
+import _pysqsar_utilities as pysq
+from dask import compute, delayed
 
-import logging
-import pysar
-from pysar.utils import utils
-from pysar.utils import readfile
+logger_ph_lnk  = pysq.send_logger_squeesar()
 
-################
+######################################################
+
+EXAMPLE = """example:
+  sentinel_squeesar.py LombokSenAT156VV.template 
+"""
 
 
-def readim(slcname):
-    ds = gdal.Open(slcname + '.vrt', gdal.GA_ReadOnly)
-    Im = ds.GetRasterBand(1).ReadAsArray()
-    ds = None
-    return Im
+def create_parser():
+    """ Creates command line argument parser object. """
 
-def main(argv):
-  try:
-    templateFileString = argv[1]
-  except:
-
-    print ("  ******************************************************************************************************")
-    print ("  ******************************************************************************************************")
-    print ("  ******************************************************************************************************")
-    print (" ")
-    print (" ")
-    print ("  Usage:")
-    print ("          writeSQ_sentinel.py templatefile	slcfile")
-    print (" ")
-    print ("  Example: ")
-    print ("          writeSQ_sentinel.py LombokSenAT156VV.template	20170310/20170310.slc.full")
-    print ("  ******************************************************************************************************")
-    print ("  ******************************************************************************************************")
-    print ("  ******************************************************************************************************")
-
-    sys.exit(1)
-  logger = logging.getLogger("process_sentinel_squeesar")
-  logger.info(os.path.basename(sys.argv[0]) + " " + sys.argv[1])
-  templateContents = readfile.read_template(templateFileString)
-  projectName = os.path.basename(templateFileString).partition('.')[0]      
-  scratchDir = os.getenv('SCRATCHDIR')
-  projdir = scratchDir + '/' + projectName
-  slavedir = projdir+'/merged/SLC'
-  sqdir = projdir+'/SqueeSAR'
-  patchDir = sqdir+'/PATCH'
-
-  listslv = os.listdir(slavedir)
-
-  wra = int(templateContents['squeesar.wsizerange'])
-  waz = int(templateContents['squeesar.wsizeazimuth'])
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, epilog=EXAMPLE)
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
+    parser.add_argument('custom_template_file', nargs='?',
+        help='custom template with option settings.\n')
     
-  if not os.path.isdir(sqdir):
-    os.mkdir(sqdir)
-
-  slc = readim(slavedir + '/' + listslv[0] + '/' + listslv[0] + '.slc.full')  #
-  nimage = len(listslv)
-  lin = slc.shape[0]
-  sam = slc.shape[1]
-  del slc
-  pr1 = np.ogrid[0:lin-50:300]
-  pr2 = pr1+300
-  pr2[-1] = lin
-  pr1[1::] = pr1[1::] - 2*waz
-
-  pc1 = np.ogrid[0:sam-50:300]
-  pc2 = pc1+300
-  pc2[-1] = sam
-  pc1[1::] = pc1[1::] - 2*wra
-  pr = [[pr1], [pr2]]
-  pc = [[pc1], [pc2]]
-  np.save(sqdir+'/rowpatch.npy',pr)
-  np.save(sqdir+'/colpatch.npy',pc) 
+    return parser
 
 
-  if os.path.isfile(sqdir + '/flag.npy'):
-      print('patchlist exist')
-  else:
-      patchlist = []
-      for n1 in range(len(pr1)):
-          lin1 = pr2[n1] - pr1[n1]
-          for n2 in range(len(pc1)):
-              sam1 = pc2[n2] - pc1[n2]
-              patchlist.append(str(n1) + '_' + str(n2))
-              patn = patchDir + str(n1) + '_' + str(n2)
-              if not os.path.isdir(patn) or not os.path.isfile(patn + '/count.npy'):
-                  os.mkdir(patn)
-                  logger.info("Making PATCH" + str(n1) + '_' + str(n2))
-                  amp1 = np.empty((nimage, lin1, sam1))
-                  ph1 = np.empty((nimage, lin1, sam1))
-                  count = 0
+def command_line_parse(args):
+    """ Parses command line agurments into inps variable. """
 
-                  for dirs in listslv:
-                      logger.info("Reading image" + dirs)
-                      dname = slavedir + '/' + dirs + '/' + dirs + '.slc.full'
-                      slc = np.memmap(dname, dtype=np.complex64, mode='r', shape=(lin, sam))
-                      amp1[count, :, :] = np.abs(slc[pr1[n1]:pr2[n1], pc1[n2]:pc2[n2]])
-                      ph1[count, :, :] = np.angle(slc[pr1[n1]:pr2[n1], pc1[n2]:pc2[n2]])
-                      count += 1
-                      del slc
-                  np.save(patn + '/' + 'Amplitude.npy', amp1)
-                  np.save(patn + '/' + 'Phase.npy', ph1)
-                  np.save(patn + '/count.npy', nimage)
-              else:
-                  print('Next patch...')
-      if n1 == len(pr1) - 1 and n2 == len(pc1) - 1:
-          np.save(sqdir + '/flag.npy', 'patchlist_created')
-          np.save(sqdir + '/patchlist.npy', patchlist)
+    parser = create_parser()
+    inps = parser.parse_args(args)
+    return inps
 
-  cmd = '$SQUEESAR/patchlist_sentinel.py ' + templateFileString
-  status = subprocess.Popen(cmd, shell=True).wait()
-  if status is not 0:
-      logger.error('ERROR patchlist not found')
-      raise Exception('ERROR patchlist not found')
+    
+def create_patch(inps, name):
+    patch_row, patch_col = name.split('_')
+    patch_row, patch_col = int(patch_row), int(patch_col)
+    patch_name = inps.patch_dir + str(patch_row) + '_' + str(patch_col)
+    line = inps.patch_rows[1][0][patch_row] - inps.patch_rows[0][0][patch_row]
+    sample = inps.patch_cols[1][0][patch_col] - inps.patch_cols[0][0][patch_col]
+    if  not os.path.isfile(patch_name + '/count.npy'):
+        if not os.path.isdir(patch_name):
+            os.mkdir(patch_name)
+        logger_ph_lnk.log(loglevel.INFO, "Making PATCH" + str(patch_row) + '_' + str(patch_col))
+        amplitude = np.empty((inps.n_image, line, sample))
+        phase = np.empty((inps.n_image, line, sample))
+        count = 0
+        for dirs in inps.list_slv:
+            data_name = inps.slave_dir + '/' + dirs + '/' + dirs + '.slc.full'
+            slc = np.memmap(data_name, dtype=np.complex64, mode='r', shape=(inps.lin, inps.sam))
+            amplitude[count, :, :] = np.abs(slc[inps.patch_rows[0][0][patch_row]:inps.patch_rows[1][0][patch_row],
+                                            inps.patch_cols[0][0][patch_col]:inps.patch_cols[1][0][patch_col]])
+            phase[count, :, :] = np.angle(slc[inps.patch_rows[0][0][patch_row]:inps.patch_rows[1][0][patch_row],
+                                       inps.patch_cols[0][0][patch_col]:inps.patch_cols[1][0][patch_col]])
+            count += 1
+            del slc
+        np.save(patch_name + '/' + 'Amplitude.npy', amplitude)
+        np.save(patch_name + '/' + 'Phase.npy', phase)
+        np.save(patch_name + '/count.npy', inps.n_image)
+    else:
+        print('Next patch...')
+    return "PATCH" + str(patch_row) + '_' + str(patch_col)+" is created"
+                                            
+######################################################################
 
-  ##################
-  flag = np.load(sqdir + '/flag.npy')
+def main(iargs=None):
+    """
+        Pre-process and wrapper for phase linking and phase filtering of Distributed scatterers
+    """
 
-  if flag == 'patchlist_created':
+    inps = command_line_parse(iargs)
+    logger_ph_lnk.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1])
+    inps.project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
+    inps.project_dir = os.getenv('SCRATCHDIR') + '/' + inps.project_name
+    inps.template = Template(inps.custom_template_file).get_options()
 
-      cmd = '$INT_SCR/split_jobs.py -f ' + sqdir + '/run_PSQ_sentinel -w 40:00 -r 3700'
-      status = subprocess.Popen(cmd, shell=True).wait()
-      if status is not 0:
-          logger.error('ERROR running PSQ_sentinel.py')
-          raise Exception('ERROR running PSQ_sentinel.py')
+    inps.slave_dir = inps.project_dir + '/merged/SLC'
+    inps.sq_dir = inps.project_dir + '/SqueeSAR'
+    inps.patch_dir = inps.sq_dir+'/PATCH'
+    inps.list_slv = os.listdir(inps.slave_dir)
+    
+    inps.range_win = int(inps.template['squeesar.wsizerange'])
+    inps.azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
+    
+    if not os.path.isdir(inps.sq_dir):
+        os.mkdir(inps.sq_dir)
+
+    slc = pysq.read_image(inps.slave_dir + '/' + inps.list_slv[0] + '/' + inps.list_slv[0] + '.slc.full')  #
+    inps.n_image = len(inps.list_slv)
+    inps.lin = slc.shape[0]
+    inps.sam = slc.shape[1]
+    del slc
+    
+    inps.patch_rows, inps.patch_cols, inps.patch_list = \
+        pysq.patch_slice(inps.lin,inps.sam,inps.azimuth_win,inps.range_win)
+                                            
+    np.save(inps.sq_dir+'/rowpatch.npy',inps.patch_rows)
+    np.save(inps.sq_dir+'/colpatch.npy',inps.patch_cols)
+    
+    time0 = time.time()                                        
+    if os.path.isfile(inps.sq_dir + '/flag.npy'):
+        print('patchlist exist')
+    else:
+        values = [delayed(create_patch)(inps, x) for x in inps.patch_list]
+        compute(*values, scheduler='processes')
+    np.save(inps.sq_dir + '/flag.npy', 'patchlist_created')
+    timep = time.time() - time0
+    logger_ph_lnk.log(loglevel.INFO, "Done Creating PATCH. time:{}".format(timep))
 
 
-  patchlist = np.load(sqdir + '/patchlist.npy')
-  for d in patchlist:
-      ff0 = np.str(d)
-      d = ff0[2:-1]
-      if os.path.isfile(sqdir + '/' + d + '/endflag.npy'):
-          count = 'True'
-      else:
-          print(str(d))
-          count = 'False'
-  if count == 'True':
+    run_PSQ_sentinel = inps.sq_dir + "/run_PSQ_sentinel"
 
-      cmd = '$SQUEESAR/wrslclist_sentinel.py ' + templateFileString
-      status = subprocess.Popen(cmd, shell=True).wait()
-      if status is not 0:
-          logger.error('ERROR making run_writeSQ list')
-          raise Exception('ERROR making run_writeSQ list')
+    with open(run_PSQ_sentinel, 'w') as f:
+        for patch in inps.patch_list:
+            cmd = 'PSQ_sentinel.py ' + inps.custom_template_file + ' -p ' +'PATCH' + patch + ' \n'
+            f.write(cmd)
+    
 
-      run_write = projdir + '/merged/run_writeSLC'
-      cmd = '$INT_SCR/split_jobs.py -f ' + projdir + '/merged/run_writeSLC -w 1:00 -r 5000'
-      status = subprocess.Popen(cmd, shell=True).wait()
-      if status is not 0:
-          logger.error('ERROR writing SLCs')
-          raise Exception('ERROR writing SLCs')
+           
+###########################################
+    flag = np.load(inps.sq_dir + '/flag.npy')
+    try:
+      jobqueue = inps.template['job_queue']
+    except:
+      jobqueue = 'general'
+    
+    PSQ = False
+    for patch in inps.patch_list:
+        if os.path.isfile(inps.patch_dir + patch + '/endflag.npy'):
+            print('phase linking done sucessfully')
+        else:
+            print('PATCH'+patch + ' was not processed')
+            PSQ = True
+    
+    if flag == 'patchlist_created' and PSQ == True:
+        #cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
+        cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 10:00 -r 6000 -q '+ jobqueue 
+        status = subprocess.Popen(cmd, shell=True).wait()
+        print(status)
+        if status is not 0:
+            logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
+            raise Exception('ERROR running PSQ_sentinel.py')
+
+    
+
+
+    run_write_slc = inps.project_dir + '/merged/run_write_SLC'
+
+    with open(run_write_slc, 'w') as f:
+        for date in inps.list_slv:
+            cmd = 'writeSQ_sentinel.py ' + inps.custom_template_file + ' -s ' + date + '/' + date + '.slc.full' + ' \n'
+            f.write(cmd)
+
+    print ("job file created: " + " run_write_SLC")
+
+    #cmd = '$INT_SCR/split_jobs.py -f ' + inps.project_dir + '/merged/run_write_SLC -w 1:00 -r 5000 -q '+ jobqueue 
+    cmd = 'createBatch.pl ' + inps.project_dir + '/merged/run_write_SLC' + ' memory=' + '5000' + ' walltime=' + '1:00' + ' QUEUENAME=bigmem'
+    status = subprocess.Popen(cmd, shell=True).wait()
+    if status is not 0:
+        logger_ph_lnk.log(loglevel.ERROR, 'ERROR writing SLCs')
+        raise Exception('ERROR writing SLCs')
 
 
 if __name__ == '__main__':
-  main(sys.argv[:])    
-
+    '''
+    Creates patches from the data and calls phase linking to process. 
+    
+    Process for each patch is done sequentially.
+    '''
+    main()

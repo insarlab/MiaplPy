@@ -5,311 +5,254 @@
 
 import os
 import sys
-import glob
 import time
-import matplotlib.pyplot as plt
-import logging
 
-import pysar
-from pysar.utils import utils
-from pysar.utils import readfile
-import subprocess
-import cmath
-from scipy.stats import ks_2samp, norm, ttest_ind
-from skimage.measure import label
-from scipy import linalg
+import argparse
+from numpy import linalg as LA
 import numpy as np
-from numpy.linalg import pinv
-import multiprocessing
-from scipy.optimize import minimize
-
-logger = logging.getLogger("process_sentinel")
-
-
-###############
-
-
-def comp_matr(x, y):
-    a1 = np.size(x, axis=0)
-    a2 = np.size(x, axis=1)
-    out = np.empty((a1, a2), dtype=complex)
-    for a in range(a1):
-        for b in range(a2):
-            out[a, b] = cmath.rect(x[a, b], y[a, b])
-    return out
+from scipy.stats import anderson_ksamp
+from skimage.measure import label
+import _pysqsar_utilities as pysq
+import pandas as pd
+from dask import compute, delayed
+sys.path.insert(0, os.getenv('RSMAS_ISCE'))
+from dataset_template import Template
 
 
-def is_semi_pos_def_chol(x):
-    try:
-        np.linalg.cholesky(x)
-        return True
-    except np.linalg.linalg.LinAlgError:
-        return False
+
+#################################
+EXAMPLE = """example:
+  PSQ_sentinel.py LombokSenAT156VV.template PATCH5_11
+"""
 
 
-def corrcov(x):
-    D = np.diag(1 / np.sqrt(np.diag(x)))
-    y = np.matmul(D, x)
-    corr = np.matmul(y, np.transpose(D))
-    return corr
+def create_parser():
+    """ Creates command line argument parser object. """
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, epilog=EXAMPLE)
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
+    parser.add_argument('custom_template_file', nargs='?',
+                        help='custom template with option settings.\n')
+    parser.add_argument('-p','--patchdir', dest='patch_dir', type=str, required=True, help='patch file directory')
+
+    return parser
 
 
-def gam_pta_f(g1, g2):
-    n1 = g1.shape[0]
-    [r, c] = np.where(g1 != 0)
-    g11 = g1[r,c].reshape(len(r))
-    g22 = g2[r,c].reshape(len(r))
-    gam = np.real(np.dot(np.exp(1j * g11), np.exp(-1j * g22))) * 2 / (n1 ** 2 - n1)
-    return gam
+def command_line_parse(args):
+    """ Parses command line agurments into inps variable. """
+
+    parser = create_parser()
+    inps = parser.parse_args(args)
+    return inps
 
 
-def trwin(x):
-    n1 = np.size(x, axis=0)
-    n2 = np.size(x, axis=1)
-    n3 = np.size(x, axis=2)
-    x1 = np.zeros((n1, n3, n2))
-    for t in range(n1):
-        x1[t, :, :] = x[t, :, :].transpose()
-    return x1
+def sequential_process(shp_df_chunk, sequential_df_chunk, inps, pixels_dict={}, pixels_dict_ref={}):
+    seq_n = sequential_df_chunk['step']   # sequence number
+    n_lines = np.shape(pixels_dict_ref['amp'])[0]
+    values = [delayed(pysq.phase_link)(x,pixels_dict=pixels_dict) for x in shp_df_chunk]
+    results = pd.DataFrame(list(compute(*values, scheduler='processes')))
+    squeezed = np.zeros([inps.lin, inps.sam]) + 0j
+    pixels_dict_ref_new = pixels_dict_ref
+    results_df = [results.loc[y] for y in range(len(results))]
 
+    for item in results_df:
+        lin,sam = item['ref_pixel'][0],item['ref_pixel'][1]
 
-def optphase(xm):
-    global igam_c
-    global fval
-    n = max(np.shape(xm))  # max([np.size(xm,axis=0),np.size(xm,axis=1)])
-    x = np.matrix(np.zeros((n + 1, 1)))
-    x = np.matrix(np.exp(1j * x))
-    x[1::, 0] = np.matrix(np.exp(1j * xm)).reshape(n, 1)
-    x[0, 0] = fval
-    y = np.matmul(x.getH(), np.matrix(igam_c))
-    f = np.real(np.log(np.matmul(y, x)))
-    return f
+        pixels_dict_ref_new['amp'][:, lin:lin + 1, sam:sam + 1] = item['amp_ref'][seq_n::, 0, 0]
+        pixels_dict_ref_new['ph'][:, lin:lin + 1, sam:sam + 1] = item['phase_ref'][seq_n::, 0, 0]
+
+        org_pixel = np.multiply(pixels_dict['amp'][seq_n::, lin, sam],
+                                np.exp(1j * pixels_dict['ph'][seq_n::, lin, sam])).reshape(n_lines, 1)
+
+        map_pixel = np.exp(1j * item['phase_ref'][seq_n::, 0, 0]).reshape(n_lines, 1)
+        map_pixel = np.matrix(map_pixel / LA.norm(map_pixel))
+
+        squeezed[lin, sam] = np.matmul(map_pixel.getH(), org_pixel)
+
+    return squeezed, pixels_dict_ref_new
 
 
 ###################################
+def main(iargs=None):
+    inps = command_line_parse(iargs)
 
+    inps.project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
+    inps.project_dir = os.getenv('SCRATCHDIR') + '/' + inps.project_name
+    inps.template = Template(inps.custom_template_file).get_options()
+    inps.scratch_dir = os.getenv('SCRATCHDIR')
+    inps.slave_dir = inps.project_dir + '/merged/SLC'
+    inps.sq_dir = inps.project_dir + '/SqueeSAR'
+    inps.list_slv = os.listdir(inps.slave_dir)
+    inps.n_image = len(inps.list_slv)
+    inps.work_dir = inps.sq_dir +'/'+ inps.patch_dir
 
-def main(argv):
-    try:
-        templateFileString = argv[1]
-        patchDir = argv[2]
-    except:
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        print (" ")
-        print ("  Run SqueeSAR on coregistered SLCs in Process directory based on Gamma outputs")
-        print (" ")
-        print ("  Usage: PSQ_gamma.py ProjectName patchfolder")
-        print (" ")
-        print ("  Example: ")
-        print ("       PSQ_gamma.py $TE/PichinchaSMT51TsxD PATCH0_0")
-        print (" ")
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        sys.exit(1)
+    RSLCamp = np.load(inps.work_dir + '/Amplitude.npy')
+    RSLCphase = np.load(inps.work_dir + '/Phase.npy')
 
-    global igam_c
-    global fval
-    global lin
-    global sam
-    global nimage
-    global SN
-    global SHP
-    global w
-    global t1, r, refr
+    inps.lin = np.size(RSLCamp, axis=1)
+    inps.sam = np.size(RSLCamp, axis=2)
 
-    logger.info(os.path.basename(sys.argv[0]) + " " + sys.argv[1])
-    templateContents = readfile.read_template(templateFileString)
-    projectName = os.path.basename(templateFileString).partition('.')[0]
-    scratchDir = os.getenv('SCRATCHDIR')
+    inps.range_win = int(inps.template['squeesar.wsizerange'])
+    inps.azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
 
-    projdir = scratchDir + '/' + projectName
-    slavedir = projdir + '/merged/SLC'
-    workDir = projdir + "/SqueeSAR/" + patchDir
-    slclist = os.listdir(slavedir)
+    ################### Finding Statistical homogeneous pixels ################
+    
+    if not os.path.isfile(inps.work_dir + '/SHP.pkl'):
+        
+        time0 = time.time()
+        shp_df = pd.DataFrame(columns=['ref_pixel','rows','cols','amp_ref','phase_ref'])
+        lin = 0
+        while lin < inps.lin:  # rows
+            r = np.ogrid[lin - ((inps.azimuth_win - 1) / 2):lin + ((inps.azimuth_win - 1) / 2) + 1]
+            ref_row = np.array([(inps.azimuth_win - 1) / 2])
+            r = r[r >= 0]
+            r = r[r < inps.lin]
+            ref_row = ref_row - (inps.azimuth_win - len(r))
+            sam = 0
+            while sam < inps.sam:
+                c = np.ogrid[sam - ((inps.range_win - 1) / 2):sam + ((inps.range_win - 1) / 2) + 1]
+                ref_col = np.array([(inps.range_win - 1) / 2])
+                c = c[c >= 0]
+                c = c[c < inps.sam]
+                ref_col = ref_col - (inps.range_win - len(c))
+                x, y = np.meshgrid(r.astype(int), c.astype(int), sparse=True)
+                win = RSLCamp[:, x, y]
+                win = pysq.trwin(win)
+                test_vec = win.reshape(inps.n_image, len(r) * len(c))
+                ks_res = np.zeros(len(r) * len(c))
+                ref_scatterer = RSLCamp[:, lin, sam]
+                ref_scatterer = ref_scatterer.reshape(inps.n_image, 1)
+                for pixel in range(len(test_vec[0])):
+                    sample_scatterer = test_vec[:, pixel]
+                    sample_scatterer = sample_scatterer.reshape(inps.n_image, 1)
 
+                    try:
+                        test = anderson_ksamp([ref_scatterer, sample_scatterer])
+                        if test.significance_level > 0.05:
+                            ks_res[pixel] = 1
+                        else:
+                            ks_res[pixel] = 0
+                    except:
+                        ks_res[pixel] = 0
 
-    nimage = len(slclist)
+                ks_result = ks_res.reshape(len(r), len(c))
+                ks_label = label(ks_result, background=False, connectivity=2)
+                ref_label = ks_label[ref_row.astype(int), ref_col.astype(int)]
 
-    RSLCamp = np.load(workDir + '/Amplitude.npy')
-    RSLCphase = np.load(workDir + '/Phase.npy')
+                rr, cc = np.where(ks_label == ref_label)
 
-    lin = np.size(RSLCamp, axis=1)
-    sam = np.size(RSLCamp, axis=2)
+                rr = rr + r[0]
+                cc = cc + c[0]
+                if len(rr) > 20:
+                    shp = {'ref_pixel': [lin, sam], 'rows': rr, 'cols': cc}
+                    shp_df = shp_df.append(shp, ignore_index=True)
+                sam = sam + 1
 
-    wra = int(templateContents['squeesar.wsizerange'])
-    waz = int(templateContents['squeesar.wsizeazimuth'])
-    ####
-    if os.path.isfile(workDir + '/SHP.npy'):
-        SHP = np.load(workDir + '/SHP.npy')
-        SHP = SHP.tolist()
-        t1 = np.load(workDir + '/ind.npy')
+            lin = lin + 1
+
+        shp_df.to_pickle(inps.work_dir + '/SHP.pkl')
+        
+        timep = time.time() - time0
+        print('time spent to find SHPs {}: min'.format(timep/60))
     else:
-        SHP = []
-        t1 = 0
-    while t1 < lin:  # rows
-        r = np.ogrid[t1 - ((waz - 1) / 2):t1 + ((waz - 1) / 2) + 1]
-        refr = np.array([(waz - 1) / 2])
-        r = r[r >= 0]
-        r = r[r < lin]
-        refr = refr - (waz - len(r))
-        t2i = 0
-        while t2i < sam:
-            time0 = time.time()
-            c = np.ogrid[t2i - ((wra - 1) / 2):t2i + ((wra - 1) / 2) + 1]
-            refc = np.array([(wra - 1) / 2])
-            c = c[c >= 0]
-            c = c[c < sam]
-            refc = refc - (wra - len(c))
-            x, y = np.meshgrid(r.astype(int), c.astype(int), sparse=True)
-            win = RSLCamp[:, x, y]
-            win = trwin(win)
-            testvec = win.reshape(nimage, len(r) * len(c))
-            ksres = np.ones(len(r) * len(c))
-            S1 = RSLCamp[:, t1, t2i]
-            S1 = S1.reshape(nimage, 1)
-            for m in range(len(testvec[0])):
-                S2 = testvec[:, m]
-                S2 = S2.reshape(nimage, 1)
-                test = ttest_ind(S1, S2, equal_var=False)
-                if test[1] > 0.05:
-                    ksres[m] = 1
-                else:
-                    ksres[m] = 0
+        print('SHP Exists...')
 
-            ks_res = ksres.reshape(len(r), len(c))
-            ks_label = label(ks_res, background=False, connectivity=2)
-            reflabel = ks_label[refr.astype(int), refc.astype(int)]
+    ###################### Sequential Phase linking ###############################
+    if not os.path.isfile(inps.work_dir + '/sequential_df.pkl'):
+      
+        RSLCamp_ref = np.zeros([inps.n_image, inps.lin, inps.sam])
+        RSLCamp_ref[:, :, :] = RSLCamp[:, :, :]
+        RSLCphase_ref = np.zeros([inps.n_image, inps.lin, inps.sam])
+        RSLCphase_ref[:, :, :] = RSLCphase[:, :, :]
 
-            rr, cc = np.where(ks_label == reflabel)
+        num_seq = np.int(np.floor(inps.n_image / 10))
+        sequential_df = pd.DataFrame(columns=['step', 'squeezed'])
+        for seq in range(num_seq):
+            sequential_df = sequential_df.append({'step': seq}, ignore_index=True)
 
-            rr = rr + r[0]
-            cc = cc + c[0]
-            if len(rr) > 20:
-                shp = {'name': str(t1) + '_' + str(t2i), 'row': rr, 'col': cc}
-                shp = np.array(shp)
-                SHP.append(shp)
-                timep = time.time() - time0
-            t2i = t2i + 1
-        print ('save row ' + str(t1) + ',  Elapsed time: ' + str(timep) + ' s')
-        np.save(workDir + '/ind.npy', t1)
-        np.save(workDir + '/SHP.npy', SHP)
-        t1 = t1 + 1
+    
+        shp_df = pd.read_pickle(inps.work_dir + '/SHP.pkl')
+        shp_df_chunk = [shp_df.loc[y] for y in range(len(shp_df))]
 
-    print('SHP created ...')
+        time0 = time.time()
+        for step in range(num_seq):
 
-    ####
-    #################################################
-    if os.path.isfile(workDir + '/Phase_ref.npy'):
-        RSLCamp_ref = np.load(workDir + '/Amplitude_ref.npy')
-        RSLCphase_ref = np.load(workDir + '/Phase_ref.npy')
-        t = np.load(workDir + '/indf.npy')
-        shpn = len(SHP)
-    else:
-        RSLCamp_ref = np.zeros([nimage, lin, sam])
-        RSLCphase_ref = np.zeros([nimage, lin, sam])
-        shpn = len(SHP)
-        t = 0
-        np.save(workDir + '/Amplitude_ref.npy', RSLCamp_ref)
-        np.save(workDir + '/Phase_ref.npy', RSLCphase_ref)
-        np.save(workDir + '/indf.npy', t)
-    while t < shpn:
-        pix = SHP[t]
-        pix = pix.tolist()
-        if pix != None:
-            rr = pix['row']
-            t1 = int(pix['name'].split('_')[0])  # row
-            t2 = int(pix['name'].split('_')[1])  # col
-            cc = pix['col']
-            dp = np.matrix(1.0 * np.arange(nimage * len(rr)).reshape((nimage, len(rr))))
-            dp = np.exp(1j * dp)
-            for q in range(len(rr)):
-                Am = RSLCamp[:, rr[q].astype(int), cc[q].astype(int)]
-                dpamp = np.matrix(1.0 * np.arange(nimage).reshape((nimage, 1)))
-                dpamp[:, 0] = Am.reshape(nimage, 1)
-                Ph = RSLCphase[:, rr[q].astype(int), cc[q].astype(int)]
-                dpph = np.matrix(1.0 * np.arange(nimage).reshape((nimage, 1)))
-                dpph[:, 0] = Ph.reshape(nimage, 1)
-                dp[:, q] = comp_matr(dpamp, dpph)
-
-            cov_m = np.matmul(dp, dp.getH()) / (len(rr))
-            phi = np.angle(cov_m)
-            abs_cov = np.abs(cov_m)
-            if is_semi_pos_def_chol(abs_cov):
-                print('yes it is semi pos def')
-                coh = corrcov(abs_cov)
-                gam_c = np.multiply(coh, np.exp(1j * phi))
-                igam_c = np.multiply(pinv(np.abs(gam_c)), gam_c)
-                x0 = RSLCphase[:, t1, t2].reshape(nimage, 1)
-                fval = 0
-                xm = x0[1::, 0]
-
-                try:
-                    res = minimize(optphase, xm, method='L-BFGS-B', tol=1e-5, options={'gtol': 1e-5, 'disp': False})
-                    xn = np.zeros((nimage, 1))
-                    xn[1::, 0] = res.x
-                    xn[0, 0] = fval
-                except:
-                    xn = x0
-                xn0 = np.exp(1j * xn)
-                xn = np.angle(xn0)
-                xn = np.matrix(xn.reshape(nimage, 1))
-                # print('xn:',xn)
-                ampn = np.sqrt(np.abs(np.diag(cov_m)))
-                x0 = x0.reshape(nimage, 1)
-                x0 = np.matrix(x0)
-                g1 = np.triu(phi)
-                g2 = np.matmul(np.exp(1j * xn), (np.exp(1j * xn)).getH())
-                g2 = np.triu(np.angle(g2), 1)
-                gam_pta = gam_pta_f(g1, g2)
-                print ([t, gam_pta])
-                if gam_pta > 0.5 and gam_pta <= 1:
-                    RSLCamp_ref[:, t1:t1 + 1, t2:t2 + 1] = np.array(ampn).reshape(nimage, 1, 1)
-                    RSLCphase_ref[:, t1:t1 + 1, t2:t2 + 1] = np.array(xn).reshape(nimage, 1, 1)
-
+            first_line = step  * 10
+            if step == num_seq-1:
+                last_line = inps.n_image
             else:
-                print ('Warning: Coherence matrix is not semi positive definite')
-                RSLCamp_ref[:, t1:t1 + 1, t2:t2 + 1] = RSLCamp[:, t1:t1 + 1, t2:t2 + 1]
-                RSLCphase_ref[:, t1:t1 + 1, t2:t2 + 1] = RSLCphase[:, t1:t1 + 1, t2:t2 + 1]
-            if t % 1000 == 0:
-                np.save(workDir + '/Amplitude_ref.npy', RSLCamp_ref)
-                np.save(workDir + '/Phase_ref.npy', RSLCphase_ref)
-                np.save(workDir + '/indf.npy', t)
-        else:
+                last_line = first_line + 10
+            if step == 0:
+                AMP = RSLCamp[first_line:last_line, :, :]
+                PHAS = RSLCphase[first_line:last_line, :, :]
+                pixels_dict = {'amp': AMP, 'ph': PHAS}
+                pixels_dict_ref = {'amp': RSLCamp_ref[first_line:last_line, :, :], 
+                                   'ph': RSLCphase_ref[first_line:last_line, :, :]}
+                squeezed_image, pixels_dict_ref = \
+                    sequential_process(shp_df_chunk=shp_df_chunk,
+                                       sequential_df_chunk=sequential_df.loc[step],
+                                       inps=inps, pixels_dict=pixels_dict,
+                                       pixels_dict_ref=pixels_dict_ref)
+                sequential_df.loc[step]['squeezed'] = squeezed_image
+            else:
+                AMP = np.zeros([step + 10, inps.lin, inps.sam])
+                AMP[0:step, :, :] = np.abs(sequential_df.at[step - 1, 0].squeezed)
+                AMP[step::, :, :] = RSLCamp[first_line:last_line, :, :]
+                PHAS = np.zeros([step + 10, inps.lin, inps.sam])
+                PHAS[0:step, :, :] = np.angle(sequential_df.at[step - 1, 0].squeezed)
+                PHAS[step::, :, :] = RSLCphase[first_line:last_line, :, :]
+                pixels_dict = {'amp': AMP, 'ph': PHAS}
+                pixels_dict_ref = {'amp': RSLCamp_ref[first_line:last_line, :, :], 'ph': RSLCphase_ref[first_line:last_line, :, :]}
+                squeezed_im, pixels_dict_ref = \
+                    sequential_process(shp_df_chunk=shp_df_chunk,
+                                       sequential_df_chunk=sequential_df.loc[step],
+                                       inps=inps, pixels_dict=pixels_dict,
+                                       pixels_dict_ref=pixels_dict_ref)
+                squeezed_image = np.dstack((sequential_df.loc[step - 1]['squeezed'].T,squeezed_im.T)).T
+                sequential_df.loc[step]['squeezed'] = squeezed_image
+        
+            RSLCamp_ref[first_line:last_line, :, :] = pixels_dict_ref['amp']
+            RSLCphase_ref[first_line:last_line, :, :] = pixels_dict_ref['ph']
+        
+            np.save(inps.work_dir + '/Amplitude_ref.npy', RSLCamp_ref)
+            np.save(inps.work_dir + '/Phase_ref.npy', RSLCphase_ref)
+            sequential_df.to_pickle(inps.work_dir + '/sequential_df.pkl')
+    
+        
 
-            print ('Warning: shp invalid')
-        t += 1
+    ############## Datum Connection ##############################
+        pixels_dict = {'amp': np.abs(sequential_df.at[num_seq - 1, 0].squeezed),
+                      'ph': np.angle(sequential_df.at[num_seq - 1, 0].squeezed)}
 
-    tt, vv = np.where(RSLCamp_ref[0, :, :] == 0)
-    tt = tt.astype(int)
-    vv = vv.astype(int)
-    RSLCamp_ref[:, tt, vv] = RSLCamp[:, tt, vv]
-    RSLCphase_ref[:, tt, vv] = RSLCphase[:, tt, vv]
+        values = [delayed(pysq.phase_link)(x,pixels_dict=pixels_dict) for x in shp_df_chunk]
+        results = pd.DataFrame(list(compute(*values, scheduler='processes')))
+        datum_connect = np.zeros([num_seq, inps.lin, inps.sam])
+        mydf = [results.loc[y] for y in range(len(results))]
+    
+        for item in mydf:
+            lin,sam = item.ref_pixel[0],item.ref_pixel[1]
+            datum_connect[:, lin:lin+1, sam:sam+1] = item.phref[:, 0, 0].reshape(num_seq, 1, 1)
+    
+        for step in range(num_seq):
+            first_line = step * 10
+            if step == num_seq-1:
+                last_line = inps.n_image
+            else:
+                last_line = first_line + 10
+            RSLCphase_ref[first_line:last_line, :, :] = RSLCphase_ref[first_line:last_line, :, :] + datum_connect[step, :, :]
 
-    np.save(workDir + '/Amplitude_ref.npy', RSLCamp_ref)
-    np.save(workDir + '/Phase_ref.npy', RSLCphase_ref)
-    np.save(workDir + '/indf.npy', t)
-    np.save(workDir + '/endflag.npy', 'True')
-
-
-#################################################
-
+        np.save(inps.work_dir + '/endflag.npy', 'True')
+        np.save(inps.work_dir + '/Amplitude_ref.npy', RSLCamp_ref)
+        np.save(inps.work_dir + '/Phase_ref.npy', RSLCphase_ref)
+        sequential_df.to_pickle(inps.work_dir + '/sequential_df.pkl')
+        
+        timep = time.time() - time0
+        print('time spent to do sequential phase linking {}: min'.format(timep/60))
 
 if __name__ == '__main__':
-    main(sys.argv[:])
+    '''
+    Phase linking process.
+    '''
+    main()
 
-
-
-
-
-
-
-
+#################################################

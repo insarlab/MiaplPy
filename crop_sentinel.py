@@ -4,225 +4,156 @@
 ############################################################
 import numpy as np
 import os
-import isce
-import isceobj
-import datetime
-import logging
-import argparse
-from isceobj.Util.ImageUtil import ImageLib as IML
-from isceobj.Util.decorators import use_api
-import glob
 import sys
 import gdal
-import subprocess
-import cmath
-import scipy.io
+import argparse
+import isce
+import isceobj
+from isceobj.Util.ImageUtil import ImageLib as IML
+sys.path.insert(0, os.getenv('RSMAS_ISCE'))
+from _pysqsar_utilities import send_logger_squeesar, convert_geo2image_coord
+from rsmas_logging import loglevel
+from dataset_template import Template
+sys.path.insert(0, os.getenv('SENTINEL_STACK'))
+from mergeBursts import multilook
 
-import logging
+logger_crop  = send_logger_squeesar()
 
-import pysar
-from pysar.utils import utils
-from pysar.utils import readfile
-from pysar.utils import writefile
-
-logger = logging.getLogger("process_sentinel")
-
-
-######################3
-
-def findrowcol(masterdir, lat1, lat2, lon1, lon2):
-    objLat = isceobj.createIntImage()
-    objLat.load(masterdir + '/lat.rdr.full.xml')
-    objLon = isceobj.createIntImage()
-    objLon.load(masterdir + '/lon.rdr.full.xml')
-    width = objLon.getWidth()
-    length = objLon.getLength()
-    cw = int(width / 2)
-    rl = int(length / 2)
-    ds = gdal.Open(masterdir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
-    lat = ds.GetRasterBand(1).ReadAsArray()
-    ds = None
-    ds = gdal.Open(masterdir + '/lon.rdr.full.vrt', gdal.GA_ReadOnly)
-    lon = ds.GetRasterBand(1).ReadAsArray()
-    ds = None
-    latc = lat[:, cw]
-    lonr = lon[rl, :]
-    latmin = latc - lat1
-    latmax = latc - lat2
-    lonmin = lonr - lon1
-    lonmax = lonr - lon2
-    frow = [index for index in range(len(latmin)) if np.abs(latmin[index]) == np.min(np.abs(latmin))]
-    lrow = [index for index in range(len(latmax)) if np.abs(latmax[index]) == np.min(np.abs(latmax))]
-    fcol = [index for index in range(len(lonmin)) if np.abs(lonmin[index]) == np.min(np.abs(lonmin))]
-    lcol = [index for index in range(len(lonmax)) if np.abs(lonmax[index]) == np.min(np.abs(lonmax))]
-    imcoords = [frow, lrow, fcol, lcol]
-    return imcoords
+##############################################################################
+EXAMPLE = """example:
+  crop_sentinel.py LombokSenAT156VV.template 
+"""
 
 
-def readim(slcname, frow, lrow, fcol, lcol):
-    objSlc = isceobj.createSlcImage()
-    objSlc.load(slcname + '.xml')
-    ds = gdal.Open(slcname + '.vrt', gdal.GA_ReadOnly)
-    Im = ds.GetRasterBand(1).ReadAsArray()
-    ds = None
-    out = Im[frow:lrow, fcol:lcol]
-    return out
+def create_parser():
+    """ Creates command line argument parser object. """
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, epilog=EXAMPLE)
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
+    parser.add_argument('custom_template_file', nargs='?',
+                        help='custom template with option settings.\n')
+
+    return parser
 
 
-def multilook(infile, outname=None, alks=5, rlks=15):
-    '''
-    Take looks.
-    '''
+def command_line_parse(iargs=None):
+    """ Parses command line agurments into inps variable. """
 
-    from mroipac.looks.Looks import Looks
+    parser = create_parser()
+    inps = parser.parse_args(args=iargs)
 
-    print('Multilooking {0} ...'.format(infile))
-
-    inimg = isceobj.createImage()
-    inimg.load(infile + '.xml')
-
-    if outname is None:
-        spl = os.path.splitext(inimg.filename)
-        ext = '.{0}alks_{1}rlks'.format(alks, rlks)
-        outname = spl[0] + ext + spl[1]
-
-    lkObj = Looks()
-    lkObj.setDownLooks(alks)
-    lkObj.setAcrossLooks(rlks)
-    lkObj.setInputImage(inimg)
-    lkObj.setOutputFilename(outname)
-    lkObj.looks()
-
-    return outname
+    return inps
 
 
-#######################
-def main(argv):
-    try:
-        templateFileString = argv[1]
-    except:
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        print (" ")
-        print ("  Replace SLC images with squeezed values")
-        print (" ")
-        print ("  Usage: crop_sentinel.py templatefile")
-        print (" ")
-        print ("  Example: ")
-        print ("       crop_sentinel.py $TE/NMerapiSenAT127VV.template")
-        print (" ")
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        print (
-            "  ******************************************************************************************************")
-        sys.exit(1)
+def main(iargs=None):
+    """
+    Crops SLC images from Isce merged/SLC directory.
+    """
 
-    logger.info(os.path.basename(sys.argv[0]) + " " + sys.argv[1])
-    templateContents = readfile.read_template(templateFileString)
+    inps = command_line_parse(iargs)
 
-    projectName = os.path.basename(templateFileString).partition('.')[0]
-    scratchDir = os.getenv('SCRATCHDIR')
-    projdir = scratchDir + '/' + projectName
-    slavedir = projdir + '/merged/SLC'
-    gmasterdir = projdir + '/merged/geom_master'
-    slclist = os.listdir(slavedir)
+    logger_crop.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1])
+    inps.template = Template(inps.custom_template_file).get_options()
 
-    lon1 = float(templateContents['lon1'])
-    lon2 = float(templateContents['lon2'])
-    lat1 = float(templateContents['lat1'])
-    lat2 = float(templateContents['lat2'])
-
-    azlks = templateContents['sentinelStack.azimuthLooks']
-    rnlks = templateContents['sentinelStack.rangeLooks']
+    project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
+    project_dir = os.getenv('SCRATCHDIR')+ '/' + project_name
+    slave_dir = project_dir + '/merged/SLC'
+    geo_master_dir = project_dir + '/merged/geom_master'
+    slc_list = os.listdir(slave_dir)
     
-    if os.path.isfile(projdir + '/merged/cropped.npy'):
+
+    lon_west = float(inps.template['lon1'])
+    lon_east = float(inps.template['lon2'])
+    lat_south = float(inps.template['lat1'])
+    lat_north = float(inps.template['lat2'])
+
+    azimuth_lks = inps.template['sentinelStack.azimuthLooks']
+    range_lks = inps.template['sentinelStack.rangeLooks']
+    
+    if os.path.isfile(project_dir + '/merged/cropped.npy'):
       print('Already cropped')
     else:
-        croparea = np.array(findrowcol(gmasterdir, lat1, lat2, lon1, lon2))
-        frow = np.int(croparea[0])
-        lrow = np.int(croparea[1])
-        fcol = np.int(croparea[2])
-        lcol = np.int(croparea[3])
+        crop_area = np.array(convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east))
+        first_row = np.int(crop_area[0])
+        last_row = np.int(crop_area[1])
+        first_col = np.int(crop_area[2])
+        last_col = np.int(crop_area[3])
 
-        nLines = lrow - frow
-        width = lcol - fcol
-        #slclist = []
+        n_lines = last_row - first_row
+        width = last_col - first_col
+
     
-        for t in slclist:
-            filename = os.path.join(slavedir, t, t + '.slc.full')
+        for slc in slc_list:
+            filename = os.path.join(slave_dir, slc, slc + '.slc.full')
 
             ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
-            Inpfile = ds.GetRasterBand(1).ReadAsArray()
+            inp_file = ds.GetRasterBand(1).ReadAsArray()
             del ds
 
-            outMap = np.memmap(filename, dtype=np.complex64, mode='r+', shape=(nLines, width))
-            outMap[:, :] = Inpfile[frow:lrow, fcol:lcol]
+            out_map = np.memmap(filename, dtype=np.complex64, mode='r+', shape=(n_lines, width))
+            out_map[:, :] = inp_file[first_row:last_row, first_col:last_col]
 
-            oimg = isceobj.createSlcImage()
-            oimg.setAccessMode('write')
-            oimg.setFilename(filename)
-            oimg.setWidth(width)
-            oimg.setLength(nLines)
-            oimg.renderVRT()
-            oimg.renderHdr()
+            out_img = isceobj.createSlcImage()
+            out_img.setAccessMode('write')
+            out_img.setFilename(filename)
+            out_img.setWidth(width)
+            out_img.setLength(n_lines)
+            out_img.renderVRT()
+            out_img.renderHdr()
 
-            del outMap
+            del out_map
             cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
             os.system(cmd)
 
-            listgeo = ['hgt', 'lat', 'lon', 'los', 'shadowMask']
+            list_geo = ['hgt', 'lat', 'lon', 'los', 'shadowMask','incLocal']
 
-        for t in listgeo:
-            filename = os.path.join(gmasterdir, t + '.rdr.full')
+        for t in list_geo:
+            filename = os.path.join(geo_master_dir, t + '.rdr.full')
 
             img = isceobj.createImage()
             img.load(filename + '.xml')
             bands = img.bands
-            dtype = IML.NUMPY_type(img.dataType)
+            data_type = IML.NUMPY_type(img.dataType)
             scheme = img.scheme
 
             ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
-            Inpfile = ds.GetRasterBand(1).ReadAsArray()
+            inp_file = ds.GetRasterBand(1).ReadAsArray()
             if bands == 2:
-                Inpfile2 = ds.GetRasterBand(2).ReadAsArray()
+                inp_file2 = ds.GetRasterBand(2).ReadAsArray()
             del ds, img
 
-            outMap = IML.memmap(filename, mode='r+', nchannels=bands,
-                            nxx=width, nyy=nLines, scheme=scheme, dataType=dtype)
+            out_map = IML.memmap(filename, mode='r+', nchannels=bands,
+                            nxx=width, nyy=n_lines, scheme=scheme, dataType=data_type)
 
             if bands == 2:
-                outMap.bands[0][:, :] = Inpfile[frow:lrow, fcol:lcol]
-                outMap.bands[1][:, :] = Inpfile2[frow:lrow, fcol:lcol]
+                out_map.bands[0][:, :] = inp_file[first_row:last_row, first_col:last_col]
+                out_map.bands[1][:, :] = inp_file2[first_row:last_row, first_col:last_col]
             else:
-                outMap.bands[0][:, :] = Inpfile[frow:lrow, fcol:lcol]
+                out_map.bands[0][:, :] = inp_file[first_row:last_row, first_col:last_col]
 
             IML.renderISCEXML(filename, bands,
-                            nLines, width,
-                            dtype, scheme)
+                            n_lines, width,
+                            data_type, scheme)
 
-            oimg = isceobj.createImage()
-            oimg.load(filename + '.xml')
-            oimg.imageType = dtype
-            oimg.renderHdr()
+            out_img = isceobj.createImage()
+            out_img.load(filename + '.xml')
+            out_img.imageType = data_type
+            out_img.renderHdr()
             try:
-                outMap.bands[0].base.base.flush()
+                out_map.bands[0].base.base.flush()
             except:
                 pass
 
             cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
             os.system(cmd)
 
-            multilook(filename, outname=filename.split('.full')[0], alks=azlks, rlks=rnlks)
-        np.save(projdir + '/merged/cropped.npy', 'True')
+            multilook(filename, outname=filename.split('.full')[0],
+                      alks=azimuth_lks, rlks=range_lks,
+                      multilook_tool='isce', no_data=None)
+        np.save(project_dir + '/merged/cropped.npy', 'True')
 
 if __name__ == '__main__':
     '''
     Crop SLCs.
     '''
-    main(sys.argv[:])
+    main()
