@@ -99,7 +99,7 @@ def corr2cov(corr_matrix = [],sigma = []):
 def cov2corr(cov_matrix):
     """ Converts covariance matrix to correlation/coherence matrix. """
     
-    D = np.diagflat(np.pinv(np.sqrt(np.diag(cov_matrix))))
+    D = LA.pinv(np.diagflat(np.sqrt(np.diag(cov_matrix))))
     y = np.matmul(D, cov_matrix)
     corr_matrix = np.matmul(y, np.transpose(D))
     
@@ -373,14 +373,14 @@ def comp_matr(x, y):
 
 def phase_link(mydf, pixels_dict={}):
     """ Runs the phase linking algorithm over each DS.""" 
-    
-    n_image = pixels_dict.at['RSLC'].shape[0]
+     
+    n_image = pixels_dict['RSLC'].shape[0]
     rr = mydf.at['rows'].astype(int)
     cc = mydf.at['cols'].astype(int)
     ref_row, ref_col = (mydf.at['ref_pixel'][0],mydf.at['ref_pixel'][1])
     dp = np.matrix(1.0 * np.arange(n_image * len(rr)).reshape(n_image, len(rr)))
     dp = np.exp(1j * dp)
-    dp[:,:] = np.matrix(pixels_dict.at['RSLC'][:, rr, cc])
+    dp[:,:] = np.matrix(pixels_dict['RSLC'][:, rr, cc])
     cov_m = np.matmul(dp, dp.getH()) / (len(rr))
     phi = np.angle(cov_m)
     abs_cov = np.abs(cov_m)
@@ -396,7 +396,7 @@ def phase_link(mydf, pixels_dict={}):
         ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
         out_phase = np.matrix(ph_PTA.reshape(n_image, 1))
     except:
-        out_phase = np.matrix(np.angle(pixels_dict.at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
+        out_phase = np.matrix(np.angle(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
         out_phase = out_phase - out_phase[0,0]
     amplitude = np.sqrt(np.abs(np.diag(cov_m)))
     g1 = np.triu(phi,1)
@@ -407,8 +407,8 @@ def phase_link(mydf, pixels_dict={}):
         mydf.at['amp_ref'] = np.array(amplitude).reshape(n_image, 1, 1)
         mydf.at['phase_ref'] = np.array(out_phase).reshape(n_image, 1, 1)
     else:
-        mydf.at['amp_ref']  = np.abs(pixels_dict.at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1, 1))
-        out_phase = np.matrix(np.angle(pixels_dict.at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
+        mydf.at['amp_ref']  = np.abs(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1, 1))
+        out_phase = np.matrix(np.angle(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
         out_phase = out_phase - out_phase[0,0]
         mydf.at['phase_ref'] = np.array(out_phase).reshape(n_image, 1, 1)
 
