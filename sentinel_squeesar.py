@@ -64,6 +64,7 @@ def create_patch(inps, name):
         for dirs in inps.list_slv:
             data_name = inps.slave_dir + '/' + dirs + '/' + dirs + '.slc.full'
             slc = np.memmap(data_name, dtype=np.complex64, mode='r', shape=(inps.lin, inps.sam))
+            
             rslc[count, :, :] = slc[inps.patch_rows[0][0][patch_row]:inps.patch_rows[1][0][patch_row],
                                             inps.patch_cols[0][0][patch_col]:inps.patch_cols[1][0][patch_col]]
             count += 1

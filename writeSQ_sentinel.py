@@ -4,8 +4,6 @@
 ############################################################
 import numpy as np
 import os
-#import isce
-#import isceobj
 import sys
 import argparse
 import glob
@@ -14,12 +12,10 @@ sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 from _pysqsar_utilities import comp_matr
 from dataset_template import Template
 
-
 ##############################################################################
 EXAMPLE = """example:
   writeSQ_sentinel.py LombokSenAT156VV.template 20170823/20170823.slc.full
 """
-
 
 def create_parser():
     """ Creates command line argument parser object. """
@@ -67,7 +63,6 @@ def main(iargs=None):
 
     patch_rows = np.load(sq_dir + '/rowpatch.npy')
     patch_cols = np.load(sq_dir + '/colpatch.npy')
-
 
     patch_rows_overlap = np.load(sq_dir + '/rowpatch.npy')
     patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win + 1
@@ -122,7 +117,6 @@ def main(iargs=None):
 
 
     del out_map
-
 
 
 if __name__ == '__main__':
