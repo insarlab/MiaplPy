@@ -133,7 +133,7 @@ def main(iargs=None):
 
             test_vec = win.reshape(num_slc, len(r) * len(c))
             ks_res = np.zeros(len(r) * len(c))
-            ref_scatterer = np.abs(rslc[num_slc, lin, sam])
+            ref_scatterer = np.abs(rslc[0:num_slc, lin, sam])
             ref_scatterer = ref_scatterer.reshape(num_slc, 1)
             for pixel in range(len(test_vec[0])):
                 sample_scatterer = test_vec[:, pixel]
