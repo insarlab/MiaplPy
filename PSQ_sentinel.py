@@ -50,7 +50,10 @@ def sequential_process(shp_df_chunk, seq_n, inps, pixels_dict={}, pixels_dict_re
 
     n_lines = np.shape(pixels_dict_ref['RSLC_ref'])[0]
     values = [delayed(pysq.phase_link)(x,pixels_dict=pixels_dict) for x in shp_df_chunk]
-    results = pd.DataFrame(list(compute(*values, scheduler='processes')))
+    
+    results = compute(*values, scheduler='processes')
+    print(results)
+    results = pd.DataFrame(list(results))
     squeezed = np.zeros([inps.lin, inps.sam]) + 0j
 
     results_df = [results.loc[y] for y in range(len(results))]
@@ -100,7 +103,7 @@ def main(iargs=None):
     inps.azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
 
     ################### Finding Statistical homogeneous pixels ################
-    num_slc = 30    # to find SHPs only
+    num_slc = 20    # to find SHPs only
     if not os.path.isfile(inps.work_dir + '/SHP.pkl'):
         
         time0 = time.time()
@@ -180,7 +183,7 @@ def main(iargs=None):
         sequential_df = pd.DataFrame(columns=['step', 'squeezed','datum_shift'])
         sequential_df = sequential_df.append({'step':0}, ignore_index=True)
 
-    step_0 = sequential_df.at[0,'step']
+    step_0 = np.int(sequential_df.at[0,'step'])
 
     shp_df = pd.read_pickle(inps.work_dir + '/SHP.pkl')
     shp_df_chunk = [shp_df.loc[y] for y in range(len(shp_df))]
