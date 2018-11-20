@@ -109,7 +109,7 @@ def main(iargs=None):
         sam = np.ogrid[0:inps.sam]
         lin, sam = np.meshgrid(lin, sam)
         coords = list(map(lambda x, y: (int(x), int(y)),
-                     sam.reshape(inps.lin*inps.sam, 1), lin.reshape(inps.lin*inps.sam, 1)))
+                     lin.T.reshape(inps.lin*inps.sam, 1), sam.T.reshape(inps.lin*inps.sam, 1)))
         del lin, sam
 
         for coord in coords:
