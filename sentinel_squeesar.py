@@ -45,29 +45,32 @@ def command_line_parse(args):
 
     
 def create_patch(inps, name):
+
     patch_row, patch_col = name.split('_')
-    patch_row, patch_col = int(patch_row), int(patch_col)
+    patch_row, patch_col = (int(patch_row), int(patch_col))
     patch_name = inps.patch_dir + str(patch_row) + '_' + str(patch_col)
+
     line = inps.patch_rows[1][0][patch_row] - inps.patch_rows[0][0][patch_row]
     sample = inps.patch_cols[1][0][patch_col] - inps.patch_cols[0][0][patch_col]
+
     if  not os.path.isfile(patch_name + '/count.npy'):
         if not os.path.isdir(patch_name):
             os.mkdir(patch_name)
         logger_ph_lnk.log(loglevel.INFO, "Making PATCH" + str(patch_row) + '_' + str(patch_col))
-        amplitude = np.empty((inps.n_image, line, sample))
-        phase = np.empty((inps.n_image, line, sample))
+
+        rslc = np.memmap(patch_name + '/RSLC', dtype=np.complex64, mode='w+', shape=(inps.n_image, line, sample))
+
         count = 0
         for dirs in inps.list_slv:
             data_name = inps.slave_dir + '/' + dirs + '/' + dirs + '.slc.full'
             slc = np.memmap(data_name, dtype=np.complex64, mode='r', shape=(inps.lin, inps.sam))
-            amplitude[count, :, :] = np.abs(slc[inps.patch_rows[0][0][patch_row]:inps.patch_rows[1][0][patch_row],
-                                            inps.patch_cols[0][0][patch_col]:inps.patch_cols[1][0][patch_col]])
-            phase[count, :, :] = np.angle(slc[inps.patch_rows[0][0][patch_row]:inps.patch_rows[1][0][patch_row],
-                                       inps.patch_cols[0][0][patch_col]:inps.patch_cols[1][0][patch_col]])
+            
+            rslc[count, :, :] = slc[inps.patch_rows[0][0][patch_row]:inps.patch_rows[1][0][patch_row],
+                                            inps.patch_cols[0][0][patch_col]:inps.patch_cols[1][0][patch_col]]
             count += 1
             del slc
-        np.save(patch_name + '/' + 'Amplitude.npy', amplitude)
-        np.save(patch_name + '/' + 'Phase.npy', phase)
+        del rslc
+
         np.save(patch_name + '/count.npy', inps.n_image)
     else:
         print('Next patch...')
