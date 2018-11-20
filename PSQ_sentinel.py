@@ -100,7 +100,7 @@ def main(iargs=None):
     inps.azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
 
     ################### Finding Statistical homogeneous pixels ################
-    
+    num_slc = 30    # to find SHPs only
     if not os.path.isfile(inps.work_dir + '/SHP.pkl'):
         
         time0 = time.time()
@@ -128,16 +128,16 @@ def main(iargs=None):
             ref_col = ref_col - (inps.range_win - len(c))
 
             x, y = np.meshgrid(r.astype(int), c.astype(int), sparse=True)
-            win = np.abs(rslc[:, x, y])
+            win = np.abs(rslc[0:num_slc, x, y])
             win = pysq.trwin(win)
 
-            test_vec = win.reshape(inps.n_image, len(r) * len(c))
+            test_vec = win.reshape(num_slc, len(r) * len(c))
             ks_res = np.zeros(len(r) * len(c))
-            ref_scatterer = np.abs(rslc[:, lin, sam])
-            ref_scatterer = ref_scatterer.reshape(inps.n_image, 1)
+            ref_scatterer = np.abs(rslc[num_slc, lin, sam])
+            ref_scatterer = ref_scatterer.reshape(num_slc, 1)
             for pixel in range(len(test_vec[0])):
                 sample_scatterer = test_vec[:, pixel]
-                sample_scatterer = sample_scatterer.reshape(inps.n_image, 1)
+                sample_scatterer = sample_scatterer.reshape(num_slc, 1)
 
                 try:
                     test = anderson_ksamp([ref_scatterer, sample_scatterer])
