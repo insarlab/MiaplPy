@@ -1,10 +1,8 @@
 #! /usr/bin/env python3
 ###############################################################################
-#
 # Project: Utilitiels for pysqsar
 # Author: Sara Mirzaee
 # Created: 10/2018
-#
 ###############################################################################
 import sys, os
 import numpy as np
