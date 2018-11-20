@@ -4,18 +4,16 @@
 ############################################################
 import numpy as np
 import os
-import isce
-import isceobj
+#import isce
+#import isceobj
 import sys
 import argparse
 import glob
 
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
-from _pysqsar_utilities import send_logger_squeesar, comp_matr
-from rsmas_logging import loglevel
+from _pysqsar_utilities import comp_matr
 from dataset_template import Template
 
-logger_write = send_logger_squeesar()
 
 ##############################################################################
 EXAMPLE = """example:
@@ -53,7 +51,6 @@ def main(iargs=None):
 
     inps = command_line_parse(iargs)
 
-    logger_write.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1] + " " + sys.argv[2])
     inps.template = Template(inps.custom_template_file).get_options()
 
     project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
@@ -70,6 +67,7 @@ def main(iargs=None):
 
     patch_rows = np.load(sq_dir + '/rowpatch.npy')
     patch_cols = np.load(sq_dir + '/colpatch.npy')
+
 
     patch_rows_overlap = np.load(sq_dir + '/rowpatch.npy')
     patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win + 1
@@ -91,60 +89,40 @@ def main(iargs=None):
     n_line = last_row - first_row
     width = last_col - first_col
 
-    g = inps.slc_dir
-    image_ind = [i for (i, val) in enumerate(slc_list) if val == g.split('/')[0]]
-
-    while g == inps.slc_dir:
-
-        RSLCamp = np.zeros([int(n_line), int(width)])
-        RSLCphase = np.zeros([int(n_line), int(width)])
-
-        for patch in patch_list:
-
-            row = int(patch.split('PATCH')[-1].split('_')[0])
-            col = int(patch.split('PATCH')[-1].split('_')[1])
-            row1 = patch_rows_overlap[0, 0, row]
-            row2 = patch_rows_overlap[1, 0, row]
-            col1 = patch_cols_overlap[0, 0, col]
-            col2 = patch_cols_overlap[1, 0, col]
-            amp = np.load(sq_dir + '/' + patch + '/Amplitude_ref.npy')
-            ph = np.load(sq_dir + '/' + patch + '/Phase_ref.npy')
-
-            f_row = (row1 - patch_rows[0, 0, row])
-            l_row = np.size(amp, axis=1) - (patch_rows[1, 0, row] - row2)
-            f_col = (col1 - patch_cols[0, 0, col])
-            l_col = np.size(amp, axis=2) - (patch_cols[1, 0, col] - col2)
-
-            RSLCamp[row1:row2 + 1, col1:col2 + 1] = \
-                amp[image_ind, f_row:l_row + 1, f_col:l_col + 1]  # ampw.reshape(s1,s2)
-            RSLCphase[row1:row2 + 1, col1:col2 + 1] = \
-                ph[image_ind, f_row:l_row + 1, f_col:l_col + 1]  # phw.reshape(s1,s2)
-
-        data = comp_matr(RSLCamp, RSLCphase)
-        slc_file = slave_dir + '/' + inps.slc_dir
-
-        #with open(slc_file + '.xml', 'r') as fid:
-        #    xml_lines = fid.readlines()
+    slc_file = slave_dir + '/' + inps.slc_dir
+    out_map = np.memmap(slc_file, dtype=np.complex64, mode='r+', shape=(n_line, width))
 
 
-        out_map = np.memmap(slc_file, dtype=np.complex64, mode='r+', shape=(n_line, width))
-        out_map[:, :] = data
+    image_ind = [i for (i, val) in enumerate(slc_list) if val == inps.slc_dir.split('/')[0]]
 
-        out_img = isceobj.createSlcImage()
-        out_img.setAccessMode('write')
-        out_img.setFilename(slc_file)
-        out_img.setWidth(width)
-        out_img.setLength(n_line)
-        out_img.renderVRT()
-        out_img.renderHdr()
 
-        del out_map
+    for patch in patch_list:
 
-        #with open(slc_file + '.xml', 'w') as fid:
-        #    for line in xml_lines:
-        #        fid.write(line)
+        row = int(patch.split('PATCH')[-1].split('_')[0])
+        col = int(patch.split('PATCH')[-1].split('_')[1])
+        row1 = patch_rows_overlap[0, 0, row]
+        row2 = patch_rows_overlap[1, 0, row]
+        col1 = patch_cols_overlap[0, 0, col]
+        col2 = patch_cols_overlap[1, 0, col]
 
-        g = 0
+        patch_lines = patch_rows[1][0][row] - patch_rows[0][0][row]
+        patch_samples = patch_cols[1][0][col] - patch_cols[0][0][col]
+
+        rslc_patch = np.memmap(sq_dir + '/' + patch  + '/RSLC_ref',
+                               dtype=np.complex64, mode='r', shape=(len(slc_list), patch_lines, patch_samples))
+
+
+        f_row = (row1 - patch_rows[0, 0, row])
+        l_row = patch_lines - (patch_rows[1, 0, row] - row2)
+        f_col = (col1 - patch_cols[0, 0, col])
+        l_col = patch_samples - (patch_cols[1, 0, col] - col2)
+
+        out_map[row1:row2 + 1, col1:col2 + 1] = \
+            rslc_patch[image_ind, f_row:l_row + 1, f_col:l_col + 1]
+
+
+    del out_map
+
 
 
 if __name__ == '__main__':
