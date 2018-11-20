@@ -410,7 +410,7 @@ def phase_link(mydf, pixels_dict={}):
         mydf.at['phase_ref'] = np.array(out_phase).reshape(n_image, 1, 1)
     else:
         mydf.at['amp_ref']  = np.abs(pixels_dict.at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1, 1))
-        out_phase = np.matrix(np.angle(pixels_dict..at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
+        out_phase = np.matrix(np.angle(pixels_dict.at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
         out_phase = out_phase - out_phase[0,0]
         mydf.at['phase_ref'] = np.array(out_phase).reshape(n_image, 1, 1)
 
