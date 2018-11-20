@@ -62,7 +62,7 @@ def sequential_process(shp_df_chunk, seq_n, inps, pixels_dict={}, pixels_dict_re
         lin,sam = item.at['ref_pixel'][0],item.at['ref_pixel'][1]
 
         pixels_dict_ref['RSLC_ref'][:, lin:lin + 1, sam:sam + 1] = \
-            np.multiply(item.at['amp_ref'][seq_n::, 0, 0], np.exp(1j*item.at['phase_ref'][seq_n::, 0, 0]))
+            (np.multiply(item.at['amp_ref'][seq_n::], np.exp(1j*item.at['phase_ref'][seq_n::]))).reshape(n_lines,1)
 
         org_pixel = pixels_dict['RSLC'][seq_n::, lin, sam]
 
