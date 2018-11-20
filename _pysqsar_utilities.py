@@ -11,8 +11,6 @@ import numpy as np
 import cmath
 from numpy import linalg as LA
 from scipy.optimize import minimize
-from scipy.stats import anderson_ksamp
-from skimage.measure import label
 import gdal
 import isce
 import isceobj
@@ -89,19 +87,6 @@ def read_image(image_file):
 ###############################################################################
 
 
-class Node():
-    """ Creates an object for each pixel. """
-
-    def __init__(self, i,j):
-        self.name = "%s_%s" % (str(i),str(j))
-        self.ref_pixel = [i,j]
-
-    def __repr__(self):
-        return self.name
-
-###############################################################################
-    
-    
 def corr2cov(corr_matrix = [],sigma = []):
     """ Converts correlation matrix to covariance matrix if std of variables are known. """
     
@@ -349,88 +334,6 @@ def trwin(x):
 ###############################################################################
 
 
-def shpobj(df):
-    """ create an object for each pixel in a dataframe."""
-    
-    n = df.shape
-    for i in range(n[0]):
-        for j in range(n[1]):
-            df.at[i,j] = Node(i,j)
-            
-    return df
-
-###############################################################################
-
-
-def win_loc(mydf, wra=21, waz=15, lin=330, sam=342):
-    """ Extract the pixels in multilook window based on image dimensions and pixel location."""
-    
-    r0 = mydf.ref_pixel[0]
-    c0 = mydf.ref_pixel[1]
-    r = np.ogrid[r0 - ((waz - 1) / 2):r0 + ((waz - 1) / 2) + 1]
-    ref_r = np.array([(waz - 1) / 2])
-    r = r[r >= 0]
-    r = r[r < lin]
-    ref_r = ref_r - (waz - len(r))
-    c = np.ogrid[c0 - ((wra - 1) / 2):c0 + ((wra - 1) / 2) + 1]
-    ref_c = np.array([(wra - 1) / 2])
-    c = c[c >= 0]
-    c = c[c < sam]
-    ref_c = ref_c - (wra - len(c))
-    mydf.ref_pixel_in_window = [ref_r,ref_c]
-    mydf.rows = r
-    mydf.cols = c
-    
-    return mydf
-    
-###############################################################################
-
-
-def shp_loc(mydf, pixels_dict={}):
-    """ Find statistical homogeneous pixels in a window based on Anderson Darling similarity test."""
-    
-    amp = pixels_dict['amp']
-    nimage = amp.shape[0]
-    r = mydf.rows.astype(int)
-    c = mydf.cols.astype(int)
-    x, y = np.meshgrid(r, c, sparse=True)
-    refr = mydf.ref_pixel[0]
-    refc = mydf.ref_pixel[1]
-    refr0 = mydf.ref_pixel_in_window[0]
-    refc0 = mydf.ref_pixel_in_window[1]
-    win = amp[:, x, y]
-    win = trwin(win)
-    testvec = win.reshape(nimage, len(r) * len(c))
-    ksres = np.ones(len(r) * len(c))
-    S1 = amp[:, refr, refc]
-    for m in range(len(testvec[0])):
-        S2 = testvec[:, m]
-        try:
-            test = anderson_ksamp([S1, S2])
-            if test.significance_level > 0.05:
-                ksres[m] = 1
-            else:
-                ksres[m] = 0
-        except:
-            ksres[m] = 0
-    ks_res = ksres.reshape(len(r), len(c))
-    ks_label = label(ks_res, background=False, connectivity=2)
-    reflabel = ks_label[refr0.astype(int), refc0.astype(int)]
-    rr, cc = np.where(ks_label == reflabel)
-    rr = rr + r[0]
-    cc = cc + c[0]
-    mydf.rows = rr
-    mydf.cols = cc
-    if len(rr)>20:
-        mydf.scatterer = 'DS'
-    else:
-        mydf.scatterer = 'PS'
-            
-    return mydf  
-
-###############################################################################
-
-
 def patch_slice(lin,sam,waz,wra):
     """ Devides an image into patches of size 300 by 300 by considering the overlay of the size of multilook window."""
     
@@ -473,16 +376,13 @@ def comp_matr(x, y):
 def phase_link(mydf, pixels_dict={}):
     """ Runs the phase linking algorithm over each DS.""" 
     
-    nimage = pixels_dict['amp'].shape[0]
-    rr = mydf['rows'].astype(int)
-    cc = mydf['cols'].astype(int)
-    refr = mydf['ref_pixel'][0]
-    refc = mydf['ref_pixel'][1]
-    dp = np.matrix(1.0 * np.arange(nimage * len(rr)).reshape(nimage, len(rr)))
+    n_image = pixels_dict.at['RSLC'].shape[0]
+    rr = mydf.at['rows'].astype(int)
+    cc = mydf.at['cols'].astype(int)
+    ref_row, ref_col = (mydf.at['ref_pixel'][0],mydf.at['ref_pixel'][1])
+    dp = np.matrix(1.0 * np.arange(n_image * len(rr)).reshape(n_image, len(rr)))
     dp = np.exp(1j * dp)
-    dpamp = pixels_dict['amp'][:, rr, cc]
-    dpph = pixels_dict['ph'][:, rr, cc]
-    dp[:,:] = np.matrix(comp_matr(dpamp, dpph))
+    dp[:,:] = np.matrix(pixels_dict.at['RSLC'][:, rr, cc])
     cov_m = np.matmul(dp, dp.getH()) / (len(rr))
     phi = np.angle(cov_m)
     abs_cov = np.abs(cov_m)
@@ -496,23 +396,23 @@ def phase_link(mydf, pixels_dict={}):
         xm[:,1::] = gam_c[:,:]
         res_PTA = PTA_L_BFGS(xm)
         ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
-        xn = np.matrix(ph_PTA.reshape(nimage, 1))
+        out_phase = np.matrix(ph_PTA.reshape(n_image, 1))
     except:
-        xn = np.matrix(pixels_dict['ph'][:, refr, refc].reshape(nimage, 1))
-        xn = xn - xn[0,0]
-    ampn = np.sqrt(np.abs(np.diag(cov_m)))
+        out_phase = np.matrix(np.angle(pixels_dict.at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
+        out_phase = out_phase - out_phase[0,0]
+    amplitude = np.sqrt(np.abs(np.diag(cov_m)))
     g1 = np.triu(phi,1)
-    g2 = np.matmul(np.exp(-1j * xn), (np.exp(-1j * xn)).getH())
+    g2 = np.matmul(np.exp(-1j * out_phase), (np.exp(-1j * out_phase)).getH())
     g2 = np.triu(np.angle(g2), 1)
     gam_pta = gam_pta_f(g1, g2)
     if 0.4 < gam_pta <= 1:
-        mydf['amp_ref'] = np.array(ampn).reshape(nimage, 1, 1)
-        mydf['phase_ref'] = np.array(xn).reshape(nimage, 1, 1)
+        mydf.at['amp_ref'] = np.array(amplitude).reshape(n_image, 1, 1)
+        mydf.at['phase_ref'] = np.array(out_phase).reshape(n_image, 1, 1)
     else:
-        mydf['amp_ref']  = pixels_dict['amp'][:, refr, refc].reshape(nimage, 1, 1)
-        xn = np.matrix(pixels_dict['ph'][:, refr, refc].reshape(nimage, 1))
-        xn = xn - xn[0,0]
-        mydf['phase_ref'] = np.array(xn).reshape(nimage, 1, 1)
+        mydf.at['amp_ref']  = np.abs(pixels_dict.at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1, 1))
+        out_phase = np.matrix(np.angle(pixels_dict..at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
+        out_phase = out_phase - out_phase[0,0]
+        mydf.at['phase_ref'] = np.array(out_phase).reshape(n_image, 1, 1)
 
     return mydf 
 
