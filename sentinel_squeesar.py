@@ -86,15 +86,15 @@ def main(iargs=None):
     logger_ph_lnk.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1])
     inps.project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
     inps.project_dir = os.getenv('SCRATCHDIR') + '/' + inps.project_name
-    inps.template = Template(inps.custom_template_file).get_options()
 
     inps.slave_dir = inps.project_dir + '/merged/SLC'
     inps.sq_dir = inps.project_dir + '/SqueeSAR'
     inps.patch_dir = inps.sq_dir+'/PATCH'
     inps.list_slv = os.listdir(inps.slave_dir)
     
-    inps.range_win = int(inps.template['squeesar.wsizerange'])
-    inps.azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
+    inps.range_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizerange'])
+    inps.azimuth_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizeazimuth'])
+    
     
     if not os.path.isdir(inps.sq_dir):
         os.mkdir(inps.sq_dir)
@@ -148,7 +148,7 @@ def main(iargs=None):
 
     flag = np.load(inps.sq_dir + '/flag.npy')
     try:
-      jobqueue = inps.template['job_queue']
+      jobqueue = Template(inps.custom_template_file).get_options()['job_queue']
     except:
       jobqueue = 'general'
     
