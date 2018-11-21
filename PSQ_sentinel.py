@@ -160,7 +160,7 @@ def main(iargs=None):
             rr = rr + r[0]
             cc = cc + c[0]
             if len(rr) > 20:
-                shp = {'ref_pixel': [lin, sam], 'rows': rr, 'cols': cc}
+                shp = {'ref_pixel': [lin, sam], 'rows': rr, 'cols': cc, 'amp_ref':{}, 'phase_ref':{}}
                 shp_df = shp_df.append(shp, ignore_index=True)
 
         shp_df.to_pickle(inps.work_dir + '/SHP.pkl')
@@ -181,7 +181,7 @@ def main(iargs=None):
         sequential_df = pd.read_pickle(inps.work_dir + '/sequential_df.pkl')
     else:
         sequential_df = pd.DataFrame(columns=['step_n', 'squeezed','datum_shift'])
-        sequential_df = sequential_df.append({'step_n':0}, ignore_index=True)
+        sequential_df = sequential_df.append({'step_n':0, 'squeezed':{}, 'datum_shift':{}}, ignore_index=True)
 
     step_0 = np.int(sequential_df.at[0,'step_n'])
 
