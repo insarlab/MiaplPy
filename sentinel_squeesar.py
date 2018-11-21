@@ -100,7 +100,6 @@ def main(iargs=None):
         os.mkdir(inps.sq_dir)
     
     
-     flag = np.load(inps.sq_dir + '/flag.npy')
     try:
       jobqueue = Template(inps.custom_template_file).get_options()['job_queue']
     except:
@@ -131,18 +130,22 @@ def main(iargs=None):
 
 ###########################################    
     
-    run_find_shp = inps.sq_dir + "/run_find_shp"
+    flag = np.load(inps.sq_dir + '/flag.npy')
+    if flag == 'patchlist_created':
+        run_find_shp = inps.sq_dir + "/run_find_shp"
 
-    with open(run_find_shp, 'w') as f:
-        for patch in inps.patch_list:
-            cmd = 'find_shp.py ' + inps.custom_template_file + ' -p ' +'PATCH' + patch + ' \n'
-            f.write(cmd)
+        with open(run_find_shp, 'w') as f:
+            for patch in inps.patch_list:
+                cmd = 'find_shp.py ' + inps.custom_template_file + ' -p ' +'PATCH' + patch + ' \n'
+                f.write(cmd)
     
-    cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_find_shp -w 2:00 -r 4000 -q '+ jobqueue 
-    status = subprocess.Popen(cmd, shell=True).wait()
-    if status is not 0:
-        logger_ph_lnk.log(loglevel.ERROR, 'ERROR running find_shp.py')
-        raise Exception('ERROR running find_shp.py')
+        cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_find_shp -w 2:00 -r 4000 -q '+ jobqueue 
+        status = subprocess.Popen(cmd, shell=True).wait()
+        if status is not 0:
+            logger_ph_lnk.log(loglevel.ERROR, 'ERROR running find_shp.py')
+            raise Exception('ERROR running find_shp.py')
+    else:
+        raise Exception('Patches are not created')
     
 ###########################################
 
