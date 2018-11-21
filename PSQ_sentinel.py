@@ -123,7 +123,6 @@ def main(iargs=None):
             r = r[r >= 0]
             r = r[r < inps.lin]
             ref_row = ref_row - (inps.azimuth_win - len(r))
-            sam = 0
             c = np.ogrid[sam - ((inps.range_win - 1) / 2):sam + ((inps.range_win - 1) / 2) + 1]
             ref_col = np.array([(inps.range_win - 1) / 2])
             c = c[c >= 0]
