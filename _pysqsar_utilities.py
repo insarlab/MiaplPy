@@ -8,7 +8,7 @@ import sys, os
 import numpy as np
 import cmath
 from numpy import linalg as LA
-from scipy.optimize import minimize
+from scipy.optimize import minimize, Bounds
 import gdal
 import isce
 import isceobj
@@ -191,7 +191,7 @@ def PTA_L_BFGS(xm):
     abs_coh = regularize_matrix(np.abs(coh))
     if np.size(abs_coh) == np.size(coh):
         inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh),coh))
-        res = minimize(optphase, x0, args = inverse_gam, method='L-BFGS-B', tol=None, options={'gtol': 1e-6, 'disp': True})
+        res = minimize(optphase, x0, args = inverse_gam, method='L-BFGS-B',bounds=Bounds(-np.pi, np.pi, keep_feasible=False), tol=None, options={'gtol': 1e-6, 'disp': True})
         out = np.zeros([n,1])
         out[1::,0] = -res.x
         return out
