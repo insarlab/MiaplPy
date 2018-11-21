@@ -180,43 +180,43 @@ def main(iargs=None):
     if os.path.isfile(inps.work_dir + '/sequential_df.pkl'):
         sequential_df = pd.read_pickle(inps.work_dir + '/sequential_df.pkl')
     else:
-        sequential_df = pd.DataFrame(columns=['step', 'squeezed','datum_shift'])
-        sequential_df = sequential_df.append({'step':0}, ignore_index=True)
+        sequential_df = pd.DataFrame(columns=['step_n', 'squeezed','datum_shift'])
+        sequential_df = sequential_df.append({'step_n':0}, ignore_index=True)
 
-    step_0 = np.int(sequential_df.at[0,'step'])
+    step_0 = np.int(sequential_df.at[0,'step_n'])
 
     shp_df = pd.read_pickle(inps.work_dir + '/SHP.pkl')
     shp_df_chunk = [shp_df.loc[y] for y in range(len(shp_df))]
 
     time0 = time.time()
-    for step in range(step_0, num_seq):
+    for stepp in range(step_0, num_seq):
 
-        first_line = step  * 10
-        if step == num_seq-1:
+        first_line = stepp  * 10
+        if stepp == num_seq-1:
             last_line = inps.n_image
         else:
             last_line = first_line + 10
-        if step == 0:
+        if stepp == 0:
             pixels_dict = {'RSLC': rslc[first_line:last_line, :, :]}
             pixels_dict_ref = {'RSLC_ref': rslc_ref[first_line:last_line, :, :]}
 
-            squeezed_image = sequential_process(shp_df_chunk=shp_df_chunk, seq_n=step,
+            squeezed_image = sequential_process(shp_df_chunk=shp_df_chunk, seq_n=stepp,
                                                 inps=inps, pixels_dict=pixels_dict,
                                                 pixels_dict_ref=pixels_dict_ref)
-            sequential_df.at[0,'step'] = step
+            sequential_df.at[0,'step_n'] = stepp
             sequential_df.at[0,'squeezed'] = squeezed_image
         else:
-            rslc_seq = np.zeros([step + 10, inps.lin, inps.sam])+1j
-            rslc_seq[0:step, :, :] = sequential_df.at[step - 1, 0].squeezed
-            rslc_seq[step::, :, :] = rslc[first_line:last_line, :, :]
+            rslc_seq = np.zeros([stepp + 10, inps.lin, inps.sam])+1j
+            rslc_seq[0:stepp, :, :] = sequential_df.at[0,'squeezed']
+            rslc_seq[stepp::, :, :] = rslc[first_line:last_line, :, :]
             pixels_dict = {'RSLC': rslc_seq}
             pixels_dict_ref = {'RSLC_ref': rslc_ref[first_line:last_line, :, :]}
-            squeezed_im = sequential_process(shp_df_chunk=shp_df_chunk, seq_n=step,
+            squeezed_im = sequential_process(shp_df_chunk=shp_df_chunk, seq_n=stepp,
                                              inps=inps, pixels_dict=pixels_dict,
                                              pixels_dict_ref=pixels_dict_ref)
-            squeezed_image = np.dstack((sequential_df.loc[step - 1]['squeezed'].T,squeezed_im.T)).T
+            squeezed_image = np.dstack((sequential_df.at[0,'squeezed'].T,squeezed_im.T)).T
 
-            sequential_df.at[0, 'step'] = step
+            sequential_df.at[0, 'step_n'] = stepp
             sequential_df.at[0, 'squeezed'] = squeezed_image
 
 
@@ -236,19 +236,19 @@ def main(iargs=None):
         lin,sam = (item.at['ref_pixel'][0],item.at['ref_pixel'][1])
         datum_connect[:, lin:lin+1, sam:sam+1] = item.at['phase_ref'][:, 0, 0].reshape(num_seq, 1, 1)
 
-    for step in range(num_seq):
-        first_line = step * 10
-        if step == num_seq-1:
+    for stepp in range(num_seq):
+        first_line = stepp * 10
+        if stepp == num_seq-1:
             last_line = inps.n_image
         else:
             last_line = first_line + 10
         if step_0 == 0:
             rslc_ref[first_line:last_line, :, :] = np.multiply(rslc_ref[first_line:last_line, :, :],
-                                                               np.exp(1j*datum_connect[step, :, :]))
+                                                               np.exp(1j*datum_connect[stepp, :, :]))
         else:
             rslc_ref[first_line:last_line, :, :] = \
                 np.multiply(rslc_ref[first_line:last_line, :, :],
-                            np.exp(1j * (datum_connect[step, :, :] - sequential_df.at[0, 'datum_shift'][step, :, :])))
+                            np.exp(1j * (datum_connect[stepp, :, :] - sequential_df.at[0, 'datum_shift'][stepp, :, :])))
 
     sequential_df.at[0, 'datum_shift'] = datum_connect
     np.save(inps.work_dir + '/endflag.npy', 'True')
