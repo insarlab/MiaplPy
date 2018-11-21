@@ -98,6 +98,14 @@ def main(iargs=None):
     
     if not os.path.isdir(inps.sq_dir):
         os.mkdir(inps.sq_dir)
+    
+    
+     flag = np.load(inps.sq_dir + '/flag.npy')
+    try:
+      jobqueue = Template(inps.custom_template_file).get_options()['job_queue']
+    except:
+      jobqueue = 'general'
+    
 
     slc = pysq.read_image(inps.slave_dir + '/' + inps.list_slv[0] + '/' + inps.list_slv[0] + '.slc.full')  #
     inps.n_image = len(inps.list_slv)
@@ -144,13 +152,6 @@ def main(iargs=None):
         for patch in inps.patch_list:
             cmd = 'PSQ_sentinel.py ' + inps.custom_template_file + ' -p ' +'PATCH' + patch + ' \n'
             f.write(cmd)
-
-
-    flag = np.load(inps.sq_dir + '/flag.npy')
-    try:
-      jobqueue = Template(inps.custom_template_file).get_options()['job_queue']
-    except:
-      jobqueue = 'general'
     
     #cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
     cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 4:00 -r 13000 -q '+ jobqueue 
