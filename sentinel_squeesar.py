@@ -121,6 +121,22 @@ def main(iargs=None):
     timep = time.time() - time0
     logger_ph_lnk.log(loglevel.INFO, "Done Creating PATCH. time:{}".format(timep))
 
+###########################################    
+    
+    run_find_shp = inps.sq_dir + "/run_find_shp"
+
+    with open(run_find_shp, 'w') as f:
+        for patch in inps.patch_list:
+            cmd = 'find_shp.py ' + inps.custom_template_file + ' -p ' +'PATCH' + patch + ' \n'
+            f.write(cmd)
+    
+    cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_find_shp -w 5:00 -r 3700 -q '+ jobqueue 
+    status = subprocess.Popen(cmd, shell=True).wait()
+    if status is not 0:
+        logger_ph_lnk.log(loglevel.ERROR, 'ERROR running find_shp.py')
+        raise Exception('ERROR running find_shp.py')
+    
+###########################################
 
     run_PSQ_sentinel = inps.sq_dir + "/run_PSQ_sentinel"
 
@@ -128,34 +144,22 @@ def main(iargs=None):
         for patch in inps.patch_list:
             cmd = 'PSQ_sentinel.py ' + inps.custom_template_file + ' -p ' +'PATCH' + patch + ' \n'
             f.write(cmd)
-    
 
-           
-###########################################
+
     flag = np.load(inps.sq_dir + '/flag.npy')
     try:
       jobqueue = inps.template['job_queue']
     except:
       jobqueue = 'general'
     
-    PSQ = False
-    for patch in inps.patch_list:
-        if os.path.isfile(inps.patch_dir + patch + '/endflag.npy'):
-            print('phase linking done sucessfully')
-        else:
-            print('PATCH'+patch + ' was not processed')
-            PSQ = True
-    
-    if flag == 'patchlist_created' and PSQ == True:
-        #cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
-        cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 5:00 -r 3700 -q '+ jobqueue 
-        status = subprocess.Popen(cmd, shell=True).wait()
-        print(status)
-        if status is not 0:
-            logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
-            raise Exception('ERROR running PSQ_sentinel.py')
+    #cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
+    cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 5:00 -r 3700 -q '+ jobqueue 
+    status = subprocess.Popen(cmd, shell=True).wait()
+    if status is not 0:
+        logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
+        raise Exception('ERROR running PSQ_sentinel.py')
 
-    
+ ###########################################   
 
 
     run_write_slc = inps.project_dir + '/merged/run_write_SLC'
