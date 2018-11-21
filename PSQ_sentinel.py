@@ -22,7 +22,7 @@ from dataset_template import Template
 
 #################################
 EXAMPLE = """example:
-  PSQ_sentinel.py LombokSenAT156VV.template PATCH5_11
+  PSQ_sentinel.py LombokSenAT156VV.template -p PATCH5_11
 """
 
 
