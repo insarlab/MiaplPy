@@ -51,8 +51,6 @@ def main(iargs=None):
 
     inps = command_line_parse(iargs)
 
-    inps.template = Template(inps.custom_template_file).get_options()
-
     project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
     project_dir = os.getenv('SCRATCHDIR') + '/' + project_name
     slave_dir = project_dir + '/merged/SLC'
@@ -62,8 +60,10 @@ def main(iargs=None):
     patch_list = glob.glob(sq_dir+'/PATCH*')
     patch_list = list(map(lambda x: x.split('/')[-1], patch_list))
     
-    range_win = int(inps.template['squeesar.wsizerange'])
-    azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
+    
+    range_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizerange'])
+    azimuth_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizeazimuth'])
+    
 
     patch_rows = np.load(sq_dir + '/rowpatch.npy')
     patch_cols = np.load(sq_dir + '/colpatch.npy')
