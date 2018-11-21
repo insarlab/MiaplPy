@@ -116,10 +116,11 @@ def main(iargs=None):
         sequential_df = pd.DataFrame(columns=['step_n', 'squeezed','datum_shift'])
         sequential_df = sequential_df.append({'step_n':0, 'squeezed':{}, 'datum_shift':{}}, ignore_index=True)
 
-    step_0 = np.int(sequential_df.at[0,'step_n'])
-
     shp_df = pd.read_pickle(inps.work_dir + '/SHP.pkl')
     shp_df_chunk = [shp_df.loc[y] for y in range(len(shp_df))]
+    
+    step_0 = np.int(sequential_df.at[0,'step_n'])
+    
 
     time0 = time.time()
     for stepp in range(step_0, num_seq):
@@ -141,14 +142,22 @@ def main(iargs=None):
             sequential_df.at[0,'squeezed'] = squeezed_image
         else:
             rslc_seq = np.zeros([stepp + num_lines, inps.lin, inps.sam])+1j
-            rslc_seq[0:stepp, :, :] = sequential_df.at[0,'squeezed']
+            
+            if step_0 ==num_seq-1:
+                rslc_seq[0:stepp, :, :] = sequential_df.at[0,'squeezed'][0:stepp, :, :]
+            else:
+                rslc_seq[0:stepp, :, :] = sequential_df.at[0,'squeezed']
+                
             rslc_seq[stepp::, :, :] = rslc[first_line:last_line, :, :]
             pixels_dict = {'RSLC': rslc_seq}
             pixels_dict_ref = {'RSLC_ref': rslc_ref[first_line:last_line, :, :]}
             squeezed_im = sequential_process(shp_df_chunk=shp_df_chunk, seq_n=stepp,
                                              inps=inps, pixels_dict=pixels_dict,
                                              pixels_dict_ref=pixels_dict_ref)
-            squeezed_image = np.dstack((sequential_df.at[0,'squeezed'].T,squeezed_im.T)).T
+            if step_0 ==num_seq-1:
+                squeezed_image = np.dstack((sequential_df.at[0,'squeezed'][0:stepp, :, :].T,squeezed_im.T)).T
+            else:
+                squeezed_image = np.dstack((sequential_df.at[0,'squeezed'].T,squeezed_im.T)).T
 
             sequential_df.at[0, 'step_n'] = stepp
             sequential_df.at[0, 'squeezed'] = squeezed_image
