@@ -8,19 +8,17 @@ import sys
 import time
 
 import argparse
-from numpy import linalg as LA
 import numpy as np
 from scipy.stats import anderson_ksamp
 from skimage.measure import label
-import _pysqsar_utilities as pysq
+from _pysqsar_utilities import trwin
 import pandas as pd
-from dask import compute, delayed
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 from dataset_template import Template
 
 #################################
 EXAMPLE = """example:
-  PSQ_sentinel.py LombokSenAT156VV.template PATCH5_11
+  find_shp.py LombokSenAT156VV.template -p PATCH5_11
 """
 
 
@@ -50,14 +48,17 @@ def main(iargs=None):
 
     inps.project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
     inps.project_dir = os.getenv('SCRATCHDIR') + '/' + inps.project_name
-    inps.template = Template(inps.custom_template_file).get_options()
+
     inps.scratch_dir = os.getenv('SCRATCHDIR')
     inps.slave_dir = inps.project_dir + '/merged/SLC'
     inps.sq_dir = inps.project_dir + '/SqueeSAR'
     inps.list_slv = os.listdir(inps.slave_dir)
     inps.n_image = len(inps.list_slv)
     inps.work_dir = inps.sq_dir +'/'+ inps.patch_dir
-
+    
+    inps.range_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizerange'])
+    inps.azimuth_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizeazimuth'])
+    
     inps.patch_rows = np.load(inps.sq_dir + '/rowpatch.npy')
     inps.patch_cols = np.load(inps.sq_dir + '/colpatch.npy')
     patch_row, patch_col = inps.patch_dir.split('PATCH')[1].split('_')
@@ -68,9 +69,6 @@ def main(iargs=None):
 
     rslc = np.memmap(inps.work_dir + '/RSLC', dtype=np.complex64, mode='r', shape=(inps.n_image, inps.lin, inps.sam))
 
-
-    inps.range_win = int(inps.template['squeesar.wsizerange'])
-    inps.azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
 
     ################### Finding Statistical homogeneous pixels ################
     num_slc = 20    # to find SHPs only
@@ -101,7 +99,7 @@ def main(iargs=None):
 
             x, y = np.meshgrid(r.astype(int), c.astype(int), sparse=True)
             win = np.abs(rslc[0:num_slc, x, y])
-            win = pysq.trwin(win)
+            win = trwin(win)
 
             test_vec = win.reshape(num_slc, len(r) * len(c))
             ks_res = np.zeros(len(r) * len(c))
