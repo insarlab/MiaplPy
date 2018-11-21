@@ -195,6 +195,7 @@ def main(iargs=None):
             last_line = inps.n_image
         else:
             last_line = first_line + 10
+        num_lines = last_line - first_line
         if stepp == 0:
             pixels_dict = {'RSLC': rslc[first_line:last_line, :, :]}
             pixels_dict_ref = {'RSLC_ref': rslc_ref[first_line:last_line, :, :]}
@@ -205,7 +206,7 @@ def main(iargs=None):
             sequential_df.at[0,'step_n'] = stepp
             sequential_df.at[0,'squeezed'] = squeezed_image
         else:
-            rslc_seq = np.zeros([stepp + 10, inps.lin, inps.sam])+1j
+            rslc_seq = np.zeros([stepp + num_lines, inps.lin, inps.sam])+1j
             rslc_seq[0:stepp, :, :] = sequential_df.at[0,'squeezed']
             rslc_seq[stepp::, :, :] = rslc[first_line:last_line, :, :]
             pixels_dict = {'RSLC': rslc_seq}
@@ -241,7 +242,7 @@ def main(iargs=None):
             last_line = inps.n_image
         else:
             last_line = first_line + 10
-        if step_0 == 0:
+        if step_0 == 0 or sequential_df.at[0, 'datum_shift']=={}:
             rslc_ref[first_line:last_line, :, :] = np.multiply(rslc_ref[first_line:last_line, :, :],
                                                                np.exp(1j*datum_connect[stepp, :, :]))
         else:
