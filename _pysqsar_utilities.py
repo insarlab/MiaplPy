@@ -404,13 +404,13 @@ def phase_link(mydf, pixels_dict={}):
     g2 = np.triu(np.angle(g2), 1)
     gam_pta = gam_pta_f(g1, g2)
     if 0.4 < gam_pta <= 1:
-        mydf.at['amp_ref'] = np.array(amplitude).reshape(n_image, 1, 1)
-        mydf.at['phase_ref'] = np.array(out_phase).reshape(n_image, 1, 1)
+        mydf.at['amp_ref'] = np.float32(np.array(amplitude).reshape(n_image, 1, 1))
+        mydf.at['phase_ref'] = np.float32(np.array(out_phase).reshape(n_image, 1, 1))
     else:
-        mydf.at['amp_ref']  = np.abs(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1, 1))
+        mydf.at['amp_ref']  =np.float32( np.abs(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1, 1)))
         out_phase = np.matrix(np.angle(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
         out_phase = out_phase - out_phase[0,0]
-        mydf.at['phase_ref'] = np.array(out_phase).reshape(n_image, 1, 1)
+        mydf.at['phase_ref'] = np.float32(np.array(out_phase).reshape(n_image, 1, 1))
 
     return mydf 
 
