@@ -124,10 +124,10 @@ def main(iargs=None):
 
             rr, cc = np.where(ks_label == ref_label)
 
-            rr = rr + r[0]
-            cc = cc + c[0]
+            rr = np.array(rr + r[0], dtype='uint16')
+            cc = np.array(cc + c[0], dtype='uint16')
             if len(rr) > 20:
-                shp = {'ref_pixel': [lin, sam], 'rows': rr, 'cols': cc, 'amp_ref':{}, 'phase_ref':{}}
+                shp = {'ref_pixel': np.array([lin, sam]).astype('uint16'), 'rows': rr, 'cols': cc, 'amp_ref':{}, 'phase_ref':{}}
                 shp_df = shp_df.append(shp, ignore_index=True)
 
         shp_df.to_pickle(inps.work_dir + '/SHP.pkl')
