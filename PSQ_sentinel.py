@@ -70,7 +70,7 @@ def sequential_process(shp_df_chunk, seq_n, inps, pixels_dict={}, pixels_dict_re
         map_pixel = np.matrix(map_pixel / LA.norm(map_pixel))
 
         squeezed[lin, sam] = np.matmul(map_pixel.getH(), org_pixel)
-
+        squeezed = squeezed.astype(np.complex64)
     return squeezed
 
 
@@ -106,7 +106,7 @@ def main(iargs=None):
     ###################### Sequential Phase linking ###############################
     
 
-    rslc_ref = np.memmap(inps.work_dir + '/RSLC_ref', dtype='complex', mode='w+', shape=(inps.n_image, inps.lin, inps.sam))
+    rslc_ref = np.memmap(inps.work_dir + '/RSLC_ref', dtype='complex64', mode='w+', shape=(inps.n_image, inps.lin, inps.sam))
     rslc_ref[:,:,:] = rslc[:,:,:]
 
     num_seq = np.int(np.floor(inps.n_image / 10))
@@ -114,12 +114,12 @@ def main(iargs=None):
         sequential_df = pd.read_pickle(inps.work_dir + '/sequential_df.pkl')
     else:
         sequential_df = pd.DataFrame(columns=['step_n', 'squeezed','datum_shift'])
-        sequential_df = sequential_df.append({'step_n':0, 'squeezed':{}, 'datum_shift':{}}, ignore_index=True)
+        sequential_df = sequential_df.append({'step_n':np.uint32(0), 'squeezed':{}, 'datum_shift':{}}, ignore_index=True)
 
     shp_df = pd.read_pickle(inps.work_dir + '/SHP.pkl')
     shp_df_chunk = [shp_df.loc[y] for y in range(len(shp_df))]
     
-    step_0 = np.int(sequential_df.at[0,'step_n'])
+    step_0 = np.uint32(sequential_df.at[0,'step_n'])
     
 
     time0 = time.time()
@@ -138,29 +138,29 @@ def main(iargs=None):
             squeezed_image = sequential_process(shp_df_chunk=shp_df_chunk, seq_n=stepp,
                                                 inps=inps, pixels_dict=pixels_dict,
                                                 pixels_dict_ref=pixels_dict_ref)
-            sequential_df.at[0,'step_n'] = stepp
-            sequential_df.at[0,'squeezed'] = squeezed_image
+            sequential_df.at[0,'step_n'] = np.uint32(stepp)
+            sequential_df.at[0,'squeezed'] = np.complex64(squeezed_image)
         else:
             rslc_seq = np.zeros([stepp + num_lines, inps.lin, inps.sam])+1j
             
             if step_0 ==num_seq-1:
-                rslc_seq[0:stepp, :, :] = sequential_df.at[0,'squeezed'][0:stepp, :, :]
+                rslc_seq[0:stepp, :, :] = np.complex64(sequential_df.at[0,'squeezed'][0:stepp, :, :])
             else:
-                rslc_seq[0:stepp, :, :] = sequential_df.at[0,'squeezed']
+                rslc_seq[0:stepp, :, :] = np.complex64(sequential_df.at[0,'squeezed'])
                 
-            rslc_seq[stepp::, :, :] = rslc[first_line:last_line, :, :]
+            rslc_seq[stepp::, :, :] = np.complex64(rslc[first_line:last_line, :, :])
             pixels_dict = {'RSLC': rslc_seq}
             pixels_dict_ref = {'RSLC_ref': rslc_ref[first_line:last_line, :, :]}
             squeezed_im = sequential_process(shp_df_chunk=shp_df_chunk, seq_n=stepp,
                                              inps=inps, pixels_dict=pixels_dict,
                                              pixels_dict_ref=pixels_dict_ref)
             if step_0 ==num_seq-1:
-                squeezed_image = np.dstack((sequential_df.at[0,'squeezed'][0:stepp, :, :].T,squeezed_im.T)).T
+                squeezed_image = np.complex64(np.dstack((sequential_df.at[0,'squeezed'][0:stepp, :, :].T,squeezed_im.T)).T)
             else:
-                squeezed_image = np.dstack((sequential_df.at[0,'squeezed'].T,squeezed_im.T)).T
+                squeezed_image = np.complex64(np.dstack((sequential_df.at[0,'squeezed'].T,squeezed_im.T)).T)
 
-            sequential_df.at[0, 'step_n'] = stepp
-            sequential_df.at[0, 'squeezed'] = squeezed_image
+            sequential_df.at[0, 'step_n'] = np.uint32(stepp)
+            sequential_df.at[0, 'squeezed'] = np.complex64(squeezed_image)
 
 
         sequential_df.to_pickle(inps.work_dir + '/sequential_df.pkl')
@@ -172,12 +172,12 @@ def main(iargs=None):
 
     values = [delayed(pysq.phase_link)(x,pixels_dict=pixels_dict) for x in shp_df_chunk]
     results = pd.DataFrame(list(compute(*values, scheduler='processes')))
-    datum_connect = np.zeros([num_seq, inps.lin, inps.sam])
+    datum_connect = np.float32(np.zeros([num_seq, inps.lin, inps.sam]))
     datum_df = [results.loc[y] for y in range(len(results))]
 
     for item in datum_df:
         lin,sam = (item.at['ref_pixel'][0],item.at['ref_pixel'][1])
-        datum_connect[:, lin:lin+1, sam:sam+1] = item.at['phase_ref'][:, 0, 0].reshape(num_seq, 1, 1)
+        datum_connect[:, lin:lin+1, sam:sam+1] = np.float32(item.at['phase_ref'][:, 0, 0].reshape(num_seq, 1, 1))
 
     for stepp in range(num_seq):
         first_line = stepp * 10
@@ -186,14 +186,14 @@ def main(iargs=None):
         else:
             last_line = first_line + 10
         if step_0 == 0 or sequential_df.at[0, 'datum_shift']=={}:
-            rslc_ref[first_line:last_line, :, :] = np.multiply(rslc_ref[first_line:last_line, :, :],
-                                                               np.exp(1j*datum_connect[stepp, :, :]))
+            rslc_ref[first_line:last_line, :, :] = np.complex64(np.multiply(rslc_ref[first_line:last_line, :, :],
+                                                               np.exp(1j*datum_connect[stepp, :, :])))
         else:
             rslc_ref[first_line:last_line, :, :] = \
-                np.multiply(rslc_ref[first_line:last_line, :, :],
-                            np.exp(1j * (datum_connect[stepp, :, :] - sequential_df.at[0, 'datum_shift'][stepp, :, :])))
+                np.complex64(np.multiply(rslc_ref[first_line:last_line, :, :],
+                            np.exp(1j * (datum_connect[stepp, :, :] - sequential_df.at[0, 'datum_shift'][stepp, :, :]))))
 
-    sequential_df.at[0, 'datum_shift'] = datum_connect
+    sequential_df.at[0, 'datum_shift'] = np.float32(datum_connect)
     np.save(inps.work_dir + '/endflag.npy', 'True')
     sequential_df.to_pickle(inps.work_dir + '/sequential_df.pkl')
 
