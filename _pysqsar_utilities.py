@@ -231,7 +231,7 @@ def EMI_phase_estimation(coh0):
         w,v = LA.eigh(M)
         f = np.where(np.abs(w) == np.sort(np.abs(w))[0])
         #vec = LA.pinv(v[:,f].reshape(len(w),1)*np.sqrt(len(coh0)))
-        vec = v[:,f].reshape(len(w),1)
+        vec = v[:,f].reshape(v.shape[0],1)
         x0 = np.angle(vec).reshape(len(w),1)
         x0 = x0 - x0[0,0]
         x0 = np.unwrap(x0,np.pi,axis=0)
