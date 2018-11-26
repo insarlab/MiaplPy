@@ -145,7 +145,7 @@ def shp_locate(mydf,method):
     CCG = np.matrix(1.0 * np.arange(n_image * len(rr)).reshape(n_image, len(rr)))
     CCG = np.exp(1j * CCG)
     CCG[:,:] = np.matrix(rslc[:, rr, cc]) 
-    amp_ref = np.mean(np.abs(CCG),axis=0)
+    amp_ref = np.mean(np.abs(CCG),axis=1)
     ph_ref = sequential_phase_linking(CCG, ref_row, ref_col, rr, cc, method)
     rslc_ref[:,ref_row, ref_col] = np.complex64(np.multiply(amp_ref,np.exp(1j*ph_ref)).reshape(len(ph_ref),1,1))
     
