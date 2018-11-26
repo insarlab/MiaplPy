@@ -16,7 +16,7 @@ from dask import compute, delayed
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 from dataset_template import Template
 
-
+global rslc, sequential_df, rslc_ref
 
 #################################
 EXAMPLE = """example:
