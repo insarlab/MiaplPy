@@ -89,7 +89,7 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
           
             ccg_sample = CCG[first_line:last_line,:]
             res, squeezed_image = sequential_process(ccg_sample, stepp, method)
-            phase_ref[first_line:last_line,0:1] = res[stepp::,0]
+            phase_ref[first_line:last_line,0:1] = res[stepp::].reshape(num_lines,1)
             
         else:
             
@@ -97,7 +97,7 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
             ccg_sample[0, :] = np.complex64(squeezed_image[-1,:])
             ccg_sample[1::, :] = CCG[first_line:last_line, :]
             res, squeezed_im = sequential_process(ccg_sample, 1, method)
-            phase_ref[first_line:last_line,0:1] = res[1::,0]
+            phase_ref[first_line:last_line,0:1] = res[1::].reshape(num_lines,1)
             squeezed_image = np.complex64(np.vstack([squeezed_image,squeezed_im]))
             
     sequential_df.at[0,'step_n'] = np.uint32(num_seq)
@@ -118,9 +118,9 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
             last_line = first_line + 10
             
         if  step_0 == 0:
-            phase_ref[first_line:last_line, 0:1] = phase_ref[first_line:last_line, 0] + res_d[int(stepp),0]
+            phase_ref[first_line:last_line, 0:1] = phase_ref[first_line:last_line, 0] + res_d[int(stepp)]
         else:
-            phase_ref[first_line:last_line, 0:1] = phase_ref[first_line:last_line, 0] + res_d[int(stepp),0] - datumshift
+            phase_ref[first_line:last_line, 0:1] = phase_ref[first_line:last_line, 0] + res_d[int(stepp)] - datumshift
             
     sequential_df.at[0, 'datum_shift'][:,ref_row+1, ref_col+1] = np.float32(res_d).reshape(len(res_d),1,1)
     
