@@ -73,7 +73,7 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
     n_image = CCG.shape[0]
     num_seq = np.int(np.floor(n_image / 10))
     ph_ref = np.float32(np.zeros([n_image,1]))
-    ph_ref[:,0:1] = np.angle(rslc_ref[:,ref_row, ref_col]).reshape(n_image,1)  
+    ph_ref[:] = np.angle(rslc_ref[:,ref_row, ref_col]).reshape(n_image,1)  
 
     squeezed_image = np.matrix(sequential_df.at[0,'squeezed'][:,rows,cols])
     
