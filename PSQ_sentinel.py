@@ -72,8 +72,8 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
     mat_shape = np.shape(sequential_df.at[0,'squeezed'])
     n_image = CCG.shape[0]
     num_seq = np.int(np.floor(n_image / 10))
-    ph_ref = np.float32(np.zeros([n_image,1]))
-    ph_ref[:,0] = np.angle(rslc_ref[:,ref_row, ref_col]).reshape(n_image,1)  
+    phase_ref = np.float32(np.zeros([n_image,1]))
+    phase_ref[:,0:1] = np.angle(rslc_ref[:,ref_row, ref_col]).reshape(n_image,1)  
 
     squeezed_image = np.matrix(sequential_df.at[0,'squeezed'][:,rows,cols])
     
@@ -89,7 +89,7 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
           
             ccg_sample = CCG[first_line:last_line,:]
             res, squeezed_image = sequential_process(ccg_sample, stepp, method)
-            ph_ref[first_line:last_line,0:1] = res[stepp::,0]
+            phase_ref[first_line:last_line,0:1] = res[stepp::,0]
             
         else:
             
@@ -97,7 +97,7 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
             ccg_sample[0, :] = np.complex64(squeezed_image[-1,:])
             ccg_sample[1::, :] = CCG[first_line:last_line, :]
             res, squeezed_im = sequential_process(ccg_sample, 1, method)
-            ph_ref[first_line:last_line,0:1] = res[1::,0]
+            phase_ref[first_line:last_line,0:1] = res[1::,0]
             squeezed_image = np.complex64(np.vstack([squeezed_image,squeezed_im]))
             
     sequential_df.at[0,'step_n'] = np.uint32(num_seq)
@@ -118,19 +118,19 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
             last_line = first_line + 10
             
         if  step_0 == 0:
-            ph_ref[first_line:last_line, 0:1] = ph_ref[first_line:last_line, 0] + res_d[int(stepp),0]
+            phase_ref[first_line:last_line, 0:1] = phase_ref[first_line:last_line, 0] + res_d[int(stepp),0]
         else:
-            ph_ref[first_line:last_line, 0:1] = ph_ref[first_line:last_line, 0] + res_d[int(stepp),0] - datumshift
+            phase_ref[first_line:last_line, 0:1] = phase_ref[first_line:last_line, 0] + res_d[int(stepp),0] - datumshift
             
     sequential_df.at[0, 'datum_shift'][:,ref_row+1, ref_col+1] = np.float32(res_d).reshape(len(res_d),1,1)
     
     
     phase_init = np.triu(np.angle(np.matmul(CCG, CCG.getH()) / (len(rows))),1)
-    phase_optimized = np.triu(np.angle(np.matmul(np.exp(-1j * ph_ref), (np.exp(-1j * ph_ref)).getH())), 1)
+    phase_optimized = np.triu(np.angle(np.matmul(np.exp(-1j * phase_ref), (np.exp(-1j * phase_ref)).getH())), 1)
     gam_pta = pysq.gam_pta_f(phase_init, phase_optimized)
     
     if 0.4 < gam_pta <= 1:
-        out = ph_ref
+        out = phase_ref
     else:
         out = np.angle(rslc_ref[:,ref_row, ref_col]).reshape(n_image,1)    
             
