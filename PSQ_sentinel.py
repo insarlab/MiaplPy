@@ -191,7 +191,7 @@ def main(iargs=None):
         sequential_df = pd.DataFrame(columns=['step_n', 'squeezed','datum_shift','n_images_done'])
         sequential_df = sequential_df.append({'step_n':np.uint32(0), 
                                               'squeezed':np.complex64(np.zeros([1,inps.lin,inps.sam])), 
-                                              'datum_shift':np.float32(np.zeros([num_seq,inps.lin,inps.sam])), ignore_index=True)
+                                              'datum_shift':np.float32(np.zeros([num_seq,inps.lin,inps.sam]))}, ignore_index=True)
                                               
     
     rslc = np.memmap(inps.work_dir + '/RSLC', dtype=np.complex64, mode='r', shape=(inps.n_image, inps.lin, inps.sam))
