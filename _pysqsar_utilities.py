@@ -172,8 +172,9 @@ def optphase(x0, inverse_gam):
     x = np.ones([n+1,1])+0j
     x[1::,0] = np.exp(1j*x0[:])#.reshape(n,1)
     x = np.matrix(x)
-    y = np.matmul(-x.getH(), inverse_gam)
-    f = np.abs(np.log(np.matmul(y, x)))
+    y = -np.matmul(x.getH(), inverse_gam)
+    y = np.matmul(y, x)
+    f = np.abs(np.log(y))
     
     return f
 
@@ -191,10 +192,13 @@ def PTA_L_BFGS(xm):
     abs_coh = regularize_matrix(np.abs(coh))
     if np.size(abs_coh) == np.size(coh):
         inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh),coh))
-        res = minimize(optphase, x0, args = inverse_gam, method='L-BFGS-B',
-                       bounds=Bounds(-100, 100, keep_feasible=False), tol=None, options={'gtol': 1e-6, 'disp': False})
+        res = minimize(optphase, x0, args = inverse_gam, method='L-BFGS-B', 
+                       bounds=Bounds(-100, 100, keep_feasible=False), 
+                       tol=None, options={'gtol': 1e-6, 'disp': False})
+        
         out = np.zeros([n,1])
-        out[1::,0] = -res.x
+        out[1::,0] = res.x
+        out = np.unwrap(out,np.pi,axis=0)
         return out
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from PTA to EVD')
@@ -206,10 +210,12 @@ def PTA_L_BFGS(xm):
 def EVD_phase_estimation(coh0):
     """ Estimates the phase values based on eigen value decomosition """
     
-    w,v = LA.eig(coh0)
-    f = np.where(w == np.sort(w)[len(coh0)-1])
-    x0 = np.reshape(-np.angle(v[:,f]),[len(coh0),1])
+    w,v = LA.eigh(coh0)
+    f = np.where(np.abs(w) == np.sort(np.abs(w))[len(coh0)-1])
+    vec = v[:,f].reshape(len(w),1)
+    x0 = np.angle(vec)
     x0 = x0 - x0[0,0]
+    x0 = np.unwrap(x0,np.pi,axis=0)
     
     return x0
 
@@ -222,12 +228,14 @@ def EMI_phase_estimation(coh0):
     abscoh = regularize_matrix(np.abs(coh0))
     if np.size(abscoh) == np.size(coh0):
         M = np.multiply(LA.pinv(abscoh),coh0)
-        w,v = LA.eig(M)
-        f = np.where(w == np.sort(w)[0])
-        x0 = np.reshape((v[:,f]),[len(v),1])
-        out = -np.angle(x0)
-        out = out - out[0,0]
-        return out
+        w,v = LA.eigh(M)
+        f = np.where(np.abs(w) == np.sort(np.abs(w))[0])
+        #vec = LA.pinv(v[:,f].reshape(len(w),1)*np.sqrt(len(coh0)))
+        vec = v[:,f].reshape(len(w),1)
+        x0 = np.angle(vec).reshape(len(w),1)
+        x0 = x0 - x0[0,0]
+        x0 = np.unwrap(x0,np.pi,axis=0)
+        return x0
     else:
         print('warning: coherence matric not positive semidifinite, It is switched from EMI to EVD')
         return EVD_phase_estimation(coh0)
@@ -285,10 +293,10 @@ def est_corr(CCGsam):
         
     CCGS = np.matrix(CCGsam)
     corr_mat = np.matmul(CCGS,CCGS.getH())/CCGS.shape[1]
-    f = np.angle(corr_mat)
-    corr_mat = np.multiply(np.abs(corr_mat),np.exp(-1j*f))
     
-    return corr_mat
+    coh = np.multiply(cov2corr(np.abs(corr_mat)),np.angle(corr_mat))
+    
+    return coh
     
 ###############################################################################
 
@@ -310,8 +318,7 @@ def custom_cmap(vmin=0,vmax=1):
 def EST_rms(x):
     """ Estimate Root mean square error."""
     
-    z = np.matrix(np.reshape(x,[len(x),1]))
-    out = (np.matmul(z,z.getH()))/len(x)
+    out = np.sqrt(np.sum(x**2,axis=1)/(np.shape(x)[1]-1))
     
     return out
           
@@ -372,46 +379,4 @@ def comp_matr(x, y):
 ###############################################################################
 
 
-def phase_link(mydf, pixels_dict={}):
-    """ Runs the phase linking algorithm over each DS.""" 
-     
-    n_image = pixels_dict['RSLC'].shape[0]
-    rr = mydf.at['rows'].astype(int)
-    cc = mydf.at['cols'].astype(int)
-    ref_row, ref_col = (mydf.at['ref_pixel'][0],mydf.at['ref_pixel'][1])
-    dp = np.matrix(1.0 * np.arange(n_image * len(rr)).reshape(n_image, len(rr)))
-    dp = np.exp(1j * dp)
-    dp[:,:] = np.matrix(pixels_dict['RSLC'][:, rr, cc])
-    cov_m = np.matmul(dp, dp.getH()) / (len(rr))
-    phi = np.angle(cov_m)
-    abs_cov = np.abs(cov_m)
-    coh = cov2corr(abs_cov)
-    gam_c = np.multiply(coh, np.exp(1j * phi))
-    try:
-        #ph0 = EVD_phase_estimation(gam_c)
-        ph0 = phi[0,:].reshape(len(phi),1)
-        xm = np.zeros([len(ph0),len(ph0)+1])+0j
-        xm[:,0:1] = np.reshape(ph0,[len(ph0),1])
-        xm[:,1::] = gam_c[:,:]
-        res_PTA = PTA_L_BFGS(xm)
-        ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
-        out_phase = np.matrix(ph_PTA.reshape(n_image, 1))
-    except:
-        out_phase = np.matrix(np.angle(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
-        out_phase = out_phase - out_phase[0,0]
-    amplitude = np.sqrt(np.abs(np.diag(cov_m)))
-    g1 = np.triu(phi,1)
-    g2 = np.matmul(np.exp(-1j * out_phase), (np.exp(-1j * out_phase)).getH())
-    g2 = np.triu(np.angle(g2), 1)
-    gam_pta = gam_pta_f(g1, g2)
-    if 0.4 < gam_pta <= 1:
-        mydf.at['amp_ref'] = np.float32(np.array(amplitude).reshape(n_image, 1, 1))
-        mydf.at['phase_ref'] = np.float32(np.array(out_phase).reshape(n_image, 1, 1))
-    else:
-        mydf.at['amp_ref']  =np.float32( np.abs(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1, 1)))
-        out_phase = np.matrix(np.angle(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
-        out_phase = out_phase - out_phase[0,0]
-        mydf.at['phase_ref'] = np.float32(np.array(out_phase).reshape(n_image, 1, 1))
-
-    return mydf 
 
