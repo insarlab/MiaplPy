@@ -125,8 +125,18 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, step_0, method):
             ph_ref[first_line:last_line, 0] = ph_ref[first_line:last_line, 0] + res_d[stepp,0] - datumshift
             
     sequential_df.at[0, 'datum_shift'][:,ref_row+1, ref_col+1] = np.float32(res_d).reshape(len(res_d),1,1)
-       
-    return  ph_ref 
+    
+    
+    phase_init = np.triu(np.angle(np.matmul(CCG, CCG.getH()) / (len(rr))),1)
+    phase_optimized = np.triu(np.angle(np.matmul(np.exp(-1j * ph_ref), (np.exp(-1j * ph_ref)).getH())), 1)
+    gam_pta = pysq.gam_pta_f(phase_init, phase_optimized)
+    
+    if 0.4 < gam_pta <= 1:
+        out = ph_ref
+    else:
+        out = np.angle(rslc_ref[:,ref_row, ref_col]).reshape(n_image,1)    
+            
+    return  out 
   
   
 def shp_locate(mydf,method):
