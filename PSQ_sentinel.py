@@ -103,7 +103,7 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
     sequential_df.at[0,'step_n'] = np.uint32(num_seq)
     sequential_df.at[0,'squeezed'] = np.complex64(np.zeros([squeezed_image.shape[0],mat_shape[1],mat_shape[2]]))
     for t in range(len(rows)):
-        sequential_df.at[0,'squeezed'][:,rows[t],cols[t]] = squeezed_image[:,t]
+        sequential_df.at[0,'squeezed'][:,rows[t]:rows[t]+1,cols[t]:cols[t]+1] = squeezed_image[:,t].reshape(squeezed_image.shape[0],1,1)
         
     
     ccg_datum = squeezed_image    
