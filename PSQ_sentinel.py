@@ -206,7 +206,7 @@ def main(iargs=None):
     shp_df = pd.read_pickle(inps.work_dir + '/SHP.pkl')
     shp_df_chunk = [shp_df.loc[y] for y in range(len(shp_df))]  
     values = [delayed(shp_locate)(x,method) for x in shp_df_chunk]
-    compute(*values, scheduler='processes'))
+    compute(*values, scheduler='processes')
                                               
     sequential_df.to_pickle(inps.work_dir + '/sequential_df.pkl')
     
