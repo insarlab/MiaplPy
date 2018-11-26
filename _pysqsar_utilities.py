@@ -1,16 +1,14 @@
 #! /usr/bin/env python3
 ###############################################################################
-#
 # Project: Utilitiels for pysqsar
 # Author: Sara Mirzaee
 # Created: 10/2018
-#
 ###############################################################################
 import sys, os
 import numpy as np
 import cmath
 from numpy import linalg as LA
-from scipy.optimize import minimize
+from scipy.optimize import minimize, Bounds
 import gdal
 import isce
 import isceobj
@@ -101,7 +99,7 @@ def corr2cov(corr_matrix = [],sigma = []):
 def cov2corr(cov_matrix):
     """ Converts covariance matrix to correlation/coherence matrix. """
     
-    D = np.diagflat(np.pinv(np.sqrt(np.diag(cov_matrix))))
+    D = LA.pinv(np.diagflat(np.sqrt(np.diag(cov_matrix))))
     y = np.matmul(D, cov_matrix)
     corr_matrix = np.matmul(y, np.transpose(D))
     
@@ -193,7 +191,8 @@ def PTA_L_BFGS(xm):
     abs_coh = regularize_matrix(np.abs(coh))
     if np.size(abs_coh) == np.size(coh):
         inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh),coh))
-        res = minimize(optphase, x0, args = inverse_gam, method='L-BFGS-B', tol=None, options={'gtol': 1e-6, 'disp': True})
+        res = minimize(optphase, x0, args = inverse_gam, method='L-BFGS-B',
+                       bounds=Bounds(-100, 100, keep_feasible=False), tol=None, options={'gtol': 1e-6, 'disp': False})
         out = np.zeros([n,1])
         out[1::,0] = -res.x
         return out
@@ -375,14 +374,14 @@ def comp_matr(x, y):
 
 def phase_link(mydf, pixels_dict={}):
     """ Runs the phase linking algorithm over each DS.""" 
-    
-    n_image = pixels_dict.at['RSLC'].shape[0]
+     
+    n_image = pixels_dict['RSLC'].shape[0]
     rr = mydf.at['rows'].astype(int)
     cc = mydf.at['cols'].astype(int)
     ref_row, ref_col = (mydf.at['ref_pixel'][0],mydf.at['ref_pixel'][1])
     dp = np.matrix(1.0 * np.arange(n_image * len(rr)).reshape(n_image, len(rr)))
     dp = np.exp(1j * dp)
-    dp[:,:] = np.matrix(pixels_dict.at['RSLC'][:, rr, cc])
+    dp[:,:] = np.matrix(pixels_dict['RSLC'][:, rr, cc])
     cov_m = np.matmul(dp, dp.getH()) / (len(rr))
     phi = np.angle(cov_m)
     abs_cov = np.abs(cov_m)
@@ -398,7 +397,7 @@ def phase_link(mydf, pixels_dict={}):
         ph_PTA = np.reshape(res_PTA,[len(res_PTA),1])
         out_phase = np.matrix(ph_PTA.reshape(n_image, 1))
     except:
-        out_phase = np.matrix(np.angle(pixels_dict.at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
+        out_phase = np.matrix(np.angle(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
         out_phase = out_phase - out_phase[0,0]
     amplitude = np.sqrt(np.abs(np.diag(cov_m)))
     g1 = np.triu(phi,1)
@@ -406,13 +405,13 @@ def phase_link(mydf, pixels_dict={}):
     g2 = np.triu(np.angle(g2), 1)
     gam_pta = gam_pta_f(g1, g2)
     if 0.4 < gam_pta <= 1:
-        mydf.at['amp_ref'] = np.array(amplitude).reshape(n_image, 1, 1)
-        mydf.at['phase_ref'] = np.array(out_phase).reshape(n_image, 1, 1)
+        mydf.at['amp_ref'] = np.float32(np.array(amplitude).reshape(n_image, 1, 1))
+        mydf.at['phase_ref'] = np.float32(np.array(out_phase).reshape(n_image, 1, 1))
     else:
-        mydf.at['amp_ref']  = np.abs(pixels_dict.at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1, 1))
-        out_phase = np.matrix(np.angle(pixels_dict..at['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
+        mydf.at['amp_ref']  =np.float32( np.abs(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1, 1)))
+        out_phase = np.matrix(np.angle(pixels_dict['RSLC'][:, ref_row, ref_col].reshape(n_image, 1)))
         out_phase = out_phase - out_phase[0,0]
-        mydf.at['phase_ref'] = np.array(out_phase).reshape(n_image, 1, 1)
+        mydf.at['phase_ref'] = np.float32(np.array(out_phase).reshape(n_image, 1, 1))
 
     return mydf 
 

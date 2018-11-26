@@ -87,18 +87,25 @@ def main(iargs=None):
     logger_ph_lnk.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1])
     inps.project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
     inps.project_dir = os.getenv('SCRATCHDIR') + '/' + inps.project_name
-    inps.template = Template(inps.custom_template_file).get_options()
 
     inps.slave_dir = inps.project_dir + '/merged/SLC'
     inps.sq_dir = inps.project_dir + '/SqueeSAR'
     inps.patch_dir = inps.sq_dir+'/PATCH'
     inps.list_slv = os.listdir(inps.slave_dir)
     
-    inps.range_win = int(inps.template['squeesar.wsizerange'])
-    inps.azimuth_win = int(inps.template['squeesar.wsizeazimuth'])
+    inps.range_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizerange'])
+    inps.azimuth_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizeazimuth'])
+    
     
     if not os.path.isdir(inps.sq_dir):
         os.mkdir(inps.sq_dir)
+    
+    
+    try:
+      jobqueue = Template(inps.custom_template_file).get_options()['job_queue']
+    except:
+      jobqueue = 'general'
+    
 
     slc = pysq.read_image(inps.slave_dir + '/' + inps.list_slv[0] + '/' + inps.list_slv[0] + '.slc.full')  #
     inps.n_image = len(inps.list_slv)
@@ -122,6 +129,26 @@ def main(iargs=None):
     timep = time.time() - time0
     logger_ph_lnk.log(loglevel.INFO, "Done Creating PATCH. time:{}".format(timep))
 
+###########################################    
+    
+    flag = np.load(inps.sq_dir + '/flag.npy')
+    if flag == 'patchlist_created':
+        run_find_shp = inps.sq_dir + "/run_find_shp"
+
+        with open(run_find_shp, 'w') as f:
+            for patch in inps.patch_list:
+                cmd = 'find_shp.py ' + inps.custom_template_file + ' -p ' +'PATCH' + patch + ' \n'
+                f.write(cmd)
+    
+        cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_find_shp -w 1:00 -r 4000 -q '+ jobqueue 
+        status = subprocess.Popen(cmd, shell=True).wait()
+        if status is not 0:
+            logger_ph_lnk.log(loglevel.ERROR, 'ERROR running find_shp.py')
+            raise Exception('ERROR running find_shp.py')
+    else:
+        raise Exception('Patches are not created')
+    
+###########################################
 
     run_PSQ_sentinel = inps.sq_dir + "/run_PSQ_sentinel"
 
@@ -130,33 +157,14 @@ def main(iargs=None):
             cmd = 'PSQ_sentinel.py ' + inps.custom_template_file + ' -p ' +'PATCH' + patch + ' \n'
             f.write(cmd)
     
+    #cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
+    cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 4:00 -r 12000 -q '+ jobqueue 
+    status = subprocess.Popen(cmd, shell=True).wait()
+    if status is not 0:
+        logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
+        raise Exception('ERROR running PSQ_sentinel.py')
 
-           
-###########################################
-    flag = np.load(inps.sq_dir + '/flag.npy')
-    try:
-      jobqueue = inps.template['job_queue']
-    except:
-      jobqueue = 'general'
-    
-    PSQ = False
-    for patch in inps.patch_list:
-        if os.path.isfile(inps.patch_dir + patch + '/endflag.npy'):
-            print('phase linking done sucessfully')
-        else:
-            print('PATCH'+patch + ' was not processed')
-            PSQ = True
-    
-    if flag == 'patchlist_created' and PSQ == True:
-        #cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
-        cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 10:00 -r 6000 -q '+ jobqueue 
-        status = subprocess.Popen(cmd, shell=True).wait()
-        print(status)
-        if status is not 0:
-            logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
-            raise Exception('ERROR running PSQ_sentinel.py')
-
-    
+ ###########################################   
 
 
     run_write_slc = inps.project_dir + '/merged/run_write_SLC'
