@@ -46,6 +46,7 @@ def command_line_parse(args):
     return inps
 
 
+
 def sequential_process(shp_df_chunk, seq_n, inps, pixels_dict={}, pixels_dict_ref={}):
 
     n_lines = np.shape(pixels_dict_ref['RSLC_ref'])[0]
@@ -73,8 +74,9 @@ def sequential_process(shp_df_chunk, seq_n, inps, pixels_dict={}, pixels_dict_re
         squeezed = squeezed.astype(np.complex64)
     return squeezed
 
-
 ###################################
+
+
 def main(iargs=None):
     inps = command_line_parse(iargs)
 
@@ -97,7 +99,6 @@ def main(iargs=None):
     inps.sam = inps.patch_cols[1][0][patch_col] - inps.patch_cols[0][0][patch_col]
 
     rslc = np.memmap(inps.work_dir + '/RSLC', dtype=np.complex64, mode='r', shape=(inps.n_image, inps.lin, inps.sam))
-
 
     inps.range_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizerange'])
     inps.azimuth_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizeazimuth'])
