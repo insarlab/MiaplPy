@@ -18,7 +18,7 @@ from dask import compute, delayed
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 from dataset_template import Template
 
-global rslc, sequential_df, rslc_ref
+
 
 #################################
 EXAMPLE = """example:
@@ -181,7 +181,7 @@ def main(iargs=None):
     inps.range_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizerange'])
     inps.azimuth_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizeazimuth'])
 
-    
+    global rslc, sequential_df, rslc_ref
     ###################### Sequential Phase linking ###############################
     
     num_seq = np.int(np.floor(inps.n_image / 10))
