@@ -19,7 +19,7 @@ def create_parser():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, epilog=EXAMPLE)
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-    parser.add_argument('-f', dest='runfile', type=argparse.FileType('r'), required=True, help='file containing run commands')
+    parser.add_argument('-f', dest='runfile', type=str, required=True, help='file containing run commands')
     parser.add_argument('-n', dest='coreNum', type=int, default=1, help='number of Cores')
     parser.add_argument('-q', dest='queue', type=str, default='general', help='job queue')
     parser.add_argument('-p', dest='projectID', type=str, default='insarlab', help='project name')
@@ -41,9 +41,9 @@ def command_line_parse(args):
 def main(iargs=None):
   
     inps = command_line_parse(iargs)
-    inps.work_dir = inps.runfile.split('/'+os.path.basename(inps.runfile))[0]
+    inps.work_dir = os.path.dirname(inps.runfile)
     jname = os.path.basename(inps.runfile)
-    with open (inps.runfiles,'r') as f:
+    with open (inps.runfile,'r') as f:
         inps.runlist = f.readlines()
     
     jobsname = list(map(lambda x: jname + '_' + str(x), range(len(inps.runlist))))
