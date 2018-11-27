@@ -50,7 +50,7 @@ def main(iargs=None):
     count = 0
     for jobn in jobsname:
         ##### Write job setting
-        with open(inps.work_dir+'/z_inp_'+jobn+'.job','w') as fjob:
+        with open(inps.work_dir+'/z_inp_'+jobn+'.job','w+') as fjob:
             fjob.write('#! /bin/tcsh')
             fjob.write('\n#BSUB -J '+jobn)
             fjob.write('\n#BSUB -P '+inps.projectID)
