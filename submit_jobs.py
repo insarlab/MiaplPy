@@ -68,7 +68,7 @@ def main(iargs=None):
             fjob.write('\n'+inps.runlist[count])
         count += 1
         
-        submitCmd = 'bsub -q ' + inps.queue+' < z_inp_' + jobn + '.job';   msg('\n'+submitCmd);   os.system(submitCmd) 
+        submitCmd = 'bsub -q ' + inps.queue+' < z_input_' + jobn + '.job';   msg('\n'+submitCmd);   os.system(submitCmd) 
             
           
 #####################################################################
