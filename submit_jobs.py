@@ -60,7 +60,7 @@ def main(iargs=None):
             fjob.write('\n#BSUB -e  z_output_.%J.e')
             fjob.write('\n#BSUB -W '+inps.walltime)
             fjob.write('\n#BSUB -q '+inps.queue)
-            fjob.write('\n#BSUB -n '+str(coreNum))
+            fjob.write('\n#BSUB -n '+str(inps.coreNum))
             fjob.write('\n#BSUB -R "rusage[mem='+str(inps.memory)+']"')
             if inps.queue == 'parallel':
                 fjob.write('\n#BSUB -R "span[ptile=16]"')
