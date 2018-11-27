@@ -133,7 +133,7 @@ def sequential_phase_linking(mydf,method):
     sequential_df.at[0, 'datum_shift'][:,ref_row:ref_row+1, ref_col:ref_col+1] = np.float32(res_d).reshape(len(res_d),1,1)
     
     phase_ref = np.matrix(phase_ref)
-    phase_init = np.triu(np.angle(np.matmul(CCG, CCG.getH()) / (len(rows))),1)
+    phase_init = np.triu(np.angle(np.matmul(CCG, CCG.getH()) / (len(rr))),1)
     phase_optimized = np.triu(np.angle(np.matmul(np.exp(-1j * phase_ref), (np.exp(-1j * phase_ref)).getH())), 1)
     gam_pta = pysq.gam_pta_f(phase_init, phase_optimized)
     
