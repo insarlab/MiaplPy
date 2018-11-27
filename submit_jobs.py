@@ -43,19 +43,21 @@ def main(iargs=None):
     inps = command_line_parse(iargs)
     inps.work_dir = os.path.dirname(inps.runfile)
     jname = os.path.basename(inps.runfile)
+    os.chdir(inps.work_dir)
+    
     with open (inps.runfile,'r') as f:
         inps.runlist = f.readlines()
-    
+        
     jobsname = list(map(lambda x: jname + '_' + str(x), range(len(inps.runlist))))
     count = 0
     for jobn in jobsname:
         ##### Write job setting
-        with open(inps.work_dir+'/z_inp_'+jobn+'.sh','w+') as fjob:
+        with open('z_input_'+jobn+'.job','w+') as fjob:
             fjob.write('#! /bin/tcsh')
             fjob.write('\n#BSUB -J '+jobn)
             fjob.write('\n#BSUB -P '+inps.projectID)
-            fjob.write('\n#BSUB -o  z_out_.%J.o')
-            fjob.write('\n#BSUB -e  z_out_.%J.e')
+            fjob.write('\n#BSUB -o  z_output_.%J.o')
+            fjob.write('\n#BSUB -e  z_output_.%J.e')
             fjob.write('\n#BSUB -W '+inps.walltime)
             fjob.write('\n#BSUB -q '+inps.queue)
             fjob.write('\n#BSUB -n '+str(coreNum))
@@ -66,7 +68,7 @@ def main(iargs=None):
             fjob.write('\n'+inps.runlist[count])
         count += 1
         
-        submitCmd = 'bsub -q ' + inps.queue+' < z_inp_' + jobn + '.sh';   msg('\n'+submitCmd);   os.system(submitCmd) 
+        submitCmd = 'bsub -q ' + inps.queue+' < z_inp_' + jobn + '.job';   msg('\n'+submitCmd);   os.system(submitCmd) 
             
           
 #####################################################################
