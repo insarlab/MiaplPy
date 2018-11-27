@@ -75,11 +75,11 @@ def sequential_phase_linking(mydf,method):
     ref_row, ref_col = (mydf.at['ref_pixel'][0],mydf.at['ref_pixel'][1])
     try: 
         squeezed_pixels = mydf.at['squeezed']
-        step_0 = squeezed_pixels.shape[0]
+        
     except:
         squeezed_pixels = np.array([0])
-        step_0 = 0
-        
+       
+    step_0 = sequential_df.at[0, 'step_n']   
     CCG = np.matrix(1.0 * np.arange(n_image * len(rr)).reshape(n_image, len(rr)))
     CCG = np.exp(1j * CCG)
     CCG[:,:] = np.matrix(rslc[:, rr, cc]) 
@@ -111,7 +111,7 @@ def sequential_phase_linking(mydf,method):
             phase_ref[first_line:last_line,0:1] = res[1::].reshape(num_lines,1)
             squeezed_pixels = np.complex64(np.vstack([squeezed_pixels,squeezed_p]))
     
-    mydf.at['squeezed'] = squeezed_pixels  
+    mydf.at['squeezed'] = np.complex64(squeezed_pixels) 
     
     ccg_datum = squeezed_pixels    
     datumshift = sequential_df.at[0, 'datum_shift'][:,ref_row, ref_col]
