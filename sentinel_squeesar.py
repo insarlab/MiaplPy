@@ -140,7 +140,7 @@ def main(iargs=None):
                 cmd = 'find_shp.py ' + inps.custom_template_file + ' -p ' +'PATCH' + patch + ' \n'
                 f.write(cmd)
     
-        cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_find_shp -w 3:00 -r 4400 -q '+ jobqueue 
+        cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_find_shp -w 2:00 -r 4400 -q '+ jobqueue 
         status = subprocess.Popen(cmd, shell=True).wait()
         if status is not 0:
             logger_ph_lnk.log(loglevel.ERROR, 'ERROR running find_shp.py')
@@ -158,7 +158,7 @@ def main(iargs=None):
             f.write(cmd)
     
     #cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
-    cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 4:00 -r 12000 -q '+ jobqueue 
+    cmd = '$INT_SCR/split_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 2:00 -r 4000 -q '+ jobqueue 
     status = subprocess.Popen(cmd, shell=True).wait()
     if status is not 0:
         logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
