@@ -133,8 +133,8 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
         amp_ref = np.mean(np.abs(CCG),axis=1)
         ph_ref = phase_ref
     else:
-        amp_ref = np.abs(rslc_ref[:,ref_row, ref_col]).reshape(n_image,1)  
-        ph_ref = np.angle(rslc_ref[:,ref_row, ref_col]).reshape(n_image,1)   
+        amp_ref = np.abs(rslc[:,ref_row, ref_col]).reshape(n_image,1)  
+        ph_ref = np.angle(rslc[:,ref_row, ref_col]).reshape(n_image,1)   
        
     rslc_ref[:,ref_row, ref_col] = np.complex64(np.multiply(amp_ref,np.exp(1j*ph_ref)).reshape(len(ph_ref),1,1)) 
     
