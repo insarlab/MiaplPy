@@ -41,7 +41,7 @@ def command_line_parse(args):
 def main(iargs=None):
   
     inps = command_line_parse(iargs)
-    inps.work_dir = os.path.dirname(inps.runfile)
+    inps.work_dir = os.path.dirname(os.path.realpath(inps.runfile))
     jname = os.path.basename(inps.runfile)
     os.chdir(inps.work_dir)
     
