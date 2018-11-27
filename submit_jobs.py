@@ -5,6 +5,8 @@
 
 import os
 import sys
+from messageRsmas import Message as msg
+import argparse
 
 #################################
 EXAMPLE = """example:
@@ -18,9 +20,9 @@ def create_parser():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, epilog=EXAMPLE)
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
     parser.add_argument('-f', dest='runfile', type=argparse.FileType('r'), required=True, help='file containing run commands')
-    parser.add_argument('-n', dest='ncores', type=int, default=1, help='number of Cores')
+    parser.add_argument('-n', dest='coreNum', type=int, default=1, help='number of Cores')
     parser.add_argument('-q', dest='queue', type=str, default='general', help='job queue')
-    parser.add_argument('-p', dest='project', type=str, default='insarlab', help='project name')
+    parser.add_argument('-p', dest='projectID', type=str, default='insarlab', help='project name')
     parser.add_argument('-w', dest='walltime', type=str, default='1:00', help='wall time')
     parser.add_argument('-r', dest='memory', type=int, default=3600, help='memory use')
     
@@ -37,7 +39,40 @@ def command_line_parse(args):
 
 ###################################
 def main(iargs=None):
+  
     inps = command_line_parse(iargs)
+    inps.work_dir = inps.runfile.split('/'+os.path.basename(inps.runfile))[0]
+    jname = os.path.basename(inps.runfile)
+    with open (inps.runfiles,'r') as f:
+        inps.runlist = f.readlines()
+    
+    jobsname = list(map(lambda x: jname + '_' + str(x), range(len(inps.runlist))))
+    count = 0
+    for jobn in jobsname:
+        ##### Write job setting
+        with open(inps.work_dir+'/z_inp_'+jobn+'.job','w') as fjob:
+            fjob.write('#! /bin/tcsh')
+            fjob.write('\n#BSUB -J '+jobn)
+            fjob.write('\n#BSUB -P '+inps.projectID)
+            fjob.write('\n#BSUB -o  z_out_.%J.o')
+            fjob.write('\n#BSUB -e  z_out_.%J.e')
+            fjob.write('\n#BSUB -W '+inps.walltime)
+            fjob.write('\n#BSUB -q '+inps.queue)
+            fjob.write('\n#BSUB -n '+str(coreNum))
+            fjob.write('\n#BSUB -R "rusage[mem='+str(inps.memory)+']"')
+            if inps.queue == 'parallel':
+                fjob.write('\n#BSUB -R "span[ptile=16]"')
+            fjob.write('\ncd '+inps.work_dir)
+            fjob.write('\n'+inps.runlist[count])
+        count += 1
+        
+        submitCmd = 'bsub -q ' + inps.queue+' < z_inp_' + jobn + '.job';   msg('\n'+submitCmd);   os.system(submitCmd) 
+            
+          
+#####################################################################
 
-    inps.project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
-    inps.project_dir = os.getenv('SCRATCHDIR') + '/' + inps.project_name
+if __name__ == '__main__':
+  main(sys.argv[1:])
+       
+        
+    
