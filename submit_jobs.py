@@ -50,7 +50,7 @@ def main(iargs=None):
     count = 0
     for jobn in jobsname:
         ##### Write job setting
-        with open(inps.work_dir+'/z_inp_'+jobn+'.job','w+') as fjob:
+        with open(inps.work_dir+'/z_inp_'+jobn+'.sh','w+') as fjob:
             fjob.write('#! /bin/tcsh')
             fjob.write('\n#BSUB -J '+jobn)
             fjob.write('\n#BSUB -P '+inps.projectID)
@@ -66,7 +66,7 @@ def main(iargs=None):
             fjob.write('\n'+inps.runlist[count])
         count += 1
         
-        submitCmd = 'bsub -q ' + inps.queue+' < z_inp_' + jobn + '.job';   msg('\n'+submitCmd);   os.system(submitCmd) 
+        submitCmd = 'bsub -q ' + inps.queue+' < z_inp_' + jobn + '.sh';   msg('\n'+submitCmd);   os.system(submitCmd) 
             
           
 #####################################################################
