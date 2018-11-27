@@ -67,15 +67,26 @@ def sequential_process(ccg_sample, stepp, method):
     return res, squeezed
 
 
-def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
-    step_0 = np.uint32(sequential_df.at[0,'step_n'])
-    mat_shape = np.shape(sequential_df.at[0,'squeezed'])
-    n_image = CCG.shape[0]
+def sequential_phase_linking(mydf,method):
+    
+    n_image = rslc.shape[0]
+    rr = mydf.at['rows'].astype(int)
+    cc = mydf.at['cols'].astype(int)
+    ref_row, ref_col = (mydf.at['ref_pixel'][0],mydf.at['ref_pixel'][1])
+    try: 
+        squeezed_pixels = mydf.at['squeezed']
+        step_0 = squeezed_pixels.shape[0]
+    except:
+        squeezed_pixels = np.array([0])
+        step_0 = 0
+        
+    CCG = np.matrix(1.0 * np.arange(n_image * len(rr)).reshape(n_image, len(rr)))
+    CCG = np.exp(1j * CCG)
+    CCG[:,:] = np.matrix(rslc[:, rr, cc]) 
+   
     num_seq = np.int(np.floor(n_image / 10))
     phase_ref = np.float32(np.zeros([n_image,1]))
     phase_ref[:,0:1] = np.angle(rslc_ref[:,ref_row, ref_col]).reshape(n_image,1)  
-
-    squeezed_image = np.matrix(sequential_df.at[0,'squeezed'][:,rows,cols])
     
     for stepp in range(step_0, num_seq):
         
@@ -88,25 +99,21 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
         if stepp == 0:
           
             ccg_sample = CCG[first_line:last_line,:]
-            res, squeezed_image = sequential_process(ccg_sample, stepp, method)
+            res, squeezed_pixels = sequential_process(ccg_sample, stepp, method)
             phase_ref[first_line:last_line,0:1] = res[stepp::].reshape(num_lines,1)
             
         else:
             
             ccg_sample = np.zeros([1 + num_lines, CCG.shape[1]])+1j
-            ccg_sample[0, :] = np.complex64(squeezed_image[-1,:])
+            ccg_sample[0:1, :] = np.complex64(squeezed_pixels[-1,:])
             ccg_sample[1::, :] = CCG[first_line:last_line, :]
-            res, squeezed_im = sequential_process(ccg_sample, 1, method)
+            res, squeezed_p = sequential_process(ccg_sample, 1, method)
             phase_ref[first_line:last_line,0:1] = res[1::].reshape(num_lines,1)
-            squeezed_image = np.complex64(np.vstack([squeezed_image,squeezed_im]))
-            
-    sequential_df.at[0,'step_n'] = np.uint32(num_seq)
-    sequential_df.at[0,'squeezed'] = np.complex64(np.zeros([squeezed_image.shape[0],mat_shape[1],mat_shape[2]]))
-    for t in range(len(rows)):
-        sequential_df.at[0,'squeezed'][:,rows[t]:rows[t]+1,cols[t]:cols[t]+1] = np.array(squeezed_image[:,t]).reshape(squeezed_image.shape[0],1,1)
-        
+            squeezed_pixels = np.complex64(np.vstack([squeezed_pixels,squeezed_p]))
     
-    ccg_datum = squeezed_image    
+    mydf.at['squeezed'] = squeezed_pixels  
+    
+    ccg_datum = squeezed_pixels    
     datumshift = sequential_df.at[0, 'datum_shift'][:,ref_row, ref_col]
     res_d, squeezed_d = sequential_process(ccg_datum, 0, method)
     del squeezed_d
@@ -121,7 +128,8 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
             phase_ref[first_line:last_line, 0:1] = (phase_ref[first_line:last_line, 0] + np.matrix(res_d[int(stepp)])- datumshift[int(stepp)]).reshape(num_lines,1)
         except:
             phase_ref[first_line:last_line, 0:1] = (phase_ref[first_line:last_line, 0] + np.matrix(res_d[int(stepp)])).reshape(num_lines,1)
-            
+    
+    sequential_df.at[0, 'step_n'] = num_seq
     sequential_df.at[0, 'datum_shift'][:,ref_row:ref_row+1, ref_col:ref_col+1] = np.float32(res_d).reshape(len(res_d),1,1)
     
     phase_ref = np.matrix(phase_ref)
@@ -138,22 +146,8 @@ def sequential_phase_linking(CCG, ref_row, ref_col, rows, cols, method):
        
     rslc_ref[:,ref_row:ref_row+1, ref_col:ref_col+1] = np.complex64(np.multiply(amp_ref,np.exp(1j*ph_ref)).reshape(len(ph_ref),1,1)) 
     
-    return  None
+    return mydf
   
-  
-def shp_locate(mydf,method):
-  
-    n_image = rslc.shape[0]
-    rr = mydf.at['rows'].astype(int)
-    cc = mydf.at['cols'].astype(int)
-    ref_row, ref_col = (mydf.at['ref_pixel'][0],mydf.at['ref_pixel'][1])
-    CCG = np.matrix(1.0 * np.arange(n_image * len(rr)).reshape(n_image, len(rr)))
-    CCG = np.exp(1j * CCG)
-    CCG[:,:] = np.matrix(rslc[:, rr, cc]) 
-    amp_ref = np.mean(np.abs(CCG),axis=1)
-    sequential_phase_linking(CCG, ref_row, ref_col, rr, cc, method)
-    
-    return None
   
 
 ###################################
@@ -190,9 +184,8 @@ def main(iargs=None):
     if os.path.isfile(inps.work_dir + '/sequential_df.pkl'):
         sequential_df = pd.read_pickle(inps.work_dir + '/sequential_df.pkl')
     else:
-        sequential_df = pd.DataFrame(columns=['step_n', 'squeezed','datum_shift','n_images_done'])
-        sequential_df = sequential_df.append({'step_n':np.uint32(0), 
-                                              'squeezed':np.complex64(np.zeros([1,inps.lin,inps.sam])), 
+        sequential_df = pd.DataFrame(columns=['step_n','datum_shift'])
+        sequential_df = sequential_df.append({'step_n':np.uint32(0),  
                                               'datum_shift':np.float32(np.zeros([num_seq,inps.lin,inps.sam]))}, ignore_index=True)
                                               
     
@@ -210,8 +203,8 @@ def main(iargs=None):
     shp_df = pd.read_pickle(inps.work_dir + '/SHP.pkl')
     shp_df_chunk = [shp_df.loc[y] for y in range(len(shp_df))]  
     values = [delayed(shp_locate)(x,method) for x in shp_df_chunk]
-    compute(*values, scheduler='processes')
-                                              
+    shp_df_2 = pd.DataFrame(list(compute(*values, scheduler='processes')))
+    shp_df_2.to_pickle(inps.work_dir + '/SHP2.pkl')                                         
     sequential_df.to_pickle(inps.work_dir + '/sequential_df.pkl')
     
     np.save(inps.work_dir + '/endflag.npy', 'True')
