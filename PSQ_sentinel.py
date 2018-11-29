@@ -203,8 +203,8 @@ def main(iargs=None):
     shp_df = pd.read_pickle(inps.work_dir + '/SHP.pkl')
     shp_df_chunk = [shp_df.loc[y] for y in range(len(shp_df))]  
     values = [delayed(sequential_phase_linking)(x,method) for x in shp_df_chunk]
-    shp_df_2 = pd.DataFrame(list(compute(*values, scheduler='processes')))
-    shp_df_2.to_pickle(inps.work_dir + '/SHP2.pkl')                                         
+    shp_df = pd.DataFrame(list(compute(*values, scheduler='processes')))
+    shp_df.to_pickle(inps.work_dir + '/SHP.pkl')                                         
     sequential_df.to_pickle(inps.work_dir + '/sequential_df.pkl')
     
     np.save(inps.work_dir + '/endflag.npy', 'True')
