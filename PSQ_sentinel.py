@@ -61,9 +61,10 @@ def sequential_process(ccg_sample, stepp, method):
     res = res.reshape(len(res),1)
     
     vm = np.matrix(np.exp(1j*res[stepp::,0])/LA.norm(np.exp(1j*res[stepp::,0])))
-    
-    squeezed = np.matmul(np.conjugate(vm),ccg_sample[stepp::,:])
-
+    try:
+        squeezed = np.matmul(np.conjugate(vm),ccg_sample[stepp::,:])
+    except:
+        squeezed = np.matmul(np.conjugate(vm),ccg_sample[stepp::])
     return res, squeezed
 
 
@@ -113,24 +114,25 @@ def sequential_phase_linking(mydf,method):
     
     mydf.at['squeezed'] = np.complex64(squeezed_pixels) 
     
-    ccg_datum = squeezed_pixels    
-    datumshift = sequential_df.at[0, 'datum_shift'][:,ref_row, ref_col]
-    res_d, squeezed_d = sequential_process(ccg_datum, 0, method)
-    del squeezed_d
-    for stepp in range(len(res_d)):
-        first_line = stepp * 10
-        if stepp == num_seq-1:
-            last_line = n_image
-        else:
-            last_line = first_line + 10
-        num_lines = last_line - first_line
-        try:
-            phase_ref[first_line:last_line, 0:1] = (phase_ref[first_line:last_line, 0] + np.matrix(res_d[int(stepp)])- datumshift[int(stepp)]).reshape(num_lines,1)
-        except:
-            phase_ref[first_line:last_line, 0:1] = (phase_ref[first_line:last_line, 0] + np.matrix(res_d[int(stepp)])).reshape(num_lines,1)
+    ccg_datum = squeezed_pixels  
+    if ccg_datum.shape[0]>1:
+        datumshift = sequential_df.at[0, 'datum_shift'][:,ref_row, ref_col]
+        res_d, squeezed_d = sequential_process(ccg_datum, 0, method)
+        del squeezed_d
+        for stepp in range(len(res_d)):
+            first_line = stepp * 10
+            if stepp == num_seq-1:
+                last_line = n_image
+            else:
+                last_line = first_line + 10
+            num_lines = last_line - first_line
+            try:
+                phase_ref[first_line:last_line, 0:1] = (phase_ref[first_line:last_line, 0] + np.matrix(res_d[int(stepp)])- datumshift[int(stepp)]).reshape(num_lines,1)
+            except:
+                phase_ref[first_line:last_line, 0:1] = (phase_ref[first_line:last_line, 0] + np.matrix(res_d[int(stepp)])).reshape(num_lines,1)
     
-    sequential_df.at[0, 'step_n'] = num_seq
-    sequential_df.at[0, 'datum_shift'][:,ref_row:ref_row+1, ref_col:ref_col+1] = np.float32(res_d).reshape(len(res_d),1,1)
+        sequential_df.at[0, 'step_n'] = num_seq
+        sequential_df.at[0, 'datum_shift'][:,ref_row:ref_row+1, ref_col:ref_col+1] = np.float32(res_d).reshape(len(res_d),1,1)
     
     phase_ref = np.matrix(phase_ref)
     phase_init = np.triu(np.angle(np.matmul(CCG, CCG.getH()) / (len(rr))),1)
