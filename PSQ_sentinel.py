@@ -15,8 +15,8 @@ import pandas as pd
 from dask import compute, delayed
 sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 from dataset_template import Template
-
-global rslc, sequential_df, rslc_ref
+from dask_jobqueue import LSFCluster
+from dask.distributed import Client, Variable
 
 #################################
 EXAMPLE = """example:
@@ -145,16 +145,25 @@ def sequential_phase_linking(mydf,method):
     else:
         amp_ref = np.abs(rslc[:,ref_row, ref_col]).reshape(n_image,1)  
         ph_ref = np.angle(rslc[:,ref_row, ref_col]).reshape(n_image,1)   
-       
-    rslc_ref[:,ref_row:ref_row+1, ref_col:ref_col+1] = np.complex64(np.multiply(amp_ref,np.exp(1j*ph_ref)).reshape(len(ph_ref),1,1)) 
-    
+
+    #rslc_ref[:,ref_row:ref_row+1, ref_col:ref_col+1] = np.complex64(np.multiply(amp_ref,np.exp(1j*ph_ref)).reshape(len(ph_ref),1,1))
+    mydf.at['amp_ref'] = amp_ref
+    mydf.at['phase_ref'] = ph_ref
+
     return mydf
   
-  
+def future_var(x):
+    return x
+
 
 ###################################
 
 def main(iargs=None):
+    
+    cluster = LSFCluster(queue='general', project='insarlab', cores=5, walltime='00:30', memory='24 GB')
+    cluster.scale(10)
+    client = Client(cluster)
+
     inps = command_line_parse(iargs)
 
     inps.project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
@@ -205,7 +214,7 @@ def main(iargs=None):
     shp_df = pd.read_pickle(inps.work_dir + '/SHP.pkl')
     shp_df_chunk = [shp_df.loc[y] for y in range(len(shp_df))]  
     values = [delayed(sequential_phase_linking)(x,method) for x in shp_df_chunk]
-    shp_df = pd.DataFrame(list(compute(*values, scheduler='processes')))
+    shp_df = pd.DataFrame(list(compute(*values, scheduler='distributed')))
     shp_df.to_pickle(inps.work_dir + '/SHP.pkl')                                         
     sequential_df.to_pickle(inps.work_dir + '/sequential_df.pkl')
     
