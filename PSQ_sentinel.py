@@ -45,8 +45,8 @@ def command_line_parse(args):
     return inps
 
 ################################################
-
 def sequential_process(ccg_sample, stepp, method, squeez=True):
+
 
     coh_mat = pysq.est_corr(ccg_sample)
     if method == 'PTA':
@@ -71,12 +71,9 @@ def sequential_process(ccg_sample, stepp, method, squeez=True):
         return res,La
 
 
-
 def squeez_im(ph, ccg):
-
     vm = np.matrix(np.exp(1j * ph) / LA.norm(np.exp(1j * ph)))
     squeezed = np.matmul(np.conjugate(vm), ccg)
-
     return squeezed
 
 
@@ -111,7 +108,6 @@ def main(iargs=None):
     ###################### Find SHPs ###############################
 
     rslc = np.memmap(inps.work_dir + '/RSLC', dtype=np.complex64, mode='r', shape=(inps.n_image, inps.lin, inps.sam))
-
 
     if not os.path.isfile(inps.work_dir + '/SHP.pkl'):
 
@@ -211,7 +207,6 @@ def main(iargs=None):
     else:
         doprocess = True
 
-
     if doprocess:
 
         if os.path.isfile(inps.work_dir + '/RSLC_ref'):
@@ -222,7 +217,6 @@ def main(iargs=None):
             rslc_ref = np.memmap(inps.work_dir + '/RSLC_ref', dtype='complex64', mode='w+',
                                  shape=(inps.n_image, inps.lin, inps.sam))
             rslc_ref[num_image_processed::,:,:] = rslc[num_image_processed::,:,:]
-
 
         datumshift = np.zeros([num_seq, rslc.shape[1], rslc.shape[2]])
 

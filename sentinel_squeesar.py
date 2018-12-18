@@ -101,8 +101,7 @@ def main(iargs=None):
     
     inps.range_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizerange'])
     inps.azimuth_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizeazimuth'])
-    
-    
+  
     if not os.path.isdir(inps.sq_dir):
         os.mkdir(inps.sq_dir)
     
@@ -142,9 +141,7 @@ def main(iargs=None):
  
     flag = np.load(inps.sq_dir + '/flag.npy')
     if flag == 'patchlist_created':
-
         run_PSQ_sentinel = inps.sq_dir + "/run_PSQ_sentinel"
-
         with open(run_PSQ_sentinel, 'w') as f:
             for patch in inps.patch_list:
                 if not os.path.isfile(inps.sq_dir+'/'+patch+'/num_processed.npy'):
@@ -156,7 +153,6 @@ def main(iargs=None):
         if status is not 0:
             #logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
             raise Exception('ERROR running PSQ_sentinel.py')
-
 
  ###########################################   
 
