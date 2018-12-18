@@ -235,10 +235,10 @@ def EMI_phase_estimation(coh0):
         x0 = np.angle(vec).reshape(len(w),1)
         x0 = x0 - x0[0,0]
         x0 = np.unwrap(x0,np.pi,axis=0)
-        return x0
+        return x0,w[f]
     else:
         print('warning: coherence matric not positive semidifinite, It is switched from EMI to EVD')
-        return EVD_phase_estimation(coh0)
+        return EVD_phase_estimation(coh0), 0
 
 ###############################################################################
 
@@ -294,7 +294,7 @@ def est_corr(CCGsam):
     CCGS = np.matrix(CCGsam)
     corr_mat = np.matmul(CCGS,CCGS.getH())/CCGS.shape[1]
     
-    coh = np.multiply(cov2corr(np.abs(corr_mat)),np.angle(corr_mat))
+    coh = np.multiply(cov2corr(np.abs(corr_mat)),np.exp(1j*np.angle(corr_mat)))
     
     return coh
     
@@ -343,13 +343,13 @@ def trwin(x):
 def patch_slice(lin,sam,waz,wra):
     """ Devides an image into patches of size 300 by 300 by considering the overlay of the size of multilook window."""
     
-    pr1 = np.ogrid[0:lin-50:300]
-    pr2 = pr1+300
+    pr1 = np.ogrid[0:lin-50:200]
+    pr2 = pr1+200
     pr2[-1] = lin
     pr1[1::] = pr1[1::] - 2*waz
 
-    pc1 = np.ogrid[0:sam-50:300]
-    pc2 = pc1+300
+    pc1 = np.ogrid[0:sam-50:200]
+    pc2 = pc1+200
     pc2[-1] = sam
     pc1[1::] = pc1[1::] - 2*wra
     pr = [[pr1], [pr2]]
