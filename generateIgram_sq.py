@@ -84,9 +84,7 @@ def multiply(master_name, slave_name, out_name, flatten=False):
             phs = np.exp(cJ*fact*rng12[kk,0:width + 1])
             ifg[kk,0:width + 1] *= phs
 
-    master=None
-    slave=None
-    ifg = None
+    del master, slave, ifg
 
     obj_int = isceobj.createIntImage()
     obj_int.setFilename(out_name)
@@ -95,6 +93,7 @@ def multiply(master_name, slave_name, out_name, flatten=False):
     obj_int.setAccessMode('READ')
     obj_int.renderHdr()
     obj_int.renderVRT()
+    
     return None
 
 
@@ -128,6 +127,8 @@ def main(iargs=None):
 
 
     print(inps.multilook)
+    inps.numberAzimuthLooks = 2
+    inps.numberRangeLooks = 6
     if inps.multilook:
         multilook(int_name + suffix, int_name,
                   alks=inps.numberAzimuthLooks, rlks=inps.numberRangeLooks,

@@ -83,11 +83,13 @@ def main(iargs=None):
 
     n_line = last_row - first_row
     width = last_col - first_col
-
+    
     slc_file = slave_dir + '/' + inps.slc_dir
     out_map = np.memmap(slc_file, dtype=np.complex64, mode='r+', shape=(n_line, width))
-
-
+    doq = False
+    if slc_list[0] == inps.slc_dir.split('/')[0]:
+        Quality = np.memmap(sq_dir+'/quality', dtype=np.float32, mode='w+', shape=(n_line, width))
+        doq = True   
     image_ind = [i for (i, val) in enumerate(slc_list) if val == inps.slc_dir.split('/')[0]]
 
 
@@ -114,10 +116,15 @@ def main(iargs=None):
 
         out_map[row1:row2 + 1, col1:col2 + 1] = \
             rslc_patch[image_ind, f_row:l_row + 1, f_col:l_col + 1]
-
+        
+        if doq:
+            qu = np.memmap(sq_dir + '/' + patch  + '/quality', dtype=np.float32, mode='r', shape=(patch_lines, patch_samples))
+            Quality[row1:row2 + 1, col1:col2 + 1] = qu[f_row:l_row + 1, f_col:l_col + 1]
+              
 
     del out_map
-
+    if slc_list[0] == inps.slc_dir.split('/')[0]:
+       del Quality
 
 if __name__ == '__main__':
     """

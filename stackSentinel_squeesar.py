@@ -246,7 +246,7 @@ def get_dates(inps):
     f = open('SAFE_files.txt', 'w')
     safe_count = 0
     safe_dict = {}
-    orbit_dates = []
+
     bbox_poly = [[bbox[0], bbox[2]], [bbox[0], bbox[3]], [bbox[1], bbox[3]], [bbox[1], bbox[2]]]
     for safe in SAFE_files:
         safeObj = sentinelSLC(safe)
@@ -278,11 +278,6 @@ def get_dates(inps):
                 import matplotlib
                 from matplotlib.path import Path as Path
 
-                #                bbox = SNWE
-                #                polygon = bbox[0] bbox[2]       SW
-                #                          bbox[0] bbox[3]       SE
-                #                          bbox[1] bbox[3]       NE
-                #                          bbox[1] bbox[2]       NW
 
                 poly = Path(bbox_poly)
                 point = (lat, lon)
@@ -589,12 +584,6 @@ def squeesarStack(inps, acquisitionDates, stackMasterDate, slaveDates, safe_dict
         runObj.mergeMaster(stackMasterDate, virtual='False')
         runObj.mergeSlaveSLC(slaveDates, virtual='False')
         runObj.finalize()
-
-        i += 1
-        runObj = run()
-        runObj.configure(inps, 'run_' + str(i) + "_grid_baseline")
-        runObj.gridBaseline(stackMasterDate, slaveDates)
-        runObj.finalize()
     
     if processingmethod=='squeesar':
         
@@ -857,8 +846,7 @@ def main(iargs=None):
         print('')
         sys.exit(1)
 
-    acquisitionDates, stackMasterDate, slaveDates, safe_dict, updateStack, allSLCs = checkCurrentStatus(
-        inps)  ###SSS 8/2018: later update for custom list of pairs
+    acquisitionDates, stackMasterDate, slaveDates, safe_dict, updateStack, allSLCs = checkCurrentStatus(inps)  ###SSS 8/2018: later update for custom list of pairs
 
     if updateStack:
         print('')
