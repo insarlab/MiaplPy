@@ -14,7 +14,7 @@ sys.path.insert(0, os.getenv('RSMAS_ISCE'))
 from rsmas_logging import loglevel
 from dataset_template import Template
 import _pysqsar_utilities as pysq
-from dask import compute, delayed
+#from dask import compute, delayed
 
 logger_ph_lnk  = pysq.send_logger_squeesar()
 
@@ -92,6 +92,12 @@ def main(iargs=None):
     inps.sq_dir = inps.project_dir + '/SqueeSAR'
     inps.patch_dir = inps.sq_dir+'/PATCH'
     inps.list_slv = os.listdir(inps.slave_dir)
+    A = [inps.list_slv[0]+'_'+x for x in inps.list_slv]
+    with open('A.txt','w') as f:
+        for t in A[1::]:
+            f.write(t+'\n')
+    
+    sys.exit(1) 
     
     inps.range_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizerange'])
     inps.azimuth_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizeazimuth'])
@@ -123,14 +129,17 @@ def main(iargs=None):
     if os.path.isfile(inps.sq_dir + '/flag.npy'):
         print('patchlist exist')
     else:
-        values = [delayed(create_patch)(inps, x) for x in inps.patch_list]
-        compute(*values, scheduler='processes')
+        for patch in inps.patch_list:
+            create_patch(inps,patch)    
+
+        #values = [delayed(create_patch)(inps, x) for x in inps.patch_list]
+        #compute(*values, scheduler='processes')
     np.save(inps.sq_dir + '/flag.npy', 'patchlist_created')
     timep = time.time() - time0
     logger_ph_lnk.log(loglevel.INFO, "Done Creating PATCH. time:{}".format(timep))
 
-###########################################    
-    
+###########################################      
+ 
     flag = np.load(inps.sq_dir + '/flag.npy')
     if flag == 'patchlist_created':
 
@@ -138,14 +147,14 @@ def main(iargs=None):
 
         with open(run_PSQ_sentinel, 'w') as f:
             for patch in inps.patch_list:
-                cmd = 'PSQ_sentinel.py ' + inps.custom_template_file + ' -p ' + 'PATCH' + patch + ' \n'
-                f.write(cmd)
-
-        # cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
-        cmd = 'submit_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 10:00 -r 6000 -q ' + jobqueue
+                if not os.path.isfile(inps.sq_dir+'/'+patch+'/num_processed.npy'):
+                    cmd = 'PSQ_sentinel.py ' + inps.custom_template_file + ' -p ' + 'PATCH' + patch + ' \n'
+                    f.write(cmd)
+        ## cmd = 'createBatch.pl ' + inps.sq_dir + '/run_PSQ_sentinel' + ' memory=' + '3700' + ' walltime=' + '10:00'
+        cmd = 'submit_jobs.py -f ' + inps.sq_dir + '/run_PSQ_sentinel -w 3:00 -r 3000 -q ' + jobqueue
         status = subprocess.Popen(cmd, shell=True).wait()
         if status is not 0:
-            logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
+            #logger_ph_lnk.log(loglevel.ERROR, 'ERROR running PSQ_sentinel.py')
             raise Exception('ERROR running PSQ_sentinel.py')
 
 
