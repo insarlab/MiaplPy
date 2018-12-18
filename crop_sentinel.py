@@ -71,91 +71,91 @@ def main(iargs=None):
     range_lks = inps.template['sentinelStack.rangeLooks']
     
     if os.path.isfile(project_dir + '/merged/cropped.npy'):
-      print('Already cropped')
+        print('Some or all are cropped, checking for remaining...')
+        crop_area = np.load(project_dir + '/merged/cropped.npy')
     else:
         crop_area = np.array(convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east))
-        first_row = np.int(crop_area[0])
-        last_row = np.int(crop_area[1])
-        first_col = np.int(crop_area[2])
-        last_col = np.int(crop_area[3])
+    first_row = np.int(crop_area[0])
+    last_row = np.int(crop_area[1])
+    first_col = np.int(crop_area[2])
+    last_col = np.int(crop_area[3])
 
-        n_lines = last_row - first_row
-        width = last_col - first_col
+    n_lines = last_row - first_row
+    width = last_col - first_col
 
     
-        for slc in slc_list:
-            filename = os.path.join(slave_dir, slc, slc + '.slc.full')
+    for slc in slc_list:
+        filename = os.path.join(slave_dir, slc, slc + '.slc.full')
 
-            ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
-            inp_file = ds.GetRasterBand(1).ReadAsArray()
-            del ds
+        ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
+        inp_file = ds.GetRasterBand(1).ReadAsArray()
+        del ds
+        if not(inp_file.shape[0]==n_lines and inp_file.shape[1]==width):
 
-            if not(inp_file.shape[0]==n_lines and inp_file.shape[1]==width):
+            out_map = np.memmap(filename, dtype=np.complex64, mode='r+', shape=(n_lines, width))
+            out_map[:, :] = inp_file[first_row:last_row, first_col:last_col]
 
-                out_map = np.memmap(filename, dtype=np.complex64, mode='r+', shape=(n_lines, width))
-                out_map[:, :] = inp_file[first_row:last_row, first_col:last_col]
+            out_img = isceobj.createSlcImage()
+            out_img.setAccessMode('write')
+            out_img.setFilename(filename)
+            out_img.setWidth(width)
+            out_img.setLength(n_lines)
+            out_img.renderVRT()
+            out_img.renderHdr()
 
-                out_img = isceobj.createSlcImage()
-                out_img.setAccessMode('write')
-                out_img.setFilename(filename)
-                out_img.setWidth(width)
-                out_img.setLength(n_lines)
-                out_img.renderVRT()
-                out_img.renderHdr()
+            del out_map
+            cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
+            os.system(cmd)
 
-                del out_map
-                cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
-                os.system(cmd)
+    list_geo = ['hgt', 'lat', 'lon', 'los', 'shadowMask','incLocal']
 
-        list_geo = ['hgt', 'lat', 'lon', 'los', 'shadowMask','incLocal']
+    for t in list_geo:
+        filename = os.path.join(geo_master_dir, t + '.rdr.full')
 
-        for t in list_geo:
-            filename = os.path.join(geo_master_dir, t + '.rdr.full')
+        img = isceobj.createImage()
+        img.load(filename + '.xml')
+        bands = img.bands
+        data_type = IML.NUMPY_type(img.dataType)
+        scheme = img.scheme
 
-            img = isceobj.createImage()
-            img.load(filename + '.xml')
-            bands = img.bands
-            data_type = IML.NUMPY_type(img.dataType)
-            scheme = img.scheme
+        ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
+        inp_file = ds.GetRasterBand(1).ReadAsArray()
 
-            ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
-            inp_file = ds.GetRasterBand(1).ReadAsArray()
+        if bands == 2:
+            inp_file2 = ds.GetRasterBand(2).ReadAsArray()
+        del ds, img
+
+        if not (inp_file.shape[0] == n_lines and inp_file.shape[1] == width):
+
+            out_map = IML.memmap(filename, mode='r+', nchannels=bands,
+                            nxx=width, nyy=n_lines, scheme=scheme, dataType=data_type)
 
             if bands == 2:
-                inp_file2 = ds.GetRasterBand(2).ReadAsArray()
-            del ds, img
+                out_map.bands[0][:, :] = inp_file[first_row:last_row, first_col:last_col]
+                out_map.bands[1][:, :] = inp_file2[first_row:last_row, first_col:last_col]
+            else:
+                out_map.bands[0][:, :] = inp_file[first_row:last_row, first_col:last_col]
 
-            if not (inp_file.shape[0] == n_lines and inp_file.shape[1] == width):
+            IML.renderISCEXML(filename, bands,
+                            n_lines, width,
+                            data_type, scheme)
 
-                out_map = IML.memmap(filename, mode='r+', nchannels=bands,
-                                nxx=width, nyy=n_lines, scheme=scheme, dataType=data_type)
+            out_img = isceobj.createImage()
+            out_img.load(filename + '.xml')
+            out_img.imageType = data_type
+            out_img.renderHdr()
+            try:
+                out_map.bands[0].base.base.flush()
+            except:
+                pass
 
-                if bands == 2:
-                    out_map.bands[0][:, :] = inp_file[first_row:last_row, first_col:last_col]
-                    out_map.bands[1][:, :] = inp_file2[first_row:last_row, first_col:last_col]
-                else:
-                    out_map.bands[0][:, :] = inp_file[first_row:last_row, first_col:last_col]
+            cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
+            os.system(cmd)
 
-                IML.renderISCEXML(filename, bands,
-                                n_lines, width,
-                                data_type, scheme)
-
-                out_img = isceobj.createImage()
-                out_img.load(filename + '.xml')
-                out_img.imageType = data_type
-                out_img.renderHdr()
-                try:
-                    out_map.bands[0].base.base.flush()
-                except:
-                    pass
-
-                cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
-                os.system(cmd)
-
-                multilook(filename, outname=filename.split('.full')[0],
-                          alks=azimuth_lks, rlks=range_lks,
-                          multilook_tool='isce', no_data=None)
-        np.save(project_dir + '/merged/cropped.npy', 'True')
+            multilook(filename, outname=filename.split('.full')[0],
+                      alks=azimuth_lks, rlks=range_lks,
+                      multilook_tool='isce', no_data=None)
+    np.save(project_dir + '/merged/cropped.npy', crop_area)
 
 if __name__ == '__main__':
     '''
