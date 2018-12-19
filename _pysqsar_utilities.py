@@ -28,32 +28,56 @@ def send_logger_squeesar():
 def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
-    obj_lat = isceobj.createIntImage()
-    obj_lat.load(geo_master_dir + '/lat.rdr.full.xml')
-    obj_lon = isceobj.createIntImage()
-    obj_lon.load(geo_master_dir + '/lon.rdr.full.xml')
-    width = obj_lon.getWidth()
-    length = obj_lon.getLength()
-    center_sample = int(width / 2)
-    center_line = int(length / 2)
     ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
     lat = ds.GetRasterBand(1).ReadAsArray()
     del ds
     ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
     lon = ds.GetRasterBand(1).ReadAsArray()
     del ds
-    lat_center_sample = lat[:, center_sample]
-    lon_center_line = lon[center_line, :]
-    lat_min = lat_center_sample - lat_south
-    lat_max = lat_center_sample - lat_north
-    lon_min = lon_center_line - lon_west
-    lon_max = lon_center_line - lon_east
-    first_row = [index for index in range(len(lat_min)) if np.abs(lat_min[index]) == np.min(np.abs(lat_min))]
-    last_row = [index for index in range(len(lat_max)) if np.abs(lat_max[index]) == np.min(np.abs(lat_max))]
-    first_col = [index for index in range(len(lon_min)) if np.abs(lon_min[index]) == np.min(np.abs(lon_min))]
-    last_col = [index for index in range(len(lon_max)) if np.abs(lon_max[index]) == np.min(np.abs(lon_max))]
+    length = lat.shape[0]
+    width = lat.shape[1]
+    
+    x_factor = (lon[0,-1]-lon[0,0])/width
+    y_factor = (lat[0,0]-lat[-1,0])/length
+    
+    ymin1 = lat_south - y_factor;  ymax1 = lat_south + y_factor
+    ymin2 = lat_north - y_factor;  ymax2 = lat_north + y_factor
+    xmin1 = lon_south - x_factor;  xmax1 = lon_south + x_factor
+    xmin2 = lon_north - x_factor;  xmax2 = lon_north + x_factor
+    mask_y_min = np.multiply(lat >= ymin1, lat <= ymax1)
+    mask_y_max = np.multiply(lat >= ymin2, lat <= ymax2)
+    mask_x_min = np.multiply(lon >= xmin1, lon <= xmax1)
+    mask_x_max = np.multiply(lon >= xmin2, lon <= xmax2)
+    
+    mask_yx_east_south = np.multiply(mask_y_min, mask_x_min)
+    mask_yx_west_south = np.multiply(mask_y_min, mask_x_max)
+    mask_yx_east_north = np.multiply(mask_y_max, mask_x_min)
+    mask_yx_west_north = np.multiply(mask_y_max, mask_x_max)
+    row_1, col_1 = np.nanmean(np.where(mask_yx_east_south), axis=1)
+    row_2, col_2 = np.nanmean(np.where(mask_yx_west_south), axis=1)
+    row_3, col_3 = np.nanmean(np.where(mask_yx_east_north), axis=1)
+    row_4, col_4 = np.nanmean(np.where(mask_yx_east_north), axis=1)
+    last_row = np.rint(np.nanmax([row_1,row_2,row_3,row_4])).astype(int)
+    first_row = np.rint(np.nanmin([row_1,row_2,row_3,row_4])).astype(int)
+    last_col = np.rint(np.nanmax([col_1,col_2,col_3,col_4])).astype(int)
+    first_col = np.rint(np.nanmin([col_1,col_2,col_3,col_4])).astype(int)
+    
+    #center_sample = int(width / 2)
+    #center_line = int(length / 2)
+    
+    #lat_center_sample = lat[:, center_sample]
+    #lon_center_line = lon[center_line, :]
+    #lat_min = lat_center_sample - lat_south
+    #lat_max = lat_center_sample - lat_north
+    #lon_min = lon_center_line - lon_west
+    #lon_max = lon_center_line - lon_east
+    #first_row = [index for index in range(len(lat_min)) if np.abs(lat_min[index]) == np.min(np.abs(lat_min))]
+    #last_row = [index for index in range(len(lat_max)) if np.abs(lat_max[index]) == np.min(np.abs(lat_max))]
+    #first_col = [index for index in range(len(lon_min)) if np.abs(lon_min[index]) == np.min(np.abs(lon_min))]
+    #last_col = [index for index in range(len(lon_max)) if np.abs(lon_max[index]) == np.min(np.abs(lon_max))]
     image_coord = [first_row, last_row, first_col, last_col]
 
+    
     return image_coord
 
 ################################################################################
