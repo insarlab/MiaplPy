@@ -25,15 +25,24 @@ def send_logger_squeesar():
 ######################################################################################
 
 
-def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
+def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east, status='multilook'):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
-    ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
-    lat = ds.GetRasterBand(1).ReadAsArray()
-    del ds
-    ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
-    lon = ds.GetRasterBand(1).ReadAsArray()
-    del ds
+    if status == 'multilook':
+        ds = gdal.Open(geo_master_dir + '/lat.rdr.vrt', gdal.GA_ReadOnly)
+        lat = ds.GetRasterBand(1).ReadAsArray()
+        del ds
+        ds = gdal.Open(geo_master_dir + "/lon.rdr.vrt", gdal.GA_ReadOnly)
+        lon = ds.GetRasterBand(1).ReadAsArray()
+        del ds
+    else:
+        ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
+        lat = ds.GetRasterBand(1).ReadAsArray()
+        del ds
+        ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
+        lon = ds.GetRasterBand(1).ReadAsArray()
+        del ds
+
     length = lat.shape[0]
     width = lat.shape[1]
     
@@ -42,8 +51,8 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
     
     ymin1 = lat_south - y_factor;  ymax1 = lat_south + y_factor
     ymin2 = lat_north - y_factor;  ymax2 = lat_north + y_factor
-    xmin1 = lon_south - x_factor;  xmax1 = lon_south + x_factor
-    xmin2 = lon_north - x_factor;  xmax2 = lon_north + x_factor
+    xmin1 = lon_west - x_factor;  xmax1 = lon_west + x_factor
+    xmin2 = lon_east - x_factor;  xmax2 = lon_east + x_factor
     mask_y_min = np.multiply(lat >= ymin1, lat <= ymax1)
     mask_y_max = np.multiply(lat >= ymin2, lat <= ymax2)
     mask_x_min = np.multiply(lon >= xmin1, lon <= xmax1)
@@ -56,7 +65,7 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
     row_1, col_1 = np.nanmean(np.where(mask_yx_east_south), axis=1)
     row_2, col_2 = np.nanmean(np.where(mask_yx_west_south), axis=1)
     row_3, col_3 = np.nanmean(np.where(mask_yx_east_north), axis=1)
-    row_4, col_4 = np.nanmean(np.where(mask_yx_east_north), axis=1)
+    row_4, col_4 = np.nanmean(np.where(mask_yx_west_north), axis=1)
     last_row = np.rint(np.nanmax([row_1,row_2,row_3,row_4])).astype(int)
     first_row = np.rint(np.nanmin([row_1,row_2,row_3,row_4])).astype(int)
     last_col = np.rint(np.nanmax([col_1,col_2,col_3,col_4])).astype(int)
