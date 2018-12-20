@@ -74,7 +74,7 @@ def main(iargs=None):
         print('Some or all are cropped, checking for remaining...')
         crop_area = np.load(project_dir + '/merged/cropped.npy')
     else:
-        crop_area = np.array(convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east))
+        crop_area = np.array(convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east, status='Full'))
     first_row = np.int(crop_area[0])
     last_row = np.int(crop_area[1])
     first_col = np.int(crop_area[2])
