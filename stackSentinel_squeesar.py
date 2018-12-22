@@ -678,7 +678,7 @@ def checkCurrentStatus(inps):
             print('                     *********           ')
             print('                 *****************           ')
             print('         *********************************           ')
-            sys.exit(1)
+           # sys.exit(1)
 
         if inps.coregistration in ['NESD', 'nesd']:
 
