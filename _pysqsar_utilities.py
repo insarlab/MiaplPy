@@ -45,9 +45,9 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
 
     length = lat.shape[0]
     width = lat.shape[1]
-    
-    x_factor = (lon[0,-1]-lon[0,0])/width
-    y_factor = (lat[0,0]-lat[-1,0])/length
+
+    x_factor = 10*np.abs((lon[0,-1]-lon[0,0])/width)
+    y_factor = 10*np.abs((lat[0,0]-lat[-1,0])/length)
     
     ymin1 = lat_south - y_factor;  ymax1 = lat_south + y_factor
     ymin2 = lat_north - y_factor;  ymax2 = lat_north + y_factor
