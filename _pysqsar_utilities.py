@@ -199,7 +199,13 @@ def PTA_L_BFGS(xm):
         out = np.zeros([n,1])
         out[1::,0] = res.x
         out = np.unwrap(out,np.pi,axis=0)
-        return out
+
+        phase_ref = np.matrix(out)
+        phase_init = np.triu(np.angle(coh), 1)
+        phase_optimized = np.triu(np.angle(np.matmul(np.exp(-1j * phase_ref), (np.exp(-1j * phase_ref)).getH())), 1)
+        gam_pta = pysq.gam_pta_f(phase_init, phase_optimized)
+
+        return out, gam_pta
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from PTA to EVD')
         return EVD_phase_estimation(coh)
@@ -217,13 +223,13 @@ def EVD_phase_estimation(coh0):
     x0 = x0 - x0[0,0]
     x0 = np.unwrap(x0,np.pi,axis=0)
     
-    return x0
+    return x0, w[f]
 
 ###############################################################################
 
 
 def EMI_phase_estimation(coh0):
-    """ Estimates the phase values based on EMI decomosition (Homa Ansari paper) """
+    """ Estimates the phase values based on EMI decomosition (Homa Ansari, 2018 paper) """
     
     abscoh = regularize_matrix(np.abs(coh0))
     if np.size(abscoh) == np.size(coh0):
@@ -237,8 +243,8 @@ def EMI_phase_estimation(coh0):
         x0 = np.unwrap(x0,np.pi,axis=0)
         return x0,w[f]
     else:
-        print('warning: coherence matric not positive semidifinite, It is switched from EMI to EVD')
-        return EVD_phase_estimation(coh0), 0
+        print('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
+        return EVD_phase_estimation(coh0)
 
 ###############################################################################
 
@@ -340,16 +346,16 @@ def trwin(x):
 ###############################################################################
 
 
-def patch_slice(lin,sam,waz,wra):
+def patch_slice(lin,sam,waz,wra,patch_size=200):
     """ Devides an image into patches of size 300 by 300 by considering the overlay of the size of multilook window."""
     
-    pr1 = np.ogrid[0:lin-50:200]
-    pr2 = pr1+200
+    pr1 = np.ogrid[0:lin-50:patch_size]
+    pr2 = pr1+patch_size
     pr2[-1] = lin
     pr1[1::] = pr1[1::] - 2*waz
 
-    pc1 = np.ogrid[0:sam-50:200]
-    pc2 = pc1+200
+    pc1 = np.ogrid[0:sam-50:patch_size]
+    pc2 = pc1+patch_size
     pc2[-1] = sam
     pc1[1::] = pc1[1::] - 2*wra
     pr = [[pr1], [pr2]]
