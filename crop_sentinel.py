@@ -11,7 +11,6 @@ import shutil
 import isce
 import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
-sys.path.insert(0, os.getenv('SENTINEL_STACK'))
 from mergeBursts import multilook
 
 
@@ -25,8 +24,8 @@ def create_parser():
     parser.add_argument('-i', '--input', dest='input', type=str, required=True,help='Input SLC')
     parser.add_argument('-o', '--output', dest='output', type=str, required=True,help='Output cropped SLC')
     parser.add_argument('-b', '--bbox', dest='bbox', type=str, default=None,
-                        help="row/col Bounding frow/lastrow/firstcol/lastcol. "
-                             "-- Example : '1000/2000/14000/15000' " "-- crop area")
+                        help="row/col Bounding frow lastrow firstcol lastcol. "
+                             "-- Example : '1000 2000 14000 15000' " "-- crop area")
 
     parser.add_argument('-m', '--multilook', action='store_true', dest='multilook', default=False,
                     help = 'Multilook the merged products. True or False')
@@ -53,52 +52,6 @@ def command_line_parse(iargs=None):
 
 
 
-def backup_Full_scence(filename):
-    filename_g = filename + '.nc'
-    #shutil.copy2(filename, filename_g, *, follow_symlinks=True)
-    #import pdb; pdb.set_trace()
-    img = isceobj.createImage()
-    img.load(filename + '.xml')
-    bands = img.bands
-    data_type = IML.NUMPY_type(img.dataType)
-    scheme = img.scheme
-    ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
-    inp_file = ds.GetRasterBand(1).ReadAsArray()
-    if bands == 2:
-        inp_file2 = ds.GetRasterBand(2).ReadAsArray()
-
-    del ds, img
-
-    out_map = IML.memmap(filename_g, mode='write', nchannels=bands,
-                         nxx=inp_file.shape[1], nyy=inp_file.shape[0],
-                         scheme=scheme, dataType=data_type)
-
-    if bands == 2:
-        out_map.bands[0][:, :] = inp_file[:,:]
-        out_map.bands[1][:, :] = inp_file2[:,:]
-    else:
-        out_map.bands[0][:, :] = inp_file[:,:]
-
-
-
-
-    IML.renderISCEXML(filename_g, bands, inp_file.shape[0], inp_file.shape[1], data_type, scheme)
-
-    #import pdb; pdb.set_trace()
-
-    out_img = isceobj.createImage()
-    out_img.load(filename_g + '.xml')
-    out_img.imageType = data_type
-    out_img.renderHdr()
-    try:
-        out_map.bands[0].base.base.flush()
-    except:
-        pass
-
-    return None
-
-
-
 def main(iargs=None):
     """
     Crops SLC images from Isce merged/SLC directory.
@@ -116,14 +69,13 @@ def main(iargs=None):
     n_lines = last_row - first_row
     width = last_col - first_col
 
-    filename = inps.input
-
-    ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
-    inp_file = ds.GetRasterBand(1).ReadAsArray()
-    del ds
-
 
     if inps.output.split('.')[1]=='slc':
+
+        ds = gdal.Open(inps.input + '.vrt', gdal.GA_ReadOnly)
+        inp_file = ds.GetRasterBand(1).ReadAsArray()
+        del ds
+
         out_map = np.memmap(inps.output, dtype=np.complex64, mode='write', shape=(n_lines, width))
         out_map[:, :] = inp_file[first_row:last_row, first_col:last_col]
 
@@ -142,18 +94,13 @@ def main(iargs=None):
     else:
 
 
-        filename_g = inps.input + '.nc'
-        if not os.path.isfile(filename_g+'.xml'):
-            backup_Full_scence(filename)
-
-
         img = isceobj.createImage()
-        img.load(filename_g + '.xml')
+        img.load(inps.input + '.xml')
         bands = img.bands
         data_type = IML.NUMPY_type(img.dataType)
         scheme = img.scheme
 
-        ds = gdal.Open(filename_g + '.vrt', gdal.GA_ReadOnly)
+        ds = gdal.Open(inps.input + '.vrt', gdal.GA_ReadOnly)
         inp_file = ds.GetRasterBand(1).ReadAsArray()
 
         if bands == 2:
@@ -162,7 +109,7 @@ def main(iargs=None):
 
         if not (inp_file.shape[0] == n_lines and inp_file.shape[1] == width):
 
-            out_map = IML.memmap(filename, mode='r+', nchannels=bands,
+            out_map = IML.memmap(inps.output, mode='r+', nchannels=bands,
                             nxx=width, nyy=n_lines, scheme=scheme, dataType=data_type)
 
             if bands == 2:
@@ -171,12 +118,12 @@ def main(iargs=None):
             else:
                 out_map.bands[0][:, :] = inp_file[first_row:last_row, first_col:last_col]
 
-            IML.renderISCEXML(filename, bands,
+            IML.renderISCEXML(inps.output, bands,
                             n_lines, width,
                             data_type, scheme)
 
             out_img = isceobj.createImage()
-            out_img.load(filename + '.xml')
+            out_img.load(inps.output + '.xml')
             out_img.imageType = data_type
             out_img.renderHdr()
             try:
@@ -190,7 +137,7 @@ def main(iargs=None):
 
     if inps.multilook:
         print('multilooking')
-        multilook(filename, outname=inps.output,
+        multilook(inps.input, outname=inps.output+'.ml',
                   alks=inps.azimuthLooks, rlks=inps.rangeLooks,
                   multilook_tool=inps.multilook_tool, no_data=None)
 
