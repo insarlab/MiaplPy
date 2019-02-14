@@ -66,7 +66,7 @@ class config(object):
         self.f.write('PSQ_sentinel : ' + '\n')
         self.f.write('patch_dir : ' + self.patchDir + '\n')
         self.f.write('range_window : ' + self.rangeWindow + '\n')
-        self.f.write('azimut_hwindow : ' + self.azimuthWindow + '\n')
+        self.f.write('azimuth_window : ' + self.azimuthWindow + '\n')
         self.f.write('method : ' + self.plmethod + '\n')
 
 
@@ -78,7 +78,7 @@ class config(object):
         self.f.write('ifg_dir : ' + self.ifgDir + '\n')
         self.f.write('ifg_index : ' + self.ifgIndex + '\n')
         self.f.write('range_window : ' + self.rangeWindow + '\n')
-        self.f.write('azimut_hwindow : ' + self.azimuthWindow + '\n')
+        self.f.write('azimuth_window : ' + self.azimuthWindow + '\n')
         self.f.write('acquisition_number : ' + self.acq_num + '\n')
         self.f.write('range_looks : ' + self.rangeLooks + '\n')
         self.f.write('azimuth_looks : ' + self.azimuthLooks + '\n')
@@ -197,7 +197,7 @@ class run(object):
             configObj.input = os.path.join(geoDir, item + '.rdr.full')
             configObj.output = os.path.join(geoDir, item + '.rdr')
             configObj.bbox = inps.bbox_rdr
-            configObj.multi_look = 'True'
+            configObj.multi_look = 'False'
             configObj.rangeLooks = inps.rangeLooks
             configObj.azimuthLooks = inps.azimuthLooks
             configObj.multilook_tool = multiookToolDict[pattern]
