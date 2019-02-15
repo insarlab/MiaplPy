@@ -10,8 +10,6 @@ import glob
 import isce
 import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
-sys.path.insert(0, os.getenv('SENTINEL_STACK'))
-from mergeBursts import multilook
 from FilterAndCoherence import estCoherence
 
 
@@ -89,11 +87,12 @@ def main(iargs=None):
 
 
     if 'geom_master' in inps.output_dir:
-        outputq = inps.output_dir + '/Quality.Full'
-        Quality = np.memmap(outputq, dtype=np.float32, mode='w+', shape=(n_line, width))
+        outputq = inps.output_dir + '/Quality.rdr'
+        Quality = IML.memmap(outputq, mode='write', nchannels=1,
+                             nxx=width, nyy=n_line, scheme='BIL', dataType='f')
         doq = True
     else:
-        outputint = inps.output_dir + '/fine.int.full'
+        outputint = inps.output_dir + '/filt.fine.int'
         ifg = np.memmap(outputint , dtype=np.float32, mode='w+', shape=(n_line, width))
         doq = False
 
@@ -118,7 +117,7 @@ def main(iargs=None):
         if doq:
             qlty = np.memmap(inps.squeesar_dir + '/' + patch  + '/quality',
                              dtype=np.float32, mode='r', shape=(patch_lines, patch_samples))
-            Quality[row1:row2 + 1, col1:col2 + 1] = qlty[f_row:l_row + 1, f_col:l_col + 1]
+            Quality.bands[0][row1:row2 + 1, col1:col2 + 1] = qlty[f_row:l_row + 1, f_col:l_col + 1]
         else:
             rslc_patch = np.memmap(inps.squeesar_dir + '/' + patch  + '/RSLC_ref',
                                dtype=np.complex64, mode='r', shape=(inps.n_image, patch_lines, patch_samples))
@@ -134,14 +133,27 @@ def main(iargs=None):
 
     if doq:
 
+        Quality = None
+
+        IML.renderISCEXML(outputq, 1, n_line, width, 'f', 'BIL')
+
+        out_img = isceobj.createImage()
+        out_img.load(outputq + '.xml')
+        out_img.imageType = 'f'
+        out_img.renderHdr()
+        try:
+            out_map.bands[0].base.base.flush()
+        except:
+            pass
+
         cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + outputq + '.vrt ' + outputq
         os.system(cmd)
 
-        multilook(outputq, outputq.split('Full')[0],
-                  alks=inps.numberAzimuthLooks, rlks=inps.numberRangeLooks,
-                  multilook_tool='gdal', no_data=None)
 
     else:
+
+        ifg = None
+
         obj_int = isceobj.createIntImage()
         obj_int.setFilename(outputint)
         obj_int.setWidth(width)
@@ -150,16 +162,11 @@ def main(iargs=None):
         obj_int.renderHdr()
         obj_int.renderVRT()
 
-        outintml = os.path.join(inps.output_dir,'filt.fine.int')
         corfile = os.path.join(inps.output_dir,'filt.fine.cor')
 
-        multilook(outputint, outintml,
-                  alks=inps.numberAzimuthLooks, rlks=inps.numberRangeLooks,
-                  multilook_tool='isce', no_data=None)
 
-        estCoherence(outintml, corfile)
+        estCoherence(outputint, corfile)
 
-    del Quality, ifg
 
 
 if __name__ == '__main__':
