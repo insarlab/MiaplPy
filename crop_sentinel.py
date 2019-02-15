@@ -116,10 +116,10 @@ def main(iargs=None):
                             nxx=width, nyy=n_lines, scheme=scheme, dataType=data_type)
 
             if bands == 2:
-                out_map.bands[0][:, :] = inp_file[first_row:last_row, first_col:last_col]
-                out_map.bands[1][:, :] = inp_file2[first_row:last_row, first_col:last_col]
+                out_map.bands[0][0::, 0::] = inp_file[first_row:last_row, first_col:last_col]
+                out_map.bands[1][0::, 0::] = inp_file2[first_row:last_row, first_col:last_col]
             else:
-                out_map.bands[0][:, :] = inp_file[first_row:last_row, first_col:last_col]
+                out_map.bands[0][0::, 0::] = inp_file[first_row:last_row, first_col:last_col]
 
             IML.renderISCEXML(inps.output, bands,
                             n_lines, width,
@@ -129,13 +129,14 @@ def main(iargs=None):
             out_img.load(inps.output + '.xml')
             out_img.imageType = data_type
             out_img.renderHdr()
+            out_img.renderVRT()
             try:
                 out_map.bands[0].base.base.flush()
             except:
                 pass
 
-            cmd = 'gdal_translate -of ENVI ' + inps.output + '.vrt ' + inps.output
-            os.system(cmd)
+            #cmd = 'gdal_translate -of ENVI ' + inps.output + '.vrt ' + inps.output
+            #os.system(cmd)
 
 
     if inps.multilook:
