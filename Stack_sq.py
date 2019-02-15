@@ -67,7 +67,7 @@ class config(object):
         self.f.write('patch_dir : ' + self.patchDir + '\n')
         self.f.write('range_window : ' + self.rangeWindow + '\n')
         self.f.write('azimuth_window : ' + self.azimuthWindow + '\n')
-        self.f.write('method : ' + self.plmethod + '\n')
+        self.f.write('plmethod : ' + self.plmethod + '\n')
 
 
     def generate_igram(self, function):
