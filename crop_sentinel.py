@@ -60,7 +60,7 @@ def main(iargs=None):
     inps = command_line_parse(iargs)
 
     crop_area = [val for val in inps.bbox.split()]
-    if len(inps.bbox) != 4:
+    if len(crop_area) != 4:
         raise Exception('Bbox should contain 4 floating point values')
 
 
@@ -112,7 +112,7 @@ def main(iargs=None):
 
         if not (inp_file.shape[0] == n_lines and inp_file.shape[1] == width):
 
-            out_map = IML.memmap(inps.output, mode='r+', nchannels=bands,
+            out_map = IML.memmap(inps.output, mode='write', nchannels=bands,
                             nxx=width, nyy=n_lines, scheme=scheme, dataType=data_type)
 
             if bands == 2:

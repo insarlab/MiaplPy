@@ -199,10 +199,14 @@ def main(iargs=None):
     inps.geo_master_dir = os.path.join(inps.work_dir, 'merged/geom_master')
     inps.squeesar_dir = os.path.join(inps.work_dir, 'SqueeSAR')
 
-    cbox = inps.cropbox.split(' ')
+    cbox = [val for val in inps.cropbox.split()]
+    if len(cbox) != 4:
+        raise Exception('Bbox should contain 4 floating point values')
+
 
     crop_area = np.array(convert_geo2image_coord(inps.geo_master_dir, np.float32(cbox[0]), np.float32(cbox[1]),
                                          np.float32(cbox[2]), np.float32(cbox[3])))
+    
     inps.bbox_rdr = '{} {} {} {}'.format(crop_area[0],crop_area[1],crop_area[2],crop_area[3])
     print(inps.bbox_rdr)
 

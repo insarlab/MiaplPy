@@ -28,6 +28,8 @@ def send_logger_squeesar():
 def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
+    import pdb; pdb.set_trace()
+
     ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
     lat = ds.GetRasterBand(1).ReadAsArray()
     del ds
@@ -40,10 +42,10 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
     idx_lon = np.where((lon >= lon_west) & (lon <= lon_east))
 
 
-    first_row = np.min(idx_lat)
-    last_row = np.max(idx_lat)
-    first_col = np.min(idx_lon)
-    last_col = np.max(idx_lon)
+    first_row = np.min(idx_lat[0])
+    last_row = np.max(idx_lat[0])
+    first_col = np.min(idx_lon[1])
+    last_col = np.max(idx_lon[1])
     image_coord = [first_row, last_row, first_col, last_col]
 
     return image_coord
