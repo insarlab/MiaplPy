@@ -238,7 +238,9 @@ class run(object):
 
 
     def generateIfg(self, inps, acquisitions):
-        ifgram_dir = os.path.dirname(inps.slc_dirname) + '/single_master_interferograms'
+        ifgram_dir = os.path.dirname(inps.slc_dirname) + '/interferograms'
+        if not os.path.isdir(ifgram_dir):
+            os.mkdir(ifgram_dir)
         index = 0
         for ifg in acquisitions[1::]:
             index += 1

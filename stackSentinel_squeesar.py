@@ -87,10 +87,10 @@ def createParser():
                         help='Phase linking method ["EVD","EMI","PTA","sequential_EVD","sequential_EMI","sequential_PTA"] '
                              'default: sequential EMI.')
 
-    parser.add_argument('-rw', '--rangewindow', dest='range_window', type=str, default='21'
+    parser.add_argument('-rw', '--range_window', dest='range_window', type=str, default='21'
                         , help='SHP searching window size in range direction. -- Default : 21')
 
-    parser.add_argument('-aw', '--azimuthwindow', dest='azimuth_window', type=str, default='15'
+    parser.add_argument('-aw', '--azimuth_window', dest='azimuth_window', type=str, default='15'
                         , help='SHP searching window size in azimuth direction. -- Default : 15')
 
 
@@ -197,6 +197,8 @@ def main(iargs=None):
     inps = cmdLineParse(iargs)
 
     inps.geo_master_dir = os.path.join(inps.work_dir, 'merged/geom_master')
+    inps.squeesar_dir = os.path.join(inps.work_dir, 'SqueeSAR')
+
     cbox = inps.cropbox.split(' ')
 
     crop_area = np.array(convert_geo2image_coord(inps.geo_master_dir, np.float32(cbox[0]), np.float32(cbox[1]),
@@ -218,7 +220,7 @@ def main(iargs=None):
 
     pairs = []
     for i in range(len(dateList)-1):
-        pairs.append((dateList[0],dateList[i]))
+        pairs.append((dateList[0],dateList[i+1]))
 
     squeesarStack(inps, dateList, pairs)
 
