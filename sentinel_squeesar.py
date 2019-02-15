@@ -92,12 +92,12 @@ def main(iargs=None):
     inps.sq_dir = inps.project_dir + '/SqueeSAR'
     inps.patch_dir = inps.sq_dir+'/PATCH'
     inps.list_slv = os.listdir(inps.slave_dir)
-    A = [inps.list_slv[0]+'_'+x for x in inps.list_slv]
-    with open('A.txt','w') as f:
-        for t in A[1::]:
-            f.write(t+'\n')
+    #A = [inps.list_slv[0]+'_'+x for x in inps.list_slv]
+    #with open('A.txt','w') as f:
+    #    for t in A[1::]:
+    #        f.write(t+'\n')
     
-    sys.exit(1) 
+    #sys.exit(1)
     
     inps.range_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizerange'])
     inps.azimuth_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizeazimuth'])

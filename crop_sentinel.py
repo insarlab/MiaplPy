@@ -59,12 +59,15 @@ def main(iargs=None):
 
     inps = command_line_parse(iargs)
 
-    crop_area = inps.bbox.split('/')
+    crop_area = [val for val in inps.bbox.split()]
+    if len(inps.bbox) != 4:
+        raise Exception('Bbox should contain 4 floating point values')
 
-    first_row = np.int(crop_area[0][1:-1])
-    last_row = np.int(crop_area[1][1:-1])
-    first_col = np.int(crop_area[2][1:-1])
-    last_col = np.int(crop_area[3][1:-1])
+
+    first_row = np.int(crop_area[0])
+    last_row = np.int(crop_area[1])
+    first_col = np.int(crop_area[2])
+    last_col = np.int(crop_area[3])
 
     n_lines = last_row - first_row
     width = last_col - first_col

@@ -28,30 +28,22 @@ def send_logger_squeesar():
 def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
-    obj_lat = isceobj.createIntImage()
-    obj_lat.load(geo_master_dir + '/lat.rdr.full.xml')
-    obj_lon = isceobj.createIntImage()
-    obj_lon.load(geo_master_dir + '/lon.rdr.full.xml')
-    width = obj_lon.getWidth()
-    length = obj_lon.getLength()
-    center_sample = int(width / 2)
-    center_line = int(length / 2)
     ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
     lat = ds.GetRasterBand(1).ReadAsArray()
     del ds
     ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
     lon = ds.GetRasterBand(1).ReadAsArray()
     del ds
-    lat_center_sample = lat[:, center_sample]
-    lon_center_line = lon[center_line, :]
-    lat_min = lat_center_sample - lat_south
-    lat_max = lat_center_sample - lat_north
-    lon_min = lon_center_line - lon_west
-    lon_max = lon_center_line - lon_east
-    first_row = [index for index in range(len(lat_min)) if np.abs(lat_min[index]) == np.min(np.abs(lat_min))]
-    last_row = [index for index in range(len(lat_max)) if np.abs(lat_max[index]) == np.min(np.abs(lat_max))]
-    first_col = [index for index in range(len(lon_min)) if np.abs(lon_min[index]) == np.min(np.abs(lon_min))]
-    last_col = [index for index in range(len(lon_max)) if np.abs(lon_max[index]) == np.min(np.abs(lon_max))]
+
+
+    idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
+    idx_lon = np.where((lon >= lon_west) & (lon <= lon_east))
+
+
+    first_row = np.min(idx_lat)
+    last_row = np.max(idx_lat)
+    first_col = np.min(idx_lon)
+    last_col = np.max(idx_lon)
     image_coord = [first_row, last_row, first_col, last_col]
 
     return image_coord

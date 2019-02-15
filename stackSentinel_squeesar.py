@@ -201,7 +201,7 @@ def main(iargs=None):
 
     crop_area = np.array(convert_geo2image_coord(inps.geo_master_dir, np.float32(cbox[0]), np.float32(cbox[1]),
                                          np.float32(cbox[2]), np.float32(cbox[3])))
-    inps.bbox_rdr = '{}/{}/{}/{}'.format(crop_area[0],crop_area[1],crop_area[2],crop_area[3])
+    inps.bbox_rdr = '{} {} {} {}'.format(crop_area[0],crop_area[1],crop_area[2],crop_area[3])
     print(inps.bbox_rdr)
 
     if os.path.exists(os.path.join(inps.work_dir, 'run_files_SQ')):
