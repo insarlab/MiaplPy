@@ -28,7 +28,7 @@ def create_parser():
                         , help='SHP searching window size in range direction. -- Default : 21')
     parser.add_argument('-a', '--azimuth_window', dest='azimuth_win', type=str, default='15'
                         , help='SHP searching window size in azimuth direction. -- Default : 15')
-    parser.add_argument('-q', '--acq_num', dest='n_image', type=str, default='20', help='number of images acquired')
+    parser.add_argument('-q', '--acquisition_number', dest='n_image', type=str, default='20', help='number of images acquired')
     parser.add_argument('-A', '--azimuth_looks', type=str, dest='azimuth_looks', default=3, help='azimuth looks')
     parser.add_argument('-R', '--range_looks', type=str, dest='range_looks', default=9, help='range looks')
 
