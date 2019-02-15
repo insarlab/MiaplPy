@@ -134,7 +134,7 @@ def main(iargs=None):
             except:
                 pass
 
-            cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
+            cmd = 'gdal_translate -of ENVI ' + inps.output + '.vrt ' + inps.output
             os.system(cmd)
 
 

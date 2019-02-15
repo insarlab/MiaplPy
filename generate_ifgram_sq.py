@@ -87,13 +87,21 @@ def main(iargs=None):
 
 
     if 'geom_master' in inps.output_dir:
+
+        if not os.path.isdir(inps.output_dir):
+            os.mkdir(inps.output_dir)
+
         outputq = inps.output_dir + '/Quality.rdr'
         Quality = IML.memmap(outputq, mode='write', nchannels=1,
                              nxx=width, nyy=n_line, scheme='BIL', dataType='f')
         doq = True
     else:
+
+        if not os.path.isdir(inps.output_dir):
+            os.mkdir(inps.output_dir)
+
         outputint = inps.output_dir + '/filt.fine.int'
-        ifg = np.memmap(outputint , dtype=np.float32, mode='w+', shape=(n_line, width))
+        ifg = np.memmap(outputint , dtype=np.complex64, mode='w+', shape=(n_line, width))
         doq = False
 
 
@@ -120,10 +128,10 @@ def main(iargs=None):
             Quality.bands[0][row1:row2 + 1, col1:col2 + 1] = qlty[f_row:l_row + 1, f_col:l_col + 1]
         else:
             rslc_patch = np.memmap(inps.squeesar_dir + '/' + patch  + '/RSLC_ref',
-                               dtype=np.complex64, mode='r', shape=(inps.n_image, patch_lines, patch_samples))
-            ifg_patch = np.zeros([patch_lines, patch_samples])
+                               dtype=np.complex64, mode='r', shape=(np.int(inps.n_image), patch_lines, patch_samples))
+            ifg_patch = np.zeros([patch_lines, patch_samples])+0j
             master = rslc_patch[0,:,:]
-            slave = rslc_patch[inps.ifg_index,:,:]
+            slave = rslc_patch[np.int(inps.ifg_index),:,:]
 
             for kk in range(0, patch_lines):
                 ifg_patch[kk, 0:patch_samples + 1] = master[kk, 0:patch_samples + 1] * np.conj(slave[kk, 0:patch_samples + 1])

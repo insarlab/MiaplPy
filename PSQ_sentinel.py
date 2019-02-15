@@ -81,8 +81,8 @@ def main(iargs=None):
     inps = command_line_parse(iargs)
     count_dim = np.load(inps.patch_dir+'/count.npy')
     inps.n_image = count_dim[0]
-    inps.lin = count[1]
-    inps.sam = count[2]
+    inps.lin = count_dim[1]
+    inps.sam = count_dim[2]
 
     inps.range_win = int(inps.range_win)
     inps.azimuth_win = int(inps.azimuth_win)
