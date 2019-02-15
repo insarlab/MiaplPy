@@ -28,7 +28,6 @@ def send_logger_squeesar():
 def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
-    import pdb; pdb.set_trace()
 
     ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
     lat = ds.GetRasterBand(1).ReadAsArray()
