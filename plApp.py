@@ -40,8 +40,7 @@ def create_parser():
                                      formatter_class=argparse.RawTextHelpFormatter,
                                      epilog=EXAMPLE)
 
-    parser.add_argument('customTemplateFile', nargs='?',
-                        help='custom template with option settings.\n' +
+    parser.add_argument('--template', dest='customTemplateFile', type=str, help='custom template with option settings.\n' +
                              "It's equivalent to None if default pysarApp_template.txt is input.")
     parser.add_argument('--dir', dest='workDir',
                         help='PySAR working directory, default is:\n' +
@@ -124,7 +123,7 @@ def check_obsolete_default_template(inps):
 def read_template(inps):
     print('\n**********  Read Template File  **********')
     # default template
-    inps.templateFile = os.path.join(inps.workDir, 'pysarApp_template.txt')
+    inps.templateFile = os.path.join(os.getenv('PYSAR_HOME'), 'docs/pysarApp_template.txt')
     if not os.path.isfile(inps.templateFile):
         print('generate default template file:', inps.templateFile)
         shutil.copy2(inps.autoTemplateFile, inps.workDir)

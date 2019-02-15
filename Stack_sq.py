@@ -114,7 +114,7 @@ class config(object):
         self.f.write('###################################' + '\n')
         self.f.write(function + '\n')
         self.f.write('plApp : ' + '\n')
-        self.f.write('customTemplateFile : ' + self.template + '\n')
+        self.f.write('template : ' + self.template + '\n')
 
 
 
@@ -281,9 +281,9 @@ class run(object):
             configName = os.path.join(self.config_path ,'config_igram_unw_' + master + '_' + slave)
             configObj = config(configName)
             configObj.configure(self)
-            configObj.ifgName = os.path.join(mergedDir,'filt.fine.int')
-            configObj.cohName = os.path.join(mergedDir,'filt.fine.cor')
-            configObj.unwName = os.path.join(mergedDir,'filt.fine.unw')
+            configObj.ifgName = os.path.join(mergedDir,'filt_fine.int')
+            configObj.cohName = os.path.join(mergedDir,'filt_fine.cor')
+            configObj.unwName = os.path.join(mergedDir,'filt_fine.unw')
             configObj.noMCF = noMCF
             configObj.master = os.path.join(self.work_dir,'master')
             configObj.defoMax = defoMax

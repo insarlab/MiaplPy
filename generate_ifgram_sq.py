@@ -100,7 +100,7 @@ def main(iargs=None):
         if not os.path.isdir(inps.output_dir):
             os.mkdir(inps.output_dir)
 
-        outputint = inps.output_dir + '/filt.fine.int'
+        outputint = inps.output_dir + '/filt_fine.int'
         ifg = np.memmap(outputint , dtype=np.complex64, mode='w+', shape=(n_line, width))
         doq = False
 
@@ -170,7 +170,7 @@ def main(iargs=None):
         obj_int.renderHdr()
         obj_int.renderVRT()
 
-        corfile = os.path.join(inps.output_dir,'filt.fine.cor')
+        corfile = os.path.join(inps.output_dir,'filt_fine.cor')
 
 
         estCoherence(outputint, corfile)
