@@ -82,6 +82,8 @@ class config(object):
         self.f.write('acquisition_number : ' + self.acq_num + '\n')
         self.f.write('range_looks : ' + self.rangeLooks + '\n')
         self.f.write('azimuth_looks : ' + self.azimuthLooks + '\n')
+        if 'geom_master' in self.ifgDir:
+            self.f.write('plmethod : ' + self.plmethod + '\n')
 
     def unwrap(self, function):
         self.f.write('###################################'+'\n')
@@ -269,6 +271,7 @@ class run(object):
         configObj.acq_num = str(len(acquisitions))
         configObj.rangeLooks = inps.rangeLooks
         configObj.azimuthLooks = inps.azimuthLooks
+        configObj.plmethod = inps.plmethod
         configObj.generate_igram('[Function-1]')
         configObj.finalize()
         self.runf.write(self.text_cmd + 'SQWrapper.py -c ' + configName + '\n')

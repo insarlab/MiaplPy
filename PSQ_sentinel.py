@@ -179,7 +179,7 @@ def main(iargs=None):
 
         time0 = time.time()
 
-        shp_df = shp_df.loc[shp_df['pixeltype']=='DS']
+        #shp_df = shp_df_0.loc[shp_df['pixeltype']=='DS']
 
         num_seq = np.int(np.floor(inps.n_image / 10))
 
@@ -231,83 +231,72 @@ def main(iargs=None):
                 phase_ref = np.zeros([inps.n_image,1])
                 phase_ref[:,:] = np.angle(rslc_ref[:,ref_row,ref_col]).reshape(inps.n_image,1)
 
-                if not step_0 == 0:
-                    squeezed_pixels = np.complex64(np.zeros([step_0, len(rr)]))
-                    for seq in range(0, step_0):
-                        squeezed_pixels[seq, :] = squeez_im(phase_ref[seq * 10:seq * 10 + 10, 0],
-                                                            CCG[seq * 10:seq * 10 + 10, :])
-                Laq = quality[ref_row,ref_col]
-
-                if num_seq == 0 or num_seq == 1:
-                    first_line = 0
-                    last_line = inps.n_image
-                    num_lines = last_line - first_line
-                    ccg_sample = CCG[first_line:last_line, :]
-                    res, La, squeezed_pixels = phase_linking_process(ccg_sample, 0, inps.phase_linking_method)
-                    phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
-                    Laq = np.max([La[0], Laq])
-
+                if shp_df.at[item,'pixeltype']=='Unknown':
+                    amp_ps = np.abs(rslc_ref[:,ref_row,ref_col]).reshape(inps.n_image,1)
+                    DA = np.std(amp_ps)/np.mean(amp_ps)
+                    if DA < 0.25:
+                        Laq = 1
                 else:
 
-                    for stepp in range(step_0, num_seq):
+                    if not step_0 == 0:
+                        squeezed_pixels = np.complex64(np.zeros([step_0, len(rr)]))
+                        for seq in range(0, step_0):
+                            squeezed_pixels[seq, :] = squeez_im(phase_ref[seq * 10:seq * 10 + 10, 0],
+                                                                CCG[seq * 10:seq * 10 + 10, :])
+                    Laq = quality[ref_row,ref_col]
 
-                        first_line = stepp * 10
-                        if stepp == num_seq - 1:
-                            last_line = inps.n_image
-                        else:
-                            last_line = first_line + 10
+                    if num_seq == 0 or num_seq == 1:
+                        first_line = 0
+                        last_line = inps.n_image
                         num_lines = last_line - first_line
+                        ccg_sample = CCG[first_line:last_line, :]
+                        res, La, squeezed_pixels = phase_linking_process(ccg_sample, 0, inps.phase_linking_method)
+                        phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
+                        Laq = np.max([La[0], Laq])
 
-                        if stepp == 0:
+                    else:
 
-                            ccg_sample = CCG[first_line:last_line, :]
-                            res,La, squeezed_pixels = phase_linking_process(ccg_sample, 0, inps.phase_linking_method)
-                            phase_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
+                        for stepp in range(step_0, num_seq):
 
-                        else:
+                            first_line = stepp * 10
+                            if stepp == num_seq - 1:
+                                last_line = inps.n_image
+                            else:
+                                last_line = first_line + 10
+                            num_lines = last_line - first_line
 
-                            ccg_sample = np.zeros([1 + num_lines, CCG.shape[1]]) + 1j
-                            ccg_sample[0:1, :] = np.complex64(squeezed_pixels[-1, :])
-                            ccg_sample[1::, :] = CCG[first_line:last_line, :]
-                            res,La, squeezed_p = phase_linking_process(ccg_sample, 1, inps.phase_linking_method)
-                            phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
-                            squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
-                        Laq = np.max([La[0],Laq])
-                    res_d,Lad = phase_linking_process(squeezed_pixels, 0, inps.phase_linking_method, squeez=False)
+                            if stepp == 0:
 
-                    for stepp in range(step_0, len(res_d)):
-                        first_line = stepp * 10
-                        if stepp == num_seq - 1:
-                            last_line = inps.n_image
-                        else:
-                            last_line = first_line + 10
-                        num_lines = last_line - first_line
+                                ccg_sample = CCG[first_line:last_line, :]
+                                res,La, squeezed_pixels = phase_linking_process(ccg_sample, 0, inps.phase_linking_method)
+                                phase_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
 
-                        phase_ref[first_line:last_line, 0:1] = (
-                                    phase_ref[first_line:last_line, 0:1] + np.matrix(res_d[int(stepp)]) - datumshift_old[
-                                int(stepp),ref_row,ref_col]).reshape(num_lines, 1)
+                            else:
+
+                                ccg_sample = np.zeros([1 + num_lines, CCG.shape[1]]) + 1j
+                                ccg_sample[0:1, :] = np.complex64(squeezed_pixels[-1, :])
+                                ccg_sample[1::, :] = CCG[first_line:last_line, :]
+                                res,La, squeezed_p = phase_linking_process(ccg_sample, 1, inps.phase_linking_method)
+                                phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
+                                squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
+                            Laq = np.max([La[0],Laq])
+                        res_d,Lad = phase_linking_process(squeezed_pixels, 0, inps.phase_linking_method, squeez=False)
+
+                        for stepp in range(step_0, len(res_d)):
+                            first_line = stepp * 10
+                            if stepp == num_seq - 1:
+                                last_line = inps.n_image
+                            else:
+                                last_line = first_line + 10
+                            num_lines = last_line - first_line
+
+                            phase_ref[first_line:last_line, 0:1] = (
+                                        phase_ref[first_line:last_line, 0:1] + np.matrix(res_d[int(stepp)]) - datumshift_old[
+                                    int(stepp),ref_row,ref_col]).reshape(num_lines, 1)
 
                 amp_ref = np.array(np.mean(np.abs(CCG), axis=1))
                 ph_ref = np.array(phase_ref)
 
-                #################### Filter now or not??
-                # if 'EMI' in inps.phase_linking_method:
-                #    if Laq < 1.03:
-                #        amp_ref = np.array(np.mean(np.abs(CCG), axis=1))
-                #        ph_ref = np.array(phase_ref)
-                #    else:
-                #        amp_ref = np.abs(rslc[:, ref_row, ref_col]).reshape(inps.n_image, 1)
-                #        ph_ref = np.angle(rslc[:, ref_row, ref_col]).reshape(inps.n_image, 1) - np.angle(
-                #            rslc[0, ref_row, ref_col])
-                # else:
-                #    if Laq > 0.55:
-                #        amp_ref = np.array(np.mean(np.abs(CCG), axis=1))
-                #        ph_ref = np.array(phase_ref)
-                #    else:
-                #        amp_ref = np.abs(rslc[:, ref_row, ref_col]).reshape(inps.n_image, 1)
-                #        ph_ref = np.angle(rslc[:, ref_row, ref_col]).reshape(inps.n_image, 1) - np.angle(
-                #            rslc[0, ref_row, ref_col])
-                ###########################################
 
 
                 rslc_ref[:,ref_row:ref_row+1,ref_col:ref_col+1] = np.complex64(np.multiply(amp_ref, np.exp(1j * ph_ref))).reshape(inps.n_image,1,1)
@@ -331,7 +320,7 @@ def main(iargs=None):
     else:
         time0 = time.time()
 
-        shp_df = shp_df.loc[shp_df['pixeltype'] == 'DS']
+        #shp_df = shp_df_0.loc[shp_df['pixeltype'] == 'DS']
 
         rslc_ref = np.memmap(inps.patch_dir + '/RSLC_ref', dtype='complex64', mode='w+',
                              shape=(inps.n_image, inps.lin, inps.sam))
@@ -349,32 +338,22 @@ def main(iargs=None):
             CCG[:, :] = np.matrix(rslc[:, rr, cc])
             phase_ref = np.zeros([inps.n_image, 1])
             phase_ref[:, :] = np.angle(rslc_ref[:, ref_row, ref_col]).reshape(inps.n_image, 1)
-            res, Laq = phase_linking_process(CCG, 0, inps.phase_linking_method, squeez=False)
-            phase_ref[:, 0:1] = res.reshape(inps.n_image, 1)
+
+            if shp_df.at[item, 'pixeltype'] == 'Unknown':
+                amp_ps = np.abs(rslc_ref[:, ref_row, ref_col]).reshape(inps.n_image, 1)
+                DA = np.std(amp_ps) / np.mean(amp_ps)
+                if DA < 0.25:
+                    Laq = 1
+            else:
+
+                res, Laq = phase_linking_process(CCG, 0, inps.phase_linking_method, squeez=False)
+                phase_ref[:, 0:1] = res.reshape(inps.n_image, 1)
+
             quality[ref_row:ref_row+1,ref_col:ref_col+1] = Laq
 
 
             amp_ref = np.array(np.mean(np.abs(CCG), axis=1))
             ph_ref = np.array(phase_ref)
-
-            #################### Filter now or not??
-            #if 'EMI' in inps.phase_linking_method:
-            #    if Laq < 1.03:
-            #        amp_ref = np.array(np.mean(np.abs(CCG), axis=1))
-            #        ph_ref = np.array(phase_ref)
-            #    else:
-            #        amp_ref = np.abs(rslc[:, ref_row, ref_col]).reshape(inps.n_image, 1)
-            #        ph_ref = np.angle(rslc[:, ref_row, ref_col]).reshape(inps.n_image, 1) - np.angle(
-            #            rslc[0, ref_row, ref_col])
-            #else:
-            #    if Laq > 0.55:
-            #        amp_ref = np.array(np.mean(np.abs(CCG), axis=1))
-            #        ph_ref = np.array(phase_ref)
-            #    else:
-            #        amp_ref = np.abs(rslc[:, ref_row, ref_col]).reshape(inps.n_image, 1)
-            #        ph_ref = np.angle(rslc[:, ref_row, ref_col]).reshape(inps.n_image, 1) - np.angle(
-            #            rslc[0, ref_row, ref_col])
-            ##########################################
 
 
             rslc_ref[:, ref_row:ref_row + 1, ref_col:ref_col + 1] = np.complex64(

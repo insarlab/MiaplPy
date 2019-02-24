@@ -42,6 +42,81 @@ def create_parser():
     return parser
 
 
+def cropSLC(inps):
+
+    ds = gdal.Open(inps.input + '.vrt', gdal.GA_ReadOnly)
+    inp_file = ds.GetRasterBand(1).ReadAsArray()
+    inp_file = inp_file[inps.first_row:inps.last_row, inps.first_col:inps.last_col]
+    del ds
+
+    out_map = np.memmap(inps.output, dtype=np.complex64, mode='write', shape=(inps.n_lines, inps.width))
+    out_map[:, :] = inp_file
+
+    out_img = isceobj.createSlcImage()
+    out_img.setAccessMode('read')
+    out_img.setFilename(inps.output)
+    out_img.setWidth(inps.width)
+    out_img.setLength(inps.n_lines)
+    out_img.renderVRT()
+    out_img.renderHdr()
+
+    del out_map
+    cmd = 'gdal_translate -of ENVI ' + inps.output + '.vrt ' + inps.output
+    os.system(cmd)
+
+    return inps
+
+def cropQualitymap(inps):
+
+    img = isceobj.createImage()
+    img.load(inps.input + '.xml')
+    bands = img.bands
+    data_type = IML.NUMPY_type(img.dataType)
+    scheme = img.scheme
+
+    ds = gdal.Open(inps.input + '.vrt', gdal.GA_ReadOnly)
+    inp_file = ds.GetRasterBand(1).ReadAsArray()
+    inp_file = inp_file[inps.first_row:inps.last_row, inps.first_col:inps.last_col]
+
+    if bands == 2:
+        inp_file2 = ds.GetRasterBand(2).ReadAsArray()
+        inp_file2 = inp_file2[inps.first_row:inps.last_row, inps.first_col:inps.last_col]
+    del ds, img
+
+    if not (inp_file.shape[0] == inps.n_lines and inp_file.shape[1] == inps.width):
+
+        out_map = IML.memmap(inps.output, mode='write', nchannels=bands,
+                             nxx=inps.width, nyy=inps.n_lines, scheme=scheme, dataType=data_type)
+
+        if bands == 2:
+            out_map.bands[0][0::, 0::] = inp_file
+            out_map.bands[1][0::, 0::] = inp_file2
+        else:
+            out_map.bands[0][0::, 0::] = inp_file
+
+        IML.renderISCEXML(inps.output, bands,
+                          inps.n_lines, inps.width,
+                          data_type, scheme)
+
+        out_img = isceobj.createImage()
+        out_img.load(inps.output + '.xml')
+        out_img.imageType = data_type
+        out_img.renderHdr()
+        out_img.renderVRT()
+        try:
+            out_map.bands[0].base.base.flush()
+        except:
+            pass
+
+        del out_map
+
+        cmd = 'gdal_translate -of ENVI ' + inps.output + '.vrt ' + inps.output
+        os.system(cmd)
+
+    return inps
+
+
+
 def command_line_parse(iargs=None):
     """ Parses command line agurments into inps variable. """
 
@@ -64,79 +139,20 @@ def main(iargs=None):
         raise Exception('Bbox should contain 4 floating point values')
 
 
-    first_row = np.int(crop_area[0])
-    last_row = np.int(crop_area[1])
-    first_col = np.int(crop_area[2])
-    last_col = np.int(crop_area[3])
+    inps.first_row = np.int(crop_area[0])
+    inps.last_row = np.int(crop_area[1])
+    inps.first_col = np.int(crop_area[2])
+    inps.last_col = np.int(crop_area[3])
 
-    n_lines = last_row - first_row
-    width = last_col - first_col
+    inps.n_lines = inps.last_row - inps.first_row
+    inps.width = inps.last_col - inps.first_col
 
 
-    if inps.output.split('.')[1]=='slc':
+    if 'slc' in inps.output:
 
-        ds = gdal.Open(inps.input + '.vrt', gdal.GA_ReadOnly)
-        inp_file = ds.GetRasterBand(1).ReadAsArray()
-        del ds
-
-        out_map = np.memmap(inps.output, dtype=np.complex64, mode='write', shape=(n_lines, width))
-        out_map[:, :] = inp_file[first_row:last_row, first_col:last_col]
-
-        out_img = isceobj.createSlcImage()
-        out_img.setAccessMode('read')
-        out_img.setFilename(inps.output)
-        out_img.setWidth(width)
-        out_img.setLength(n_lines)
-        out_img.renderVRT()
-        out_img.renderHdr()
-
-        del out_map
-        cmd = 'gdal_translate -of ENVI ' + inps.output + '.vrt ' + inps.output
-        os.system(cmd)
-
+        inps = cropSLC(inps)
     else:
-
-
-        img = isceobj.createImage()
-        img.load(inps.input + '.xml')
-        bands = img.bands
-        data_type = IML.NUMPY_type(img.dataType)
-        scheme = img.scheme
-
-        ds = gdal.Open(inps.input + '.vrt', gdal.GA_ReadOnly)
-        inp_file = ds.GetRasterBand(1).ReadAsArray()
-
-        if bands == 2:
-            inp_file2 = ds.GetRasterBand(2).ReadAsArray()
-        del ds, img
-
-        if not (inp_file.shape[0] == n_lines and inp_file.shape[1] == width):
-
-            out_map = IML.memmap(inps.output, mode='write', nchannels=bands,
-                            nxx=width, nyy=n_lines, scheme=scheme, dataType=data_type)
-
-            if bands == 2:
-                out_map.bands[0][0::, 0::] = inp_file[first_row:last_row, first_col:last_col]
-                out_map.bands[1][0::, 0::] = inp_file2[first_row:last_row, first_col:last_col]
-            else:
-                out_map.bands[0][0::, 0::] = inp_file[first_row:last_row, first_col:last_col]
-
-            IML.renderISCEXML(inps.output, bands,
-                            n_lines, width,
-                            data_type, scheme)
-
-            out_img = isceobj.createImage()
-            out_img.load(inps.output + '.xml')
-            out_img.imageType = data_type
-            out_img.renderHdr()
-            out_img.renderVRT()
-            try:
-                out_map.bands[0].base.base.flush()
-            except:
-                pass
-
-            #cmd = 'gdal_translate -of ENVI ' + inps.output + '.vrt ' + inps.output
-            #os.system(cmd)
+        inps = cropQualitymap(inps)
 
 
     if inps.multilook:

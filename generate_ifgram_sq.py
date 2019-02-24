@@ -7,6 +7,7 @@ import os
 import sys
 import argparse
 import glob
+import gdal
 import isce
 import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
@@ -31,6 +32,9 @@ def create_parser():
     parser.add_argument('-q', '--acquisition_number', dest='n_image', type=str, default='20', help='number of images acquired')
     parser.add_argument('-A', '--azimuth_looks', type=str, dest='azimuth_looks', default=3, help='azimuth looks')
     parser.add_argument('-R', '--range_looks', type=str, dest='range_looks', default=9, help='range looks')
+    parser.add_argument('-m', '--plmethod', dest='plmethod', type=str, default='sequential_EMI',
+                        help='Phase linking method ["EVD","EMI","PTA","sequential_EVD","sequential_EMI","sequential_PTA"] '
+                             'default: sequential EMI.')
 
     return parser
 
@@ -156,6 +160,13 @@ def main(iargs=None):
 
         cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + outputq + '.vrt ' + outputq
         os.system(cmd)
+
+
+        ds = gdal.Open(outputq, gdal.GA_ReadOnly)
+
+        ds.SetMetadata({'plmethod': inps.plmethod})
+
+        ds = None
 
 
     else:

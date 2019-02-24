@@ -12,15 +12,15 @@ from scipy.optimize import minimize, Bounds
 import gdal
 import isce
 import isceobj
-sys.path.insert(0, os.getenv('RSMAS_ISCE'))
-from rsmas_logging import rsmas_logger, loglevel
+#sys.path.insert(0, os.getenv('RSMAS_ISCE'))
+#from rsmas_logging import rsmas_logger, loglevel
 
-logfile_name = os.getenv('OPERATIONS') + '/LOGS/squeesar.log'
-logger_pysq = rsmas_logger(file_name=logfile_name)
+#logfile_name = os.getenv('OPERATIONS') + '/LOGS/squeesar.log'
+#logger_pysq = rsmas_logger(file_name=logfile_name)
 
 
-def send_logger_squeesar():
-    return logger_pysq
+#def send_logger_squeesar():
+#    return logger_pysq
 
 ######################################################################################
 
@@ -28,23 +28,35 @@ def send_logger_squeesar():
 def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
-
     ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
     lat = ds.GetRasterBand(1).ReadAsArray()
     del ds
+
+    idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
+    lat_c = np.int(np.mean(idx_lat[0]))
+
     ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
     lon = ds.GetRasterBand(1).ReadAsArray()
+    lon = lon[lat_c,:]
     del ds
 
 
-    idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
     idx_lon = np.where((lon >= lon_west) & (lon <= lon_east))
 
 
-    first_row = np.min(idx_lat[0])
-    last_row = np.max(idx_lat[0])
-    first_col = np.min(idx_lon[1])
-    last_col = np.max(idx_lon[1])
+    lon_c = np.int(np.mean(idx_lon))
+
+
+    lat = lat[:,lon_c]
+
+    idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
+
+
+
+    first_row = np.min(idx_lat)
+    last_row = np.max(idx_lat)
+    first_col = np.min(idx_lon)
+    last_col = np.max(idx_lon)
     image_coord = [first_row, last_row, first_col, last_col]
 
     return image_coord
