@@ -42,15 +42,15 @@ def create_patch(inps, name):
     line = inps.patch_rows[1][0][patch_row] - inps.patch_rows[0][0][patch_row]
     sample = inps.patch_cols[1][0][patch_col] - inps.patch_cols[0][0][patch_col]
 
-    a = True
-    if a==True: #not os.path.isfile(patch_name + '/count.npy'):
+
+    if not os.path.isfile(patch_name + '/count.npy'):
         if not os.path.isdir(patch_name):
             os.mkdir(patch_name)
 
         rslc = np.memmap(patch_name + '/RSLC', dtype=np.complex64, mode='w+', shape=(inps.n_image, line, sample))
 
         count = 0
-    
+
         for dirs in inps.list_slv:
             data_name = inps.slave_dir + '/' + dirs + '/' + dirs + '.slc'
             slc = np.memmap(data_name, dtype=np.complex64, mode='r', shape=(inps.lin, inps.sam))
@@ -109,6 +109,7 @@ def main(iargs=None):
 
     np.save(inps.sq_dir + '/flag.npy', 'patchlist_created')
     timep = time.time() - time0
+
 
     print("Done Creating PATCH. time:{} min".format(timep/60))
 

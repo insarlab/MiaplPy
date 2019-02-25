@@ -190,6 +190,7 @@ def main(iargs=None):
             else:
                 doprocess = True
         else:
+            num_image_processed = 0
             doprocess = True
 
         if doprocess:

@@ -223,14 +223,12 @@ class run(object):
 
 
     def phaseLinking(self, inps):
-        patchlist = glob.glob(inps.squeesar_dir+'/PATCH*')
-        patchlist = [x.split('/')[-1] for x in patchlist]
-        print(patchlist)
-        for patch in patchlist:
-            configName = os.path.join(self.config_path, 'config_phase_link_'+patch)
+
+        for patch in inps.patch_list:
+            configName = os.path.join(self.config_path, 'config_phase_link_PATCH'+patch)
             configObj = config(configName)
             configObj.configure(self)
-            configObj.patchDir = os.path.join(inps.squeesar_dir, patch)
+            configObj.patchDir = os.path.join(inps.squeesar_dir,'PATCH'+patch)
             configObj.rangeWindow = inps.range_window
             configObj.azimuthWindow = inps.azimuth_window
             configObj.plmethod = inps.plmethod

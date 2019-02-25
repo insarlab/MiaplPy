@@ -17,7 +17,7 @@ from itertools import chain
 import re
 sys.path.insert(0, os.getenv('SQUEESAR'))
 from Stack_sq import config, run, sentinelSLC
-from _pysqsar_utilities import convert_geo2image_coord
+from _pysqsar_utilities import convert_geo2image_coord, patch_slice
 
 
 helpstr= '''
@@ -206,6 +206,12 @@ def main(iargs=None):
 
     crop_area = np.array(convert_geo2image_coord(inps.geo_master_dir, np.float32(cbox[0]), np.float32(cbox[1]),
                                          np.float32(cbox[2]), np.float32(cbox[3])))
+
+    inps.lin = crop_area[1] - crop_area[0]
+    inps.sam = crop_area[3] - crop_area[2]
+
+    inps.patch_rows, inps.patch_cols, inps.patch_list = \
+        patch_slice(inps.lin, inps.sam, np.int(inps.azimuth_window), np.int(inps.range_window), np.int(inps.patch_size))
     
     inps.bbox_rdr = '{} {} {} {}'.format(crop_area[0],crop_area[1],crop_area[2],crop_area[3])
     print(inps.bbox_rdr)
