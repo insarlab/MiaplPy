@@ -41,39 +41,6 @@ def command_line_parse(args):
     inps = parser.parse_args(args)
     return inps
 
-################################################
-def phase_linking_process(ccg_sample, stepp, method, squeez=True):
-
-
-    coh_mat = pysq.est_corr(ccg_sample)
-    if 'PTA' in method:
-        ph_EMI, La = pysq.EMI_phase_estimation(coh_mat)
-        xm = np.zeros([len(ph_EMI),len(ph_EMI)+1])+0j
-        xm[:,0:1] = np.reshape(ph_EMI,[len(ph_EMI),1])
-        xm[:,1::] = coh_mat[:,:]
-        res, La = pysq.PTA_L_BFGS(xm)
-
-    elif 'EMI' in method:
-        res, La = pysq.EMI_phase_estimation(coh_mat)
-    else:
-        res, La = pysq.EVD_phase_estimation(coh_mat)
-
-        
-    res = res.reshape(len(res),1)
-
-    if squeez:
-        squeezed = squeez_im(res[stepp::,0], ccg_sample[stepp::,0])
-        return res, La, squeezed
-    else:
-        return res, La
-
-
-def squeez_im(ph, ccg):
-    vm = np.matrix(np.exp(1j * ph) / LA.norm(np.exp(1j * ph)))
-    squeezed = np.matmul(np.conjugate(vm), ccg)
-    return squeezed
-
-
 ###################################
 
 def main(iargs=None):
@@ -242,7 +209,7 @@ def main(iargs=None):
                     if not step_0 == 0:
                         squeezed_pixels = np.complex64(np.zeros([step_0, len(rr)]))
                         for seq in range(0, step_0):
-                            squeezed_pixels[seq, :] = squeez_im(phase_ref[seq * 10:seq * 10 + 10, 0],
+                            squeezed_pixels[seq, :] = pysq.squeez_im(phase_ref[seq * 10:seq * 10 + 10, 0],
                                                                 CCG[seq * 10:seq * 10 + 10, :])
                     Laq = quality[ref_row,ref_col]
 
