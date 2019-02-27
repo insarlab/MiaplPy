@@ -25,7 +25,7 @@ import isceobj
 ######################################################################################
 
 
-def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
+def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east, status='multilook'):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
     ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
@@ -57,8 +57,10 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
     last_row = np.max(idx_lat)
     first_col = np.min(idx_lon)
     last_col = np.max(idx_lon)
+
     image_coord = [first_row, last_row, first_col, last_col]
 
+    
     return image_coord
 
 ################################################################################
@@ -211,6 +213,7 @@ def PTA_L_BFGS(xm):
         gam_pta = pysq.gam_pta_f(phase_init, phase_optimized)
 
         return out, gam_pta
+
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from PTA to EVD')
         return EVD_phase_estimation(coh)
@@ -391,6 +394,7 @@ def est_corr(CCGsam):
     """ Estimate Correlation matrix from an ensemble."""
 
     CCGS = np.matrix(CCGsam)
+
     corr_mat = np.matmul(CCGS, CCGS.getH()) / CCGS.shape[1]
 
     coh = np.multiply(cov2corr(np.abs(corr_mat)), np.exp(1j * np.angle(corr_mat)))
@@ -442,6 +446,7 @@ def phase_linking_process(ccg_sample, stepp, method, squeez=True):
 
     res = res.reshape(len(res), 1)
 
+
     if squeez:
         squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, 0])
         return res, La, squeezed
@@ -471,3 +476,4 @@ def CRLB_cov(gama, L):
 
 
 ###############################################################################
+

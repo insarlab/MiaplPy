@@ -189,10 +189,11 @@ def squeesarStack(inps, acquisition_dates, pairs):
     runObj.plAPP(inps)
     runObj.finalize()
 
+
     return i
 
-
 def main(iargs=None):
+
 
     inps = cmdLineParse(iargs)
 
@@ -233,6 +234,7 @@ def main(iargs=None):
         pairs.append((dateList[0],dateList[i+1]))
 
     squeesarStack(inps, dateList, pairs)
+
 
 
 if __name__ == "__main__":
