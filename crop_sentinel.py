@@ -7,33 +7,114 @@ import os
 import sys
 import gdal
 import argparse
+import shutil
 import isce
 import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
-sys.path.insert(0, os.getenv('RSMAS_ISCE'))
-from _pysqsar_utilities import send_logger_squeesar, convert_geo2image_coord
-from rsmas_logging import loglevel
-from dataset_template import Template
-sys.path.insert(0, os.getenv('SENTINEL_STACK'))
 from mergeBursts import multilook
 
-logger_crop  = send_logger_squeesar()
 
 ##############################################################################
-EXAMPLE = """example:
-  crop_sentinel.py LombokSenAT156VV.template 
-"""
-
 
 def create_parser():
     """ Creates command line argument parser object. """
 
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, epilog=EXAMPLE)
+    parser = argparse.ArgumentParser(description='Crops the scene given bounding box in lat/lon')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-    parser.add_argument('custom_template_file', nargs='?',
-                        help='custom template with option settings.\n')
+    parser.add_argument('-i', '--input', dest='input', type=str, required=True,help='Input SLC')
+    parser.add_argument('-o', '--output', dest='output', type=str, required=True,help='Output cropped SLC')
+    parser.add_argument('-b', '--bbox', dest='bbox', type=str, default=None,
+                        help="row/col Bounding frow lastrow firstcol lastcol. "
+                             "-- Example : '1000 2000 14000 15000' " "-- crop area")
+
+    parser.add_argument('-m', '--multilook', action='store_true', dest='multilook', default=False,
+                    help = 'Multilook the merged products. True or False')
+    parser.add_argument('-z', '--azimuth_looks', dest='azimuthLooks', type=str, default='3'
+                        , help='Number of looks in azimuth. -- Default : 3')
+
+    parser.add_argument('-r', '--range_looks', dest='rangeLooks', type=str, default='9'
+                        , help='Number of looks in range. -- Default : 9')
+
+    parser.add_argument('-t', '--multilook_tool', dest='multilook_tool', type=str, default='gdal'
+                        , help='Multilooking tool: gdal or isce')
+
 
     return parser
+
+
+def cropSLC(inps):
+
+    ds = gdal.Open(inps.input + '.vrt', gdal.GA_ReadOnly)
+    inp_file = ds.GetRasterBand(1).ReadAsArray()
+    inp_file = inp_file[inps.first_row:inps.last_row, inps.first_col:inps.last_col]
+    del ds
+
+    out_map = np.memmap(inps.output, dtype=np.complex64, mode='write', shape=(inps.n_lines, inps.width))
+    out_map[:, :] = inp_file
+
+    out_img = isceobj.createSlcImage()
+    out_img.setAccessMode('read')
+    out_img.setFilename(inps.output)
+    out_img.setWidth(inps.width)
+    out_img.setLength(inps.n_lines)
+    out_img.renderVRT()
+    out_img.renderHdr()
+
+    del out_map
+    cmd = 'gdal_translate -of ENVI ' + inps.output + '.vrt ' + inps.output
+    os.system(cmd)
+
+    return inps
+
+def cropQualitymap(inps):
+
+    img = isceobj.createImage()
+    img.load(inps.input + '.xml')
+    bands = img.bands
+    data_type = IML.NUMPY_type(img.dataType)
+    scheme = img.scheme
+
+    ds = gdal.Open(inps.input + '.vrt', gdal.GA_ReadOnly)
+    inp_file = ds.GetRasterBand(1).ReadAsArray()
+    inp_file = inp_file[inps.first_row:inps.last_row, inps.first_col:inps.last_col]
+
+    if bands == 2:
+        inp_file2 = ds.GetRasterBand(2).ReadAsArray()
+        inp_file2 = inp_file2[inps.first_row:inps.last_row, inps.first_col:inps.last_col]
+    del ds, img
+
+    if not (inp_file.shape[0] == inps.n_lines and inp_file.shape[1] == inps.width):
+
+        out_map = IML.memmap(inps.output, mode='write', nchannels=bands,
+                             nxx=inps.width, nyy=inps.n_lines, scheme=scheme, dataType=data_type)
+
+        if bands == 2:
+            out_map.bands[0][0::, 0::] = inp_file
+            out_map.bands[1][0::, 0::] = inp_file2
+        else:
+            out_map.bands[0][0::, 0::] = inp_file
+
+        IML.renderISCEXML(inps.output, bands,
+                          inps.n_lines, inps.width,
+                          data_type, scheme)
+
+        out_img = isceobj.createImage()
+        out_img.load(inps.output + '.xml')
+        out_img.imageType = data_type
+        out_img.renderHdr()
+        out_img.renderVRT()
+        try:
+            out_map.bands[0].base.base.flush()
+        except:
+            pass
+
+        del out_map
+
+        cmd = 'gdal_translate -of ENVI ' + inps.output + '.vrt ' + inps.output
+        os.system(cmd)
+
+    return inps
+
 
 
 def command_line_parse(iargs=None):
@@ -45,6 +126,7 @@ def command_line_parse(iargs=None):
     return inps
 
 
+
 def main(iargs=None):
     """
     Crops SLC images from Isce merged/SLC directory.
@@ -52,110 +134,33 @@ def main(iargs=None):
 
     inps = command_line_parse(iargs)
 
-    logger_crop.log(loglevel.INFO, os.path.basename(sys.argv[0]) + " " + sys.argv[1])
-    inps.template = Template(inps.custom_template_file).get_options()
+    crop_area = [val for val in inps.bbox.split()]
+    if len(crop_area) != 4:
+        raise Exception('Bbox should contain 4 floating point values')
 
-    project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
-    project_dir = os.getenv('SCRATCHDIR')+ '/' + project_name
-    slave_dir = project_dir + '/merged/SLC'
-    geo_master_dir = project_dir + '/merged/geom_master'
-    slc_list = os.listdir(slave_dir)
-    
 
-    lon_west = float(inps.template['lon1'])
-    lon_east = float(inps.template['lon2'])
-    lat_south = float(inps.template['lat1'])
-    lat_north = float(inps.template['lat2'])
+    inps.first_row = np.int(crop_area[0])
+    inps.last_row = np.int(crop_area[1])
+    inps.first_col = np.int(crop_area[2])
+    inps.last_col = np.int(crop_area[3])
 
-    azimuth_lks = inps.template['sentinelStack.azimuthLooks']
-    range_lks = inps.template['sentinelStack.rangeLooks']
-    
-    if os.path.isfile(project_dir + '/merged/cropped.npy'):
-        print('Some or all are cropped, checking for remaining...')
-        crop_area = np.load(project_dir + '/merged/cropped.npy')
+    inps.n_lines = inps.last_row - inps.first_row
+    inps.width = inps.last_col - inps.first_col
+
+
+    if 'slc' in inps.output:
+
+        inps = cropSLC(inps)
     else:
-        crop_area = np.array(convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east, status='Full'))
-    first_row = np.int(crop_area[0])
-    last_row = np.int(crop_area[1])
-    first_col = np.int(crop_area[2])
-    last_col = np.int(crop_area[3])
+        inps = cropQualitymap(inps)
 
-    n_lines = last_row - first_row
-    width = last_col - first_col
 
-    
-    for slc in slc_list:
-        filename = os.path.join(slave_dir, slc, slc + '.slc.full')
+    if inps.multilook:
+        print('multilooking')
+        multilook(inps.input, outname=inps.output+'.ml',
+                  alks=inps.azimuthLooks, rlks=inps.rangeLooks,
+                  multilook_tool=inps.multilook_tool, no_data=None)
 
-        ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
-        inp_file = ds.GetRasterBand(1).ReadAsArray()
-        del ds
-        if not(inp_file.shape[0]==n_lines and inp_file.shape[1]==width):
-
-            out_map = np.memmap(filename, dtype=np.complex64, mode='r+', shape=(n_lines, width))
-            out_map[:, :] = inp_file[first_row:last_row, first_col:last_col]
-
-            out_img = isceobj.createSlcImage()
-            out_img.setAccessMode('write')
-            out_img.setFilename(filename)
-            out_img.setWidth(width)
-            out_img.setLength(n_lines)
-            out_img.renderVRT()
-            out_img.renderHdr()
-
-            del out_map
-            cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
-            os.system(cmd)
-
-    list_geo = ['hgt', 'lat', 'lon', 'los', 'shadowMask','incLocal']
-
-    for t in list_geo:
-        filename = os.path.join(geo_master_dir, t + '.rdr.full')
-
-        img = isceobj.createImage()
-        img.load(filename + '.xml')
-        bands = img.bands
-        data_type = IML.NUMPY_type(img.dataType)
-        scheme = img.scheme
-
-        ds = gdal.Open(filename + '.vrt', gdal.GA_ReadOnly)
-        inp_file = ds.GetRasterBand(1).ReadAsArray()
-
-        if bands == 2:
-            inp_file2 = ds.GetRasterBand(2).ReadAsArray()
-        del ds, img
-
-        if not (inp_file.shape[0] == n_lines and inp_file.shape[1] == width):
-
-            out_map = IML.memmap(filename, mode='r+', nchannels=bands,
-                            nxx=width, nyy=n_lines, scheme=scheme, dataType=data_type)
-
-            if bands == 2:
-                out_map.bands[0][:, :] = inp_file[first_row:last_row, first_col:last_col]
-                out_map.bands[1][:, :] = inp_file2[first_row:last_row, first_col:last_col]
-            else:
-                out_map.bands[0][:, :] = inp_file[first_row:last_row, first_col:last_col]
-
-            IML.renderISCEXML(filename, bands,
-                            n_lines, width,
-                            data_type, scheme)
-
-            out_img = isceobj.createImage()
-            out_img.load(filename + '.xml')
-            out_img.imageType = data_type
-            out_img.renderHdr()
-            try:
-                out_map.bands[0].base.base.flush()
-            except:
-                pass
-
-            cmd = 'gdal_translate -of ENVI ' + filename + '.vrt ' + filename
-            os.system(cmd)
-
-            multilook(filename, outname=filename.split('.full')[0],
-                      alks=azimuth_lks, rlks=range_lks,
-                      multilook_tool='isce', no_data=None)
-    np.save(project_dir + '/merged/cropped.npy', crop_area)
 
 if __name__ == '__main__':
     '''

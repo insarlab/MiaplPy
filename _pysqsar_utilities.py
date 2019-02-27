@@ -12,15 +12,15 @@ from scipy.optimize import minimize, Bounds
 import gdal
 import isce
 import isceobj
-sys.path.insert(0, os.getenv('RSMAS_ISCE'))
-from rsmas_logging import rsmas_logger, loglevel
+#sys.path.insert(0, os.getenv('RSMAS_ISCE'))
+#from rsmas_logging import rsmas_logger, loglevel
 
-logfile_name = os.getenv('OPERATIONS') + '/LOGS/squeesar.log'
-logger_pysq = rsmas_logger(file_name=logfile_name)
+#logfile_name = os.getenv('OPERATIONS') + '/LOGS/squeesar.log'
+#logger_pysq = rsmas_logger(file_name=logfile_name)
 
 
-def send_logger_squeesar():
-    return logger_pysq
+#def send_logger_squeesar():
+#    return logger_pysq
 
 ######################################################################################
 
@@ -28,62 +28,36 @@ def send_logger_squeesar():
 def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east, status='multilook'):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
-    if status == 'multilook':
-        ds = gdal.Open(geo_master_dir + '/lat.rdr.vrt', gdal.GA_ReadOnly)
-        lat = ds.GetRasterBand(1).ReadAsArray()
-        del ds
-        ds = gdal.Open(geo_master_dir + "/lon.rdr.vrt", gdal.GA_ReadOnly)
-        lon = ds.GetRasterBand(1).ReadAsArray()
-        del ds
-    else:
-        ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
-        lat = ds.GetRasterBand(1).ReadAsArray()
-        del ds
-        ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
-        lon = ds.GetRasterBand(1).ReadAsArray()
-        del ds
+    ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
+    lat = ds.GetRasterBand(1).ReadAsArray()
+    del ds
 
-    length = lat.shape[0]
-    width = lat.shape[1]
+    idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
+    lat_c = np.int(np.mean(idx_lat[0]))
 
-    x_factor = 10*np.abs((lon[0,-1]-lon[0,0])/width)
-    y_factor = 10*np.abs((lat[0,0]-lat[-1,0])/length)
-    
-    ymin1 = lat_south - y_factor;  ymax1 = lat_south + y_factor
-    ymin2 = lat_north - y_factor;  ymax2 = lat_north + y_factor
-    xmin1 = lon_west - x_factor;  xmax1 = lon_west + x_factor
-    xmin2 = lon_east - x_factor;  xmax2 = lon_east + x_factor
-    mask_y_min = np.multiply(lat >= ymin1, lat <= ymax1)
-    mask_y_max = np.multiply(lat >= ymin2, lat <= ymax2)
-    mask_x_min = np.multiply(lon >= xmin1, lon <= xmax1)
-    mask_x_max = np.multiply(lon >= xmin2, lon <= xmax2)
-    
-    mask_yx_east_south = np.multiply(mask_y_min, mask_x_min)
-    mask_yx_west_south = np.multiply(mask_y_min, mask_x_max)
-    mask_yx_east_north = np.multiply(mask_y_max, mask_x_min)
-    mask_yx_west_north = np.multiply(mask_y_max, mask_x_max)
-    row_1, col_1 = np.nanmean(np.where(mask_yx_east_south), axis=1)
-    row_2, col_2 = np.nanmean(np.where(mask_yx_west_south), axis=1)
-    row_3, col_3 = np.nanmean(np.where(mask_yx_east_north), axis=1)
-    row_4, col_4 = np.nanmean(np.where(mask_yx_west_north), axis=1)
-    last_row = np.rint(np.nanmax([row_1,row_2,row_3,row_4])).astype(int)
-    first_row = np.rint(np.nanmin([row_1,row_2,row_3,row_4])).astype(int)
-    last_col = np.rint(np.nanmax([col_1,col_2,col_3,col_4])).astype(int)
-    first_col = np.rint(np.nanmin([col_1,col_2,col_3,col_4])).astype(int)
-    
-    #center_sample = int(width / 2)
-    #center_line = int(length / 2)
-    
-    #lat_center_sample = lat[:, center_sample]
-    #lon_center_line = lon[center_line, :]
-    #lat_min = lat_center_sample - lat_south
-    #lat_max = lat_center_sample - lat_north
-    #lon_min = lon_center_line - lon_west
-    #lon_max = lon_center_line - lon_east
-    #first_row = [index for index in range(len(lat_min)) if np.abs(lat_min[index]) == np.min(np.abs(lat_min))]
-    #last_row = [index for index in range(len(lat_max)) if np.abs(lat_max[index]) == np.min(np.abs(lat_max))]
-    #first_col = [index for index in range(len(lon_min)) if np.abs(lon_min[index]) == np.min(np.abs(lon_min))]
-    #last_col = [index for index in range(len(lon_max)) if np.abs(lon_max[index]) == np.min(np.abs(lon_max))]
+    ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
+    lon = ds.GetRasterBand(1).ReadAsArray()
+    lon = lon[lat_c,:]
+    del ds
+
+
+    idx_lon = np.where((lon >= lon_west) & (lon <= lon_east))
+
+
+    lon_c = np.int(np.mean(idx_lon))
+
+
+    lat = lat[:,lon_c]
+
+    idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
+
+
+
+    first_row = np.min(idx_lat)
+    last_row = np.max(idx_lat)
+    first_col = np.min(idx_lon)
+    last_col = np.max(idx_lon)
+
     image_coord = [first_row, last_row, first_col, last_col]
 
     
@@ -232,7 +206,14 @@ def PTA_L_BFGS(xm):
         out = np.zeros([n,1])
         out[1::,0] = res.x
         out = np.unwrap(out,np.pi,axis=0)
-        return out
+
+        phase_ref = np.matrix(out)
+        phase_init = np.triu(np.angle(coh), 1)
+        phase_optimized = np.triu(np.angle(np.matmul(np.exp(-1j * phase_ref), (np.exp(-1j * phase_ref)).getH())), 1)
+        gam_pta = pysq.gam_pta_f(phase_init, phase_optimized)
+
+        return out, gam_pta
+
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from PTA to EVD')
         return EVD_phase_estimation(coh)
@@ -250,13 +231,13 @@ def EVD_phase_estimation(coh0):
     x0 = x0 - x0[0,0]
     x0 = np.unwrap(x0,np.pi,axis=0)
     
-    return x0
+    return x0, w[f]
 
 ###############################################################################
 
 
 def EMI_phase_estimation(coh0):
-    """ Estimates the phase values based on EMI decomosition (Homa Ansari paper) """
+    """ Estimates the phase values based on EMI decomosition (Homa Ansari, 2018 paper) """
     
     abscoh = regularize_matrix(np.abs(coh0))
     if np.size(abscoh) == np.size(coh0):
@@ -270,91 +251,9 @@ def EMI_phase_estimation(coh0):
         x0 = np.unwrap(x0,np.pi,axis=0)
         return x0,w[f]
     else:
-        print('warning: coherence matric not positive semidifinite, It is switched from EMI to EVD')
-        return EVD_phase_estimation(coh0), 0
+        print('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
+        return EVD_phase_estimation(coh0)
 
-###############################################################################
-
-
-def CRLB_cov(gama, L):
-    """ Estimates the Cramer Rao Lowe Bound based on coherence=gam and ensemble size = L """
-    
-    B_theta = np.zeros([len(gama),len(gama)-1])
-    B_theta[1::,:] = np.identity(len(gama)-1)
-    X = 2*L*(np.multiply(np.abs(gama),LA.pinv(np.abs(gama)))-np.identity(len(gama)))
-    cov_out = LA.pinv(np.matmul(np.matmul(B_theta.T,(X+np.identity(len(X)))),B_theta))
-    
-    return cov_out
-
-###############################################################################
-
-
-def daysmat(n_img,tmp_bl):
-    """ Builds a temporal baseline matrix """
-    
-    ddays = np.matrix(np.exp(1j*np.arange(n_img)*tmp_bl/10000))
-    days_mat = np.round((np.angle(np.matmul(ddays.getH(),ddays)))*10000)
-    
-    return days_mat
-
-###############################################################################
-
-
-def simulate_phase(n_img=100,tmp_bl=6,deformation_rate=1,lamda=56):
-    """ Simulate Interferogram with constant velocity deformation rate """
-    
-    days_mat = daysmat(n_img,tmp_bl)
-    Ip = days_mat*4*np.pi*deformation_rate/(lamda*365)
-    np.fill_diagonal(Ip, 0)
-    
-    return Ip, days_mat
-
-###############################################################################
-
-
-def simulate_corr(Ip, days_mat,gam0=0.6,gamf=0.2,decorr_days=50):
-    """ Simulate Correlation matrix."""
-    
-    corr_mat = np.multiply((gam0-gamf)*np.exp(-np.abs(days_mat/decorr_days))+gamf,np.exp(1j*Ip))
-    return corr_mat
-
-###############################################################################
-
-
-def est_corr(CCGsam):
-    """ Estimate Correlation matrix from an ensemble."""
-        
-    CCGS = np.matrix(CCGsam)
-    corr_mat = np.matmul(CCGS,CCGS.getH())/CCGS.shape[1]
-    
-    coh = np.multiply(cov2corr(np.abs(corr_mat)),np.exp(1j*np.angle(corr_mat)))
-    
-    return coh
-    
-###############################################################################
-
-
-def custom_cmap(vmin=0,vmax=1):
-    """ create a custom colormap based on visible portion of electromagnetive wave."""
-    
-    from spectrumRGB import rgb
-    rgb=rgb()
-    import matplotlib as mpl
-    cmap = mpl.colors.ListedColormap(rgb)
-    norm = mpl.colors.Normalize(vmin, vmax)
-    
-    return cmap, norm
-   
-###############################################################################
-
-
-def EST_rms(x):
-    """ Estimate Root mean square error."""
-    
-    out = np.sqrt(np.sum(x**2,axis=1)/(np.shape(x)[1]-1))
-    
-    return out
-          
 ###############################################################################
 
 
@@ -373,16 +272,16 @@ def trwin(x):
 ###############################################################################
 
 
-def patch_slice(lin,sam,waz,wra):
+def patch_slice(lin,sam,waz,wra,patch_size=200):
     """ Devides an image into patches of size 300 by 300 by considering the overlay of the size of multilook window."""
     
-    pr1 = np.ogrid[0:lin-50:200]
-    pr2 = pr1+200
+    pr1 = np.ogrid[0:lin-50:patch_size]
+    pr2 = pr1+patch_size
     pr2[-1] = lin
     pr1[1::] = pr1[1::] - 2*waz
 
-    pc1 = np.ogrid[0:sam-50:200]
-    pc2 = pc1+200
+    pc1 = np.ogrid[0:sam-50:patch_size]
+    pc2 = pc1+patch_size
     pc2[-1] = sam
     pc1[1::] = pc1[1::] - 2*wra
     pr = [[pr1], [pr2]]
@@ -410,5 +309,171 @@ def comp_matr(x, y):
     return out
 
 ###############################################################################
+################# Simulation:
 
+
+def simulate_volcano_def_phase(n_img=100, tmp_bl=6):
+    """ Simulate Interferogram with complex deformation signal """
+    t = np.ogrid[0:(tmp_bl * n_img):tmp_bl]
+    nl = int(len(t) / 4)
+    x = np.zeros(len(t))
+    x[0:nl] = -2 * t[0:nl] / 365
+    x[nl:2 * nl] = 2 * (np.log((t[nl:2 * nl] - t[nl - 1]) / 365)) - 3 * (np.log((t[nl] - t[nl - 1]) / 365))
+    x[2 * nl:3 * nl] = 10 * t[2 * nl:3 * nl] / 365 - x[2 * nl - 1] / 2
+    x[3 * nl::] = -2 * t[3 * nl::] / 365
+
+    return t, x
+
+
+def simulate_constant_vel_phase(n_img=100, tmp_bl=6):
+    """ Simulate Interferogram with constant velocity deformation rate """
+    t = np.ogrid[0:(tmp_bl * n_img):tmp_bl]
+    x = t / 365
+
+    return t, x
+
+###############################################################################
+
+
+def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=False):
+    """Simulate a Coherence matrix based on de-correlation rate, phase and dates"""
+    # t: a vector of acquistion times
+    # ph: a vector of simulated phase time-series for one pixel
+    # returns the complex covariance matrix
+    # corr_mat = (gamma0-gammaf)*np.exp(-np.abs(days_mat/decorr_days))+gammaf
+    length = t.shape[0]
+    C = np.ones((length, length), dtype=np.complex64)
+    factor = gamma0 - gammaf
+    if seasonal:
+        f1 = lambda x, y: (x - y) ** 2 - gammaf
+        f2 = lambda x, y: (x + y) ** 2 - gamma0
+        res = double_solve(f1, f2, 0.5, 0.5)
+        A = res[0]
+        B = res[1]
+
+    for ii in range(length):
+        for jj in range(ii + 1, length):
+            if seasonal:
+                factor = (A + B * np.cos(2 * np.pi * t[ii] / 90)) * (A + B * np.cos(2 * np.pi * t[jj] / 90))
+            gamma = factor * (np.exp((t[ii] - t[jj]) / Tau0) + gammaf)
+            C[ii, jj] = gamma * np.exp(1j * (ph[ii] - ph[jj]))
+            C[jj, ii] = np.conj(C[ii, jj])
+
+    return C
+
+################################################################################
+
+
+def simulate_neighborhood_stack(corr_matrix, neighborSamples=300):
+    """Simulating the neighbouring pixels (SHPs) based on a given coherence matrix"""
+
+    numberOfSlc = corr_matrix.shape[0]
+    # A 2D matrix for a neighborhood over time. Each column is the neighborhood complex data for each acquisition date
+
+    neighbor_stack = np.zeros((numberOfSlc, neighborSamples), dtype=np.complex64)
+
+    for ii in range(neighborSamples):
+        cpxSLC = simulate_noise(corr_matrix)
+        neighbor_stack[:,ii] = cpxSLC
+    return neighbor_stack
+
+##############################################################################
+
+
+def double_solve(f1,f2,x0,y0):
+    """Solve for two equation with two unknowns using iterations"""
+
+    from scipy.optimize import fsolve
+    func = lambda x: [f1(x[0], x[1]), f2(x[0], x[1])]
+    return fsolve(func,[x0,y0])
+
+###############################################################################
+
+
+def est_corr(CCGsam):
+    """ Estimate Correlation matrix from an ensemble."""
+
+    CCGS = np.matrix(CCGsam)
+
+    corr_mat = np.matmul(CCGS, CCGS.getH()) / CCGS.shape[1]
+
+    coh = np.multiply(cov2corr(np.abs(corr_mat)), np.exp(1j * np.angle(corr_mat)))
+
+    return coh
+
+###############################################################################
+
+
+def custom_cmap(vmin=0, vmax=1):
+    """ create a custom colormap based on visible portion of electromagnetive wave."""
+
+    from spectrumRGB import rgb
+    rgb = rgb()
+    import matplotlib as mpl
+    cmap = mpl.colors.ListedColormap(rgb)
+    norm = mpl.colors.Normalize(vmin, vmax)
+
+    return cmap, norm
+
+###############################################################################
+
+
+def EST_rms(x):
+    """ Estimate Root mean square error."""
+
+    out = np.sqrt(np.sum(x ** 2, axis=1) / (np.shape(x)[1] - 1))
+
+    return out
+
+###############################################################################
+
+
+def phase_linking_process(ccg_sample, stepp, method, squeez=True):
+    """Inversion of phase based on a selected method among PTA, EVD and EMI """
+
+    coh_mat = pysq.est_corr(ccg_sample)
+    if 'PTA' in method:
+        ph_EMI, La = pysq.EMI_phase_estimation(coh_mat)
+        xm = np.zeros([len(ph_EMI), len(ph_EMI) + 1]) + 0j
+        xm[:, 0:1] = np.reshape(ph_EMI, [len(ph_EMI), 1])
+        xm[:, 1::] = coh_mat[:, :]
+        res, La = pysq.PTA_L_BFGS(xm)
+
+    elif 'EMI' in method:
+        res, La = pysq.EMI_phase_estimation(coh_mat)
+    else:
+        res, La = pysq.EVD_phase_estimation(coh_mat)
+
+    res = res.reshape(len(res), 1)
+
+
+    if squeez:
+        squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, 0])
+        return res, La, squeezed
+    else:
+        return res, La
+
+
+def squeez_im(ph, ccg):
+    """Squeeze a stack of images in to one (PCA)"""
+
+    vm = np.matrix(np.exp(1j * ph) / LA.norm(np.exp(1j * ph)))
+    squeezed = np.matmul(np.conjugate(vm), ccg)
+    return squeezed
+
+
+###############################################################################
+
+def CRLB_cov(gama, L):
+    """ Estimates the Cramer Rao Lowe Bound based on coherence=gam and ensemble size = L """
+
+    B_theta = np.zeros([len(gama), len(gama) - 1])
+    B_theta[1::, :] = np.identity(len(gama) - 1)
+    X = 2 * L * (np.multiply(np.abs(gama), LA.pinv(np.abs(gama))) - np.identity(len(gama)))
+    cov_out = LA.pinv(np.matmul(np.matmul(B_theta.T, (X + np.identity(len(X)))), B_theta))
+
+    return cov_out
+
+
+###############################################################################
 

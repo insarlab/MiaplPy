@@ -15,24 +15,20 @@ import pandas as pd
 from scipy.stats import anderson_ksamp
 from skimage.measure import label
 from dask import compute, delayed
-sys.path.insert(0, os.getenv('RSMAS_ISCE'))
-from dataset_template import Template
 
 
 #################################
-EXAMPLE = """example:
-  PSQ_sentinel.py LombokSenAT156VV.template -p PATCH5_11
-"""
-
-
 def create_parser():
     """ Creates command line argument parser object. """
 
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, epilog=EXAMPLE)
+    parser = argparse.ArgumentParser(description='Crops the scene given bounding box in lat/lon')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-    parser.add_argument('custom_template_file', nargs='?',
-                        help='custom template with option settings.\n')
-    parser.add_argument('-p','--patchdir', dest='patch_dir', type=str, required=True, help='patch file directory')
+    parser.add_argument('-p','--patch_dir', dest='patch_dir', type=str, required=True, help='patch file directory')
+    parser.add_argument('-r', '--range_window', dest='range_win', type=str, default='21'
+                        , help='SHP searching window size in range direction. -- Default : 21')
+    parser.add_argument('-a', '--azimuth_window', dest='azimuth_win', type=str, default='15'
+                        , help='SHP searching window size in azimuth direction. -- Default : 15')
+    parser.add_argument('-m', '--plmethod', dest='phase_linking_method', type=str, default='sequential_EMI', help='Phase linking method')
 
     return parser
 
@@ -44,72 +40,23 @@ def command_line_parse(args):
     inps = parser.parse_args(args)
     return inps
 
-################################################
-def sequential_process(ccg_sample, stepp, method, squeez=True):
-
-
-    coh_mat = pysq.est_corr(ccg_sample)
-    if method == 'PTA':
-        ph_EMI = pysq.EMI_phase_estimation(coh_mat)
-        xm = np.zeros([len(ph_EMI),len(ph_EMI)+1])+0j
-        xm[:,0:1] = np.reshape(ph_EMI,[len(ph_EMI),1])
-        xm[:,1::] = coh_mat[:,:]
-        res = pysq.PTA_L_BFGS(xm)
-        La = 0
-    elif method == 'EMI':
-        res,La = pysq.EMI_phase_estimation(coh_mat)
-    else:
-        res = pysq.EVD_phase_estimation(coh_mat)
-        La = 0
-        
-    res = res.reshape(len(res),1)
-
-    if squeez:
-        squeezed = squeez_im(res[stepp::,0], ccg_sample[stepp::,0])
-        return res,La, squeezed
-    else:
-        return res,La
-
-
-def squeez_im(ph, ccg):
-    vm = np.matrix(np.exp(1j * ph) / LA.norm(np.exp(1j * ph)))
-    squeezed = np.matmul(np.conjugate(vm), ccg)
-    return squeezed
-
-
-###################################
 
 def main(iargs=None):
 
     inps = command_line_parse(iargs)
+    count_dim = np.load(inps.patch_dir+'/count.npy')
+    inps.n_image = count_dim[0]
+    inps.lin = count_dim[1]
+    inps.sam = count_dim[2]
 
-    inps.project_name = os.path.basename(inps.custom_template_file).partition('.')[0]
-    inps.project_dir = os.getenv('SCRATCHDIR') + '/' + inps.project_name
-    inps.scratch_dir = os.getenv('SCRATCHDIR')
-    
-    inps.slave_dir = inps.project_dir + '/merged/SLC'
-    inps.sq_dir = inps.project_dir + '/SqueeSAR'
-    inps.list_slv = os.listdir(inps.slave_dir)
-    inps.n_image = len(inps.list_slv)
-    inps.work_dir = inps.sq_dir +'/'+ inps.patch_dir
-    
-    inps.patch_rows = np.load(inps.sq_dir + '/rowpatch.npy')
-    inps.patch_cols = np.load(inps.sq_dir + '/colpatch.npy')
-    patch_row, patch_col = inps.patch_dir.split('PATCH')[1].split('_')
-    patch_row, patch_col = (int(patch_row), int(patch_col))
-
-    inps.lin = inps.patch_rows[1][0][patch_row] - inps.patch_rows[0][0][patch_row]
-    inps.sam = inps.patch_cols[1][0][patch_col] - inps.patch_cols[0][0][patch_col]
-    
-    inps.range_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizerange'])
-    inps.azimuth_win = int(Template(inps.custom_template_file).get_options()['squeesar.wsizeazimuth'])
-
+    inps.range_win = int(inps.range_win)
+    inps.azimuth_win = int(inps.azimuth_win)
 
     ###################### Find SHPs ###############################
 
-    rslc = np.memmap(inps.work_dir + '/RSLC', dtype=np.complex64, mode='r', shape=(inps.n_image, inps.lin, inps.sam))
+    rslc = np.memmap(inps.patch_dir + '/RSLC', dtype=np.complex64, mode='r', shape=(inps.n_image, inps.lin, inps.sam))
 
-    if not os.path.isfile(inps.work_dir + '/SHP.pkl'):
+    if not os.path.isfile(inps.patch_dir + '/SHP.pkl'):
 
         if inps.n_image < 20:
             num_slc = inps.n_image
@@ -179,7 +126,7 @@ def main(iargs=None):
                 shp_df.at[item,'pixeltype'] = 'Unknown'
 
 
-        shp_df.to_pickle(inps.work_dir + '/SHP.pkl')
+        shp_df.to_pickle(inps.patch_dir + '/SHP.pkl')
 
         timep = time.time() - time0
 
@@ -187,137 +134,202 @@ def main(iargs=None):
 
     else:
 
-        shp_df = pd.read_pickle(inps.work_dir + '/SHP.pkl')
+        shp_df = pd.read_pickle(inps.patch_dir + '/SHP.pkl')
 
         print('SHP Exists ...')
 
-    ###################### Sequential Phase linking ###############################
-    time0 = time.time()
+    ###################### Phase linking inversion ###############################
 
-    shp_df = shp_df.loc[shp_df['pixeltype']=='DS']
 
-    num_seq = np.int(np.floor(inps.n_image / 10))
-  
-    if os.path.isfile(inps.work_dir + '/num_processed.npy'):
-        num_image_processed = np.load(inps.work_dir + '/num_processed.npy')[0]
-        if num_image_processed == inps.n_image:
-            doprocess = False
+    if 'sequential' in inps.phase_linking_method:
+
+        time0 = time.time()
+
+        #shp_df = shp_df_0.loc[shp_df['pixeltype']=='DS']
+
+        num_seq = np.int(np.floor(inps.n_image / 10))
+
+        if os.path.isfile(inps.patch_dir + '/num_processed.npy'):
+            num_image_processed = np.load(inps.patch_dir + '/num_processed.npy')[0]
+            if num_image_processed == inps.n_image:
+                doprocess = False
+            else:
+                doprocess = True
         else:
+            num_image_processed = 0
             doprocess = True
+
+        if doprocess:
+
+            if os.path.isfile(inps.patch_dir + '/RSLC_ref'):
+                rslc_ref = np.memmap(inps.patch_dir + '/RSLC_ref', dtype='complex64', mode='r+',
+                                     shape=(inps.n_image, inps.lin, inps.sam))
+
+            else:
+                rslc_ref = np.memmap(inps.patch_dir + '/RSLC_ref', dtype='complex64', mode='w+',
+                                     shape=(inps.n_image, inps.lin, inps.sam))
+                rslc_ref[num_image_processed::,:,:] = rslc[num_image_processed::,:,:]
+
+            datumshift = np.zeros([num_seq, rslc.shape[1], rslc.shape[2]])
+
+            if os.path.isfile(inps.patch_dir + '/datum_shift.npy'):
+                datumshift_old = np.load(inps.patch_dir + '/datum_shift.npy')
+                step_0 = datumshift.shape[0] - 1
+            else:
+                datumshift_old = np.zeros([num_seq,rslc.shape[1],rslc.shape[2]])
+                step_0 = 0
+
+
+            if os.path.isfile(inps.patch_dir + '/quality'):
+                quality = np.memmap(inps.patch_dir + '/quality', dtype='float32', mode='r+',shape=(inps.lin, inps.sam))
+            else:
+                quality = np.memmap(inps.patch_dir + '/quality', dtype='float32', mode='w+',shape=(inps.lin, inps.sam))
+                quality[:,:] = -1
+
+            for item in range(len(shp_df)):
+
+                ref_row, ref_col = (shp_df.at[item,'ref_pixel'][0], shp_df.at[item,'ref_pixel'][1])
+                rr = shp_df.at[item,'rows'].astype(int)
+                cc = shp_df.at[item,'cols'].astype(int)
+
+                CCG = np.matrix(1.0 * np.arange(inps.n_image * len(rr)).reshape(inps.n_image, len(rr)))
+                CCG = np.exp(1j * CCG)
+                CCG[:, :] = np.matrix(rslc[:, rr, cc])
+                phase_ref = np.zeros([inps.n_image,1])
+                phase_ref[:,:] = np.angle(rslc_ref[:,ref_row,ref_col]).reshape(inps.n_image,1)
+
+                if shp_df.at[item,'pixeltype']=='Unknown':
+                    amp_ps = np.abs(rslc_ref[:,ref_row,ref_col]).reshape(inps.n_image,1)
+                    DA = np.std(amp_ps)/np.mean(amp_ps)
+                    if DA < 0.25:
+                        Laq = 1
+                else:
+
+                    if not step_0 == 0:
+                        squeezed_pixels = np.complex64(np.zeros([step_0, len(rr)]))
+                        for seq in range(0, step_0):
+                            squeezed_pixels[seq, :] = pysq.squeez_im(phase_ref[seq * 10:seq * 10 + 10, 0],
+                                                                CCG[seq * 10:seq * 10 + 10, :])
+                    Laq = quality[ref_row,ref_col]
+
+                    if num_seq == 0 or num_seq == 1:
+                        first_line = 0
+                        last_line = inps.n_image
+                        num_lines = last_line - first_line
+                        ccg_sample = CCG[first_line:last_line, :]
+                        res, La, squeezed_pixels = pysq.phase_linking_process(ccg_sample, 0, inps.phase_linking_method)
+                        phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
+                        Laq = np.max([La[0], Laq])
+
+                    else:
+
+                        for stepp in range(step_0, num_seq):
+
+                            first_line = stepp * 10
+                            if stepp == num_seq - 1:
+                                last_line = inps.n_image
+                            else:
+                                last_line = first_line + 10
+                            num_lines = last_line - first_line
+
+                            if stepp == 0:
+
+                                ccg_sample = CCG[first_line:last_line, :]
+                                res,La, squeezed_pixels = pysq.phase_linking_process(ccg_sample, 0, inps.phase_linking_method)
+                                phase_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
+
+                            else:
+
+                                ccg_sample = np.zeros([1 + num_lines, CCG.shape[1]]) + 1j
+                                ccg_sample[0:1, :] = np.complex64(squeezed_pixels[-1, :])
+                                ccg_sample[1::, :] = CCG[first_line:last_line, :]
+                                res,La, squeezed_p = pysq.phase_linking_process(ccg_sample, 1, inps.phase_linking_method)
+                                phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
+                                squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
+                            Laq = np.max([La[0],Laq])
+                        res_d,Lad = pysq.phase_linking_process(squeezed_pixels, 0, inps.phase_linking_method, squeez=False)
+
+                        for stepp in range(step_0, len(res_d)):
+                            first_line = stepp * 10
+                            if stepp == num_seq - 1:
+                                last_line = inps.n_image
+                            else:
+                                last_line = first_line + 10
+                            num_lines = last_line - first_line
+
+                            phase_ref[first_line:last_line, 0:1] = (
+                                        phase_ref[first_line:last_line, 0:1] + np.matrix(res_d[int(stepp)]) - datumshift_old[
+                                    int(stepp),ref_row,ref_col]).reshape(num_lines, 1)
+
+                amp_ref = np.array(np.mean(np.abs(CCG), axis=1))
+                ph_ref = np.array(phase_ref)
+
+
+
+                rslc_ref[:,ref_row:ref_row+1,ref_col:ref_col+1] = np.complex64(np.multiply(amp_ref, np.exp(1j * ph_ref))).reshape(inps.n_image,1,1)
+
+
+                quality[ref_row:ref_row+1, ref_col:ref_col+1] = Laq
+
+                if num_seq > 1:
+                    datumshift[:, ref_row:ref_row + 1, ref_col:ref_col + 1] = res_d.reshape(num_seq, 1, 1)
+
+
+            np.save(inps.patch_dir + '/num_processed.npy', [inps.n_image,inps.lin,inps.sam])
+            np.save(inps.patch_dir + '/datum_shift.npy', datumshift)
+
+            del rslc_ref, rslc, quality
+
+            timep = time.time() - time0
+            print('time spent to do sequential phase linking {}: min'.format(timep/60))
+
+
     else:
-        doprocess = True
+        time0 = time.time()
 
-    if doprocess:
+        #shp_df = shp_df_0.loc[shp_df['pixeltype'] == 'DS']
 
-        if os.path.isfile(inps.work_dir + '/RSLC_ref'):
-            rslc_ref = np.memmap(inps.work_dir + '/RSLC_ref', dtype='complex64', mode='r+',
-                                 shape=(inps.n_image, inps.lin, inps.sam))
+        rslc_ref = np.memmap(inps.patch_dir + '/RSLC_ref', dtype='complex64', mode='w+',
+                             shape=(inps.n_image, inps.lin, inps.sam))
+        rslc_ref[:, :, :] = rslc[:, :, :]
 
-        else:
-            rslc_ref = np.memmap(inps.work_dir + '/RSLC_ref', dtype='complex64', mode='w+',
-                                 shape=(inps.n_image, inps.lin, inps.sam))
-            rslc_ref[num_image_processed::,:,:] = rslc[num_image_processed::,:,:]
-
-        datumshift = np.zeros([num_seq, rslc.shape[1], rslc.shape[2]])
-
-        if os.path.isfile(inps.work_dir + '/datum_shift.npy'):
-            datumshift_old = np.load(inps.work_dir + '/datum_shift.npy')
-            step_0 = datumshift.shape[0] - 1
-        else:
-            datumshift_old = np.zeros([num_seq,rslc.shape[1],rslc.shape[2]])
-            step_0 = 0
-
-
-        method = 'EMI'
-
-        if os.path.isfile(inps.work_dir + '/quality'):
-            quality = np.memmap(inps.work_dir + '/quality', dtype='float32', mode='r+',shape=(inps.lin, inps.sam))
-        else:
-            quality = np.memmap(inps.work_dir + '/quality', dtype='float32', mode='w+',shape=(inps.lin, inps.sam))
+        quality = np.memmap(inps.patch_dir + '/quality', dtype='float32', mode='w+', shape=(inps.lin, inps.sam))
+        quality[:,:] = -1
 
         for item in range(len(shp_df)):
-            
-            ref_row, ref_col = (shp_df.at[item,'ref_pixel'][0], shp_df.at[item,'ref_pixel'][1])
-            rr = shp_df.at[item,'rows'].astype(int)
-            cc = shp_df.at[item,'cols'].astype(int)
-
+            ref_row, ref_col = (shp_df.at[item, 'ref_pixel'][0], shp_df.at[item, 'ref_pixel'][1])
+            rr = shp_df.at[item, 'rows'].astype(int)
+            cc = shp_df.at[item, 'cols'].astype(int)
             CCG = np.matrix(1.0 * np.arange(inps.n_image * len(rr)).reshape(inps.n_image, len(rr)))
             CCG = np.exp(1j * CCG)
             CCG[:, :] = np.matrix(rslc[:, rr, cc])
-            phase_ref = np.zeros([inps.n_image,1])
-            phase_ref[:,:] = np.angle(rslc_ref[:,ref_row,ref_col]).reshape(inps.n_image,1)
+            phase_ref = np.zeros([inps.n_image, 1])
+            phase_ref[:, :] = np.angle(rslc_ref[:, ref_row, ref_col]).reshape(inps.n_image, 1)
 
-            if not step_0 == 0:
-                squeezed_pixels = np.complex64(np.zeros([step_0, len(rr)]))
-                for seq in range(0, step_0):
-                    squeezed_pixels[seq, :] = squeez_im(phase_ref[seq * 10:seq * 10 + 10, 0],
-                                                        CCG[seq * 10:seq * 10 + 10, :])
-            Laq = quality[ref_row,ref_col]
-            for stepp in range(step_0, num_seq):
-               
-                first_line = stepp * 10
-                if stepp == num_seq - 1:
-                    last_line = inps.n_image
-                else:
-                    last_line = first_line + 10
-                num_lines = last_line - first_line
-
-                if stepp == 0:
-
-                    ccg_sample = CCG[first_line:last_line, :]
-                    res,La, squeezed_pixels = sequential_process(ccg_sample, 0, method)
-                    phase_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
-
-                else:
-
-                    ccg_sample = np.zeros([1 + num_lines, CCG.shape[1]]) + 1j
-                    ccg_sample[0:1, :] = np.complex64(squeezed_pixels[-1, :])
-                    ccg_sample[1::, :] = CCG[first_line:last_line, :]
-                    res,La, squeezed_p = sequential_process(ccg_sample, 1, method)
-                    phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
-                    squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
-                Laq = np.max([La,Laq])
-            res_d,Lad = sequential_process(squeezed_pixels, 0, method, squeez=False)
-
-            for stepp in range(step_0, len(res_d)):
-                first_line = stepp * 10
-                if stepp == num_seq - 1:
-                    last_line = inps.n_image
-                else:
-                    last_line = first_line + 10
-                num_lines = last_line - first_line
-
-                phase_ref[first_line:last_line, 0:1] = (
-                            phase_ref[first_line:last_line, 0:1] + np.matrix(res_d[int(stepp)]) - datumshift_old[
-                        int(stepp),ref_row,ref_col]).reshape(num_lines, 1)
-
-            #phase_ref = np.matrix(phase_ref)
-            #phase_init = np.triu(np.angle(np.matmul(CCG, CCG.getH()) / (len(rr))), 1)
-            #phase_optimized = np.triu(
-            #    np.angle(np.matmul(np.exp(-1j * phase_ref), (np.exp(-1j * phase_ref)).getH())), 1)
-            #gam_pta = pysq.gam_pta_f(phase_init, phase_optimized)
-
-            if  Laq < 1.03:
-                amp_ref = np.array(np.mean(np.abs(CCG), axis=1))
-                ph_ref = np.array(phase_ref)
+            if shp_df.at[item, 'pixeltype'] == 'Unknown':
+                amp_ps = np.abs(rslc_ref[:, ref_row, ref_col]).reshape(inps.n_image, 1)
+                DA = np.std(amp_ps) / np.mean(amp_ps)
+                if DA < 0.25:
+                    Laq = 1
             else:
-                amp_ref = np.abs(rslc[:, ref_row, ref_col]).reshape(inps.n_image, 1)
-                ph_ref = np.angle(rslc[:, ref_row, ref_col]).reshape(inps.n_image, 1) - np.angle(rslc[0, ref_row, ref_col])
+
+                res, Laq = pysq.phase_linking_process(CCG, 0, inps.phase_linking_method, squeez=False)
+                phase_ref[:, 0:1] = res.reshape(inps.n_image, 1)
+
+            quality[ref_row:ref_row+1,ref_col:ref_col+1] = Laq
 
 
-            rslc_ref[:,ref_row:ref_row+1,ref_col:ref_col+1] = np.complex64(np.multiply(amp_ref, np.exp(1j * ph_ref))).reshape(inps.n_image,1,1)
-            
-            datumshift[:, ref_row:ref_row+1, ref_col:ref_col+1] = res_d.reshape(num_seq, 1, 1)
-            quality[ref_row:ref_row+1, ref_col:ref_col+1] = Laq
+            amp_ref = np.array(np.mean(np.abs(CCG), axis=1))
+            ph_ref = np.array(phase_ref)
 
 
-        np.save(inps.work_dir + '/num_processed.npy', [inps.n_image,inps.lin,inps.sam])
-        np.save(inps.work_dir + '/datum_shift.npy', datumshift)
-        
+            rslc_ref[:, ref_row:ref_row + 1, ref_col:ref_col + 1] = np.complex64(
+                np.multiply(amp_ref, np.exp(1j * ph_ref))).reshape(inps.n_image, 1, 1)
+
         del rslc_ref, rslc, quality
 
         timep = time.time() - time0
-        print('time spent to do sequential phase linking {}: min'.format(timep/60))
+        print('time spent to do phase linking {}: min'.format(timep / 60))
 
 if __name__ == '__main__':
     '''
