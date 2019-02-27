@@ -251,7 +251,7 @@ def main(iargs=None):
                         last_line = inps.n_image
                         num_lines = last_line - first_line
                         ccg_sample = CCG[first_line:last_line, :]
-                        res, La, squeezed_pixels = phase_linking_process(ccg_sample, 0, inps.phase_linking_method)
+                        res, La, squeezed_pixels = pysq.phase_linking_process(ccg_sample, 0, inps.phase_linking_method)
                         phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
                         Laq = np.max([La[0], Laq])
 
@@ -269,7 +269,7 @@ def main(iargs=None):
                             if stepp == 0:
 
                                 ccg_sample = CCG[first_line:last_line, :]
-                                res,La, squeezed_pixels = phase_linking_process(ccg_sample, 0, inps.phase_linking_method)
+                                res,La, squeezed_pixels = pysq.phase_linking_process(ccg_sample, 0, inps.phase_linking_method)
                                 phase_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
 
                             else:
@@ -277,11 +277,11 @@ def main(iargs=None):
                                 ccg_sample = np.zeros([1 + num_lines, CCG.shape[1]]) + 1j
                                 ccg_sample[0:1, :] = np.complex64(squeezed_pixels[-1, :])
                                 ccg_sample[1::, :] = CCG[first_line:last_line, :]
-                                res,La, squeezed_p = phase_linking_process(ccg_sample, 1, inps.phase_linking_method)
+                                res,La, squeezed_p = pysq.phase_linking_process(ccg_sample, 1, inps.phase_linking_method)
                                 phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
                                 squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
                             Laq = np.max([La[0],Laq])
-                        res_d,Lad = phase_linking_process(squeezed_pixels, 0, inps.phase_linking_method, squeez=False)
+                        res_d,Lad = pysq.phase_linking_process(squeezed_pixels, 0, inps.phase_linking_method, squeez=False)
 
                         for stepp in range(step_0, len(res_d)):
                             first_line = stepp * 10
@@ -347,7 +347,7 @@ def main(iargs=None):
                     Laq = 1
             else:
 
-                res, Laq = phase_linking_process(CCG, 0, inps.phase_linking_method, squeez=False)
+                res, Laq = pysq.phase_linking_process(CCG, 0, inps.phase_linking_method, squeez=False)
                 phase_ref[:, 0:1] = res.reshape(inps.n_image, 1)
 
             quality[ref_row:ref_row+1,ref_col:ref_col+1] = Laq

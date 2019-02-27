@@ -254,88 +254,6 @@ def EMI_phase_estimation(coh0):
 ###############################################################################
 
 
-def CRLB_cov(gama, L):
-    """ Estimates the Cramer Rao Lowe Bound based on coherence=gam and ensemble size = L """
-    
-    B_theta = np.zeros([len(gama),len(gama)-1])
-    B_theta[1::,:] = np.identity(len(gama)-1)
-    X = 2*L*(np.multiply(np.abs(gama),LA.pinv(np.abs(gama)))-np.identity(len(gama)))
-    cov_out = LA.pinv(np.matmul(np.matmul(B_theta.T,(X+np.identity(len(X)))),B_theta))
-    
-    return cov_out
-
-###############################################################################
-
-
-def daysmat(n_img,tmp_bl):
-    """ Builds a temporal baseline matrix """
-    
-    ddays = np.matrix(np.exp(1j*np.arange(n_img)*tmp_bl/10000))
-    days_mat = np.round((np.angle(np.matmul(ddays.getH(),ddays)))*10000)
-    
-    return days_mat
-
-###############################################################################
-
-
-def simulate_phase(n_img=100,tmp_bl=6,deformation_rate=1,lamda=56):
-    """ Simulate Interferogram with constant velocity deformation rate """
-    
-    days_mat = daysmat(n_img,tmp_bl)
-    Ip = days_mat*4*np.pi*deformation_rate/(lamda*365)
-    np.fill_diagonal(Ip, 0)
-    
-    return Ip, days_mat
-
-###############################################################################
-
-
-def simulate_corr(Ip, days_mat,gam0=0.6,gamf=0.2,decorr_days=50):
-    """ Simulate Correlation matrix."""
-    
-    corr_mat = np.multiply((gam0-gamf)*np.exp(-np.abs(days_mat/decorr_days))+gamf,np.exp(1j*Ip))
-    return corr_mat
-
-###############################################################################
-
-
-def est_corr(CCGsam):
-    """ Estimate Correlation matrix from an ensemble."""
-        
-    CCGS = np.matrix(CCGsam)
-    corr_mat = np.matmul(CCGS,CCGS.getH())/CCGS.shape[1]
-    
-    coh = np.multiply(cov2corr(np.abs(corr_mat)),np.exp(1j*np.angle(corr_mat)))
-    
-    return coh
-    
-###############################################################################
-
-
-def custom_cmap(vmin=0,vmax=1):
-    """ create a custom colormap based on visible portion of electromagnetive wave."""
-    
-    from spectrumRGB import rgb
-    rgb=rgb()
-    import matplotlib as mpl
-    cmap = mpl.colors.ListedColormap(rgb)
-    norm = mpl.colors.Normalize(vmin, vmax)
-    
-    return cmap, norm
-   
-###############################################################################
-
-
-def EST_rms(x):
-    """ Estimate Root mean square error."""
-    
-    out = np.sqrt(np.sum(x**2,axis=1)/(np.shape(x)[1]-1))
-    
-    return out
-          
-###############################################################################
-
-
 def trwin(x):
     """ Transpose each layer of a 3 dimentional array."""
     
@@ -388,5 +306,168 @@ def comp_matr(x, y):
     return out
 
 ###############################################################################
+################# Simulation:
 
 
+def simulate_volcano_def_phase(n_img=100, tmp_bl=6):
+    """ Simulate Interferogram with complex deformation signal """
+    t = np.ogrid[0:(tmp_bl * n_img):tmp_bl]
+    nl = int(len(t) / 4)
+    x = np.zeros(len(t))
+    x[0:nl] = -2 * t[0:nl] / 365
+    x[nl:2 * nl] = 2 * (np.log((t[nl:2 * nl] - t[nl - 1]) / 365)) - 3 * (np.log((t[nl] - t[nl - 1]) / 365))
+    x[2 * nl:3 * nl] = 10 * t[2 * nl:3 * nl] / 365 - x[2 * nl - 1] / 2
+    x[3 * nl::] = -2 * t[3 * nl::] / 365
+
+    return t, x
+
+
+def simulate_constant_vel_phase(n_img=100, tmp_bl=6):
+    """ Simulate Interferogram with constant velocity deformation rate """
+    t = np.ogrid[0:(tmp_bl * n_img):tmp_bl]
+    x = t / 365
+
+    return t, x
+
+###############################################################################
+
+
+def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=False):
+    """Simulate a Coherence matrix based on de-correlation rate, phase and dates"""
+    # t: a vector of acquistion times
+    # ph: a vector of simulated phase time-series for one pixel
+    # returns the complex covariance matrix
+    # corr_mat = (gamma0-gammaf)*np.exp(-np.abs(days_mat/decorr_days))+gammaf
+    length = t.shape[0]
+    C = np.ones((length, length), dtype=np.complex64)
+    factor = gamma0 - gammaf
+    if seasonal:
+        f1 = lambda x, y: (x - y) ** 2 - gammaf
+        f2 = lambda x, y: (x + y) ** 2 - gamma0
+        res = double_solve(f1, f2, 0.5, 0.5)
+        A = res[0]
+        B = res[1]
+
+    for ii in range(length):
+        for jj in range(ii + 1, length):
+            if seasonal:
+                factor = (A + B * np.cos(2 * np.pi * t[ii] / 90)) * (A + B * np.cos(2 * np.pi * t[jj] / 90))
+            gamma = factor * (np.exp((t[ii] - t[jj]) / Tau0) + gammaf)
+            C[ii, jj] = gamma * np.exp(1j * (ph[ii] - ph[jj]))
+            C[jj, ii] = np.conj(C[ii, jj])
+
+    return C
+
+################################################################################
+
+
+def simulate_neighborhood_stack(corr_matrix, neighborSamples=300):
+    """Simulating the neighbouring pixels (SHPs) based on a given coherence matrix"""
+
+    numberOfSlc = corr_matrix.shape[0]
+    # A 2D matrix for a neighborhood over time. Each column is the neighborhood complex data for each acquisition date
+
+    neighbor_stack = np.zeros((numberOfSlc, neighborSamples), dtype=np.complex64)
+
+    for ii in range(neighborSamples):
+        cpxSLC = simulate_noise(corr_matrix)
+        neighbor_stack[:,ii] = cpxSLC
+    return neighbor_stack
+
+##############################################################################
+
+
+def double_solve(f1,f2,x0,y0):
+    """Solve for two equation with two unknowns using iterations"""
+
+    from scipy.optimize import fsolve
+    func = lambda x: [f1(x[0], x[1]), f2(x[0], x[1])]
+    return fsolve(func,[x0,y0])
+
+###############################################################################
+
+
+def est_corr(CCGsam):
+    """ Estimate Correlation matrix from an ensemble."""
+
+    CCGS = np.matrix(CCGsam)
+    corr_mat = np.matmul(CCGS, CCGS.getH()) / CCGS.shape[1]
+
+    coh = np.multiply(cov2corr(np.abs(corr_mat)), np.exp(1j * np.angle(corr_mat)))
+
+    return coh
+
+###############################################################################
+
+
+def custom_cmap(vmin=0, vmax=1):
+    """ create a custom colormap based on visible portion of electromagnetive wave."""
+
+    from spectrumRGB import rgb
+    rgb = rgb()
+    import matplotlib as mpl
+    cmap = mpl.colors.ListedColormap(rgb)
+    norm = mpl.colors.Normalize(vmin, vmax)
+
+    return cmap, norm
+
+###############################################################################
+
+
+def EST_rms(x):
+    """ Estimate Root mean square error."""
+
+    out = np.sqrt(np.sum(x ** 2, axis=1) / (np.shape(x)[1] - 1))
+
+    return out
+
+###############################################################################
+
+
+def phase_linking_process(ccg_sample, stepp, method, squeez=True):
+    """Inversion of phase based on a selected method among PTA, EVD and EMI """
+
+    coh_mat = pysq.est_corr(ccg_sample)
+    if 'PTA' in method:
+        ph_EMI, La = pysq.EMI_phase_estimation(coh_mat)
+        xm = np.zeros([len(ph_EMI), len(ph_EMI) + 1]) + 0j
+        xm[:, 0:1] = np.reshape(ph_EMI, [len(ph_EMI), 1])
+        xm[:, 1::] = coh_mat[:, :]
+        res, La = pysq.PTA_L_BFGS(xm)
+
+    elif 'EMI' in method:
+        res, La = pysq.EMI_phase_estimation(coh_mat)
+    else:
+        res, La = pysq.EVD_phase_estimation(coh_mat)
+
+    res = res.reshape(len(res), 1)
+
+    if squeez:
+        squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, 0])
+        return res, La, squeezed
+    else:
+        return res, La
+
+
+def squeez_im(ph, ccg):
+    """Squeeze a stack of images in to one (PCA)"""
+
+    vm = np.matrix(np.exp(1j * ph) / LA.norm(np.exp(1j * ph)))
+    squeezed = np.matmul(np.conjugate(vm), ccg)
+    return squeezed
+
+
+###############################################################################
+
+def CRLB_cov(gama, L):
+    """ Estimates the Cramer Rao Lowe Bound based on coherence=gam and ensemble size = L """
+
+    B_theta = np.zeros([len(gama), len(gama) - 1])
+    B_theta[1::, :] = np.identity(len(gama) - 1)
+    X = 2 * L * (np.multiply(np.abs(gama), LA.pinv(np.abs(gama))) - np.identity(len(gama)))
+    cov_out = LA.pinv(np.matmul(np.matmul(B_theta.T, (X + np.identity(len(X)))), B_theta))
+
+    return cov_out
+
+
+###############################################################################
