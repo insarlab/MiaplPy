@@ -427,18 +427,18 @@ def EST_rms(x):
 def phase_linking_process(ccg_sample, stepp, method, squeez=True):
     """Inversion of phase based on a selected method among PTA, EVD and EMI """
 
-    coh_mat = pysq.est_corr(ccg_sample)
+    coh_mat = est_corr(ccg_sample)
     if 'PTA' in method:
-        ph_EMI, La = pysq.EMI_phase_estimation(coh_mat)
+        ph_EMI, La = EMI_phase_estimation(coh_mat)
         xm = np.zeros([len(ph_EMI), len(ph_EMI) + 1]) + 0j
         xm[:, 0:1] = np.reshape(ph_EMI, [len(ph_EMI), 1])
         xm[:, 1::] = coh_mat[:, :]
-        res, La = pysq.PTA_L_BFGS(xm)
+        res, La = PTA_L_BFGS(xm)
 
     elif 'EMI' in method:
-        res, La = pysq.EMI_phase_estimation(coh_mat)
+        res, La = EMI_phase_estimation(coh_mat)
     else:
-        res, La = pysq.EVD_phase_estimation(coh_mat)
+        res, La = EVD_phase_estimation(coh_mat)
 
     res = res.reshape(len(res), 1)
 
