@@ -17,7 +17,6 @@ from skimage.measure import label
 from dask import compute, delayed
 
 
-
 #################################
 def create_parser():
     """ Creates command line argument parser object. """
@@ -41,7 +40,6 @@ def command_line_parse(args):
     inps = parser.parse_args(args)
     return inps
 
-###################################
 
 def main(iargs=None):
 
@@ -141,6 +139,7 @@ def main(iargs=None):
         print('SHP Exists ...')
 
     ###################### Phase linking inversion ###############################
+
 
     if 'sequential' in inps.phase_linking_method:
 
@@ -331,7 +330,6 @@ def main(iargs=None):
 
         timep = time.time() - time0
         print('time spent to do phase linking {}: min'.format(timep / 60))
-
 
 if __name__ == '__main__':
     '''
