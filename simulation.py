@@ -11,6 +11,7 @@ from numpy import linalg as LA
 import _pysqsar_utilities as psq
 import cmath
 import pandas as pd
+import time
 
 from pysar.utils import ptime, utils as ut, network as pnet, plot as pp
 
@@ -51,6 +52,62 @@ def command_line_parse(iargs=None):
     return inps
 
 
+def sequential_phase_linking(CCG, method, numsq=1):
+
+    n_image = CCG.shape[0]
+    num_seq = np.int(np.floor(n_image / 10))
+    ph_ref = np.zeros([np.shape(CCG)[0],1])
+
+    datumshift = np.zeros([num_seq, 1])
+    Laq = -1
+
+    for stepp in range(0, num_seq):
+
+        first_line = stepp  * 10
+        if stepp == num_seq-1:
+            last_line = n_image
+        else:
+            last_line = first_line + 10
+        num_lines = last_line - first_line
+
+        if stepp == 0:
+
+            ccg_sample = CCG[first_line:last_line, :]
+            res, La, squeezed_pixels = psq.phase_linking_process(ccg_sample, 0, method, squeez=True)
+            ph_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
+
+        else:
+
+            if numsq==1:
+                ccg_sample = np.zeros([1 + num_lines, CCG.shape[1]]) + 1j
+                ccg_sample[0:1, :] = np.complex64(squeezed_pixels[-1, :])
+                ccg_sample[1::, :] = CCG[first_line:last_line, :]
+                res, La, squeezed_p = psq.phase_linking_process(ccg_sample, 1, method, squeez=True)
+                ph_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
+                squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
+            else:
+                ccg_sample = np.zeros([stepp + num_lines, CCG.shape[1]]) + 1j
+                ccg_sample[0:stepp, :] = np.complex64(squeezed_pixels[0:stepp, :])
+                ccg_sample[stepp::, :] = CCG[first_line:last_line, :]
+                res, La, squeezed_p = psq.phase_linking_process(ccg_sample, stepp, method, squeez=True)
+                ph_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
+                squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
+        Laq = np.max([La[0], Laq])
+    res_d, Lad = psq.phase_linking_process(squeezed_pixels, 0, 'EMI', squeez=False)
+
+    for stepp in range(0, len(res_d)):
+        first_line = stepp * 10
+        if stepp == num_seq - 1:
+            last_line = inps.n_image
+        else:
+            last_line = first_line + 10
+        num_lines = last_line - first_line
+
+        ph_ref[first_line:last_line, 0:1] = (ph_ref[first_line:last_line, 0:1] +
+                                             np.matrix(res_d[int(stepp)]) - datumshift[
+                                                 int(stepp)]).reshape(num_lines, 1)
+
+    return  ph_ref
 
 #######################################################################
 ############## Make a plot of coherence matrix and save: ##############
@@ -194,8 +251,9 @@ def plot_simulated(inps):
 
 ###################################################
 
-def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L):
+def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname):
 
+    Timesmat = np.zeros([12, numr])
 
     EVD_est_resS = np.zeros([n_img, numr])
     EVD_est_resL = np.zeros([n_img, numr])
@@ -215,41 +273,46 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L):
         CCGsam_Sterm = psq.simulate_neighborhood_stack(coh_sim_S, neighborSamples=n_shp)
         CCGsam_Lterm = psq.simulate_neighborhood_stack(coh_sim_L, neighborSamples=n_shp)
 
-        coh_est_S = psq.est_corr(CCGsam_Sterm)
-        coh_est_L = psq.est_corr(CCGsam_Lterm)
-
+        time0 = time.time()
         ####
-        ph_EVD = psq.EVD_phase_estimation(coh_est_S)
+        ph_EVD,la = psq.phase_linking_process(CCGsam_Sterm, 0, 'EVD', squeez=False)
         EVD_est_resS[:, t:t + 1] = ph_EVD - phas
-        ph_EVD = psq.EVD_phase_estimation(coh_est_L)
+        time1 = time.time()
+        ph_EVD,la = psq.phase_linking_process(CCGsam_Lterm, 0, 'EVD', squeez=False)
         EVD_est_resL[:, t:t + 1] = ph_EVD - phas
+        time2 = time.time()
 
         ####
-        ph_EMI = psq.EMI_phase_estimation(coh_est_S)
+        ph_EMI,la = psq.phase_linking_process(CCGsam_Sterm, 0, 'EMI', squeez=False)
         EMI_est_resS[:, t:t + 1] = ph_EMI - phas
-        xm = np.zeros([len(ph0), len(ph0) + 1]) + 0j
-        xm[:, 0:1] = np.reshape(ph_EMI, [len(ph0), 1])
-        xm[:, 1::] = coh_est_S[:, :]
-        res_PTA = psq.PTA_L_BFGS(xm)
-        PTA_est_resS[:, t:t + 1] = res_PTA - phas
-
-        ####
-        ph_EMI = psq.EMI_phase_estimation(coh_est_L)
+        time3 = time.time()
+        ph_EMI,la = psq.phase_linking_process(CCGsam_Lterm, 0, 'EMI', squeez=False)
         EMI_est_resL[:, t:t + 1] = ph_EMI - phas
-        xm = np.zeros([len(ph0), len(ph0) + 1]) + 0j
-        xm[:, 0:1] = np.reshape(ph_EMI, [len(ph0), 1])
-        # xm[:,0:1] = np.reshape(np.angle(CCGsam_Lterm[:,0]),[len(ph0),1])
-        xm[:, 1::] = coh_est_L[:, :]
-        res_PTA = psq.PTA_L_BFGS(xm)
-        PTA_est_resL[:, t:t + 1] = res_PTA - phas
+        time4 = time.time()
 
         ####
-        EVD_seq_est_resS[:, t:t + 1] = psq.sequential_phase_linking(CCGsam_Sterm, 'EVD') - phas
-        EVD_seq_est_resL[:, t:t + 1] = psq.sequential_phase_linking(CCGsam_Lterm, 'EVD') - phas
-        EMI_seq_est_resS[:, t:t + 1] = psq.sequential_phase_linking(CCGsam_Sterm, 'EMI') - phas
-        EMI_seq_est_resL[:, t:t + 1] = psq.sequential_phase_linking(CCGsam_Lterm, 'EMI') - phas
-        PTA_seq_est_resS[:, t:t + 1] = psq.sequential_phase_linking(CCGsam_Sterm, 'PTA') - phas
-        PTA_seq_est_resL[:, t:t + 1] = psq.sequential_phase_linking(CCGsam_Lterm, 'PTA') - phas
+        ph_PTA, la = psq.phase_linking_process(CCGsam_Sterm, 0, 'PTA', squeez=False)
+        PTA_est_resS[:, t:t + 1] = ph_PTA - phas
+        time5 = time.time()
+        ph_PTA, la = psq.phase_linking_process(CCGsam_Lterm, 0, 'PTA', squeez=False)
+        PTA_est_resL[:, t:t + 1] = ph_PTA - phas
+        time6 = time.time()
+
+
+
+        ####
+        EVD_seq_est_resS[:, t:t + 1] = sequential_phase_linking(CCGsam_Sterm, 'EVD') - phas
+        time7 = time.time()
+        EVD_seq_est_resL[:, t:t + 1] = sequential_phase_linking(CCGsam_Lterm, 'EVD') - phas
+        time8 = time.time()
+        EMI_seq_est_resS[:, t:t + 1] = sequential_phase_linking(CCGsam_Sterm, 'EMI') - phas
+        time9 = time.time()
+        EMI_seq_est_resL[:, t:t + 1] = sequential_phase_linking(CCGsam_Lterm, 'EMI') - phas
+        time10 = time.time()
+        PTA_seq_est_resS[:, t:t + 1] = sequential_phase_linking(CCGsam_Sterm, 'PTA') - phas
+        time11 = time.time()
+        PTA_seq_est_resL[:, t:t + 1] = sequential_phase_linking(CCGsam_Lterm, 'PTA') - phas
+        time12 = time.time()
 
     rmsemat_est = np.zeros([n_img, 12])
 
@@ -267,20 +330,66 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L):
     rmsemat_est[:, 10] = psq.EST_rms(PTA_seq_est_resS)
     rmsemat_est[:, 11] = psq.EST_rms(PTA_seq_est_resL)
 
-    np.save('rmsemat_linear_seasonal.npy', rmsemat_est)
+    Timesmat[0:1, t:t + 1] = time1 - time0  # EVD_S
+    Timesmat[1:2, t:t + 1] = time2 - time1  # EVD_L
+    Timesmat[2:3, t:t + 1] = time3 - time2  # EMI_S
+    Timesmat[3:4, t:t + 1] = time4 - time3  # EMI_L
+    Timesmat[4:5, t:t + 1] = time5 - time4  # PTA_S
+    Timesmat[5:6, t:t + 1] = time6 - time5  # PTA_L
+    Timesmat[6:7, t:t + 1] = time7 - time6  # EVD_S_seq
+    Timesmat[7:8, t:t + 1] = time8 - time7  # EVD_L_seq
+    Timesmat[8:9, t:t + 1] = time9 - time8  # EMI_S_seq
+    Timesmat[9:10, t:t + 1] = time10 - time9  # EMI_L_seq
+    Timesmat[10:11, t:t + 1] = time11 - time10  # PTA_S_seq
+    Timesmat[11:12, t:t + 1] = time12 - time11  # PTA_L_seq
+
+    rmsemat_est_time = np.mean(Timesmat, 1)
+
+    np.save(outname, rmsemat_est)
+    np.save(outname.split('.npy')[0]+'_time.npy', rmsemat_est_time)
+
+    return none
 
 
     ####################################
 
-    def main():
+def main(iargs=None):
 
-        inps = command_line_parse(iargs)
+    inps = command_line_parse(iargs)
+    simul_dir = os.path.join(os.getenv('SCRATCHDIR'),'simulation')
+    if not os.path.isdir(simul_dir):
+        os.mkdir(simul_dir)
+
+    if inps.plot_mat:
+        plot_simulated(inps)
+
+    outname = 'rmsemat_'+inps.signal_type
+    if inps.seasonality:
+        outname = outname+'_seasonal.npy'
+
+    inps.outname = os.path.join(simul_dir,outname)
 
 
-        inps = ()
-        inps.lamda = 56.0  # wavelength (mm)
-        inps.n_img = 100
-        inps.n_shp = 300
-        inps.decorr_days = 50
-        inps.deformation_rate = 1  # mm/y
-        inps.tmp_bl = 6  # days
+    if inps.signal_type=='linear':
+        temp_baseline, displacement = psq.simulate_constant_vel_phase(inps.n_img, inps.tmp_bl)
+    else:
+        temp_baseline, displacement = psq.simulate_volcano_def_phase(inps.n_img, inps.tmp_bl)
+
+    inps.ph0 = np.matrix((displacement * 4 * np.pi * inps.deformation_rate / (inps.lamda)).reshape(len(displacement), 1))
+
+
+    inps.coh_sim_S = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0, inps.decorr_days,
+                                                          ph0, seasonal=inps.seasonality)
+    inps.coh_sim_L = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0.2, inps.decorr_days,
+                                                          ph0, seasonal=inps.seasonality)
+
+    repeat_simulation(numr=inps.n_sim, n_img=inps.n_img, n_shp=inps.n_shp,
+                      phas=inps.ph0, coh_sim_S=inps.coh_sim_S, coh_sim_L=inps.coh_sim_L, outname=inps.outname)
+
+
+if __name__ == '__main__':
+    '''
+    Simulates the phase linking process
+
+    '''
+    main()

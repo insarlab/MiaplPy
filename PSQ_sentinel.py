@@ -247,7 +247,7 @@ def main(iargs=None):
                                 phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
                                 squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
                             Laq = np.max([La[0],Laq])
-                        res_d,Lad = pysq.phase_linking_process(squeezed_pixels, 0, inps.phase_linking_method, squeez=False)
+                        res_d,Lad = pysq.phase_linking_process(squeezed_pixels, 0, 'EMI', squeez=False)
 
                         for stepp in range(step_0, len(res_d)):
                             first_line = stepp * 10
