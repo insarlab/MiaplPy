@@ -210,7 +210,7 @@ def PTA_L_BFGS(xm):
         phase_ref = np.matrix(out)
         phase_init = np.triu(np.angle(coh), 1)
         phase_optimized = np.triu(np.angle(np.matmul(np.exp(-1j * phase_ref), (np.exp(-1j * phase_ref)).getH())), 1)
-        gam_pta = pysq.gam_pta_f(phase_init, phase_optimized)
+        gam_pta = gam_pta_f(phase_init, phase_optimized)
 
         return out, gam_pta
 
@@ -362,6 +362,22 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
     return C
 
 ################################################################################
+
+def simulate_noise(corr_matrix):
+    N = corr_matrix.shape[0]
+
+    nsar = corr_matrix.shape[0]
+    w, v = np.linalg.eigh(corr_matrix)
+    msk = (w < 1e-3)
+    w[msk] = 0.
+    #corr_matrix =  np.dot(v, np.dot(np.diag(w), np.matrix.getH(v)))
+
+    #C = np.linalg.cholesky(corr_matrix)
+    C = np.dot(v, np.dot(np.diag(np.sqrt(w)), np.matrix.getH(v)))
+    Z = (np.random.randn(N) +1j*np.random.randn(N)) / np.sqrt(2)
+    noise = np.dot(C,Z)
+
+    return noise
 
 
 def simulate_neighborhood_stack(corr_matrix, neighborSamples=300):

@@ -12,6 +12,7 @@ import _pysqsar_utilities as psq
 import cmath
 import pandas as pd
 import time
+import argparse
 
 from pysar.utils import ptime, utils as ut, network as pnet, plot as pp
 
@@ -92,13 +93,13 @@ def sequential_phase_linking(CCG, method, numsq=1):
                 res, La, squeezed_p = psq.phase_linking_process(ccg_sample, stepp, method, squeez=True)
                 ph_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
                 squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
-        Laq = np.max([La[0], Laq])
+        Laq = np.max([La, Laq])
     res_d, Lad = psq.phase_linking_process(squeezed_pixels, 0, 'EMI', squeez=False)
 
     for stepp in range(0, len(res_d)):
         first_line = stepp * 10
         if stepp == num_seq - 1:
-            last_line = inps.n_image
+            last_line = n_image
         else:
             last_line = first_line + 10
         num_lines = last_line - first_line
@@ -114,6 +115,8 @@ def sequential_phase_linking(CCG, method, numsq=1):
 
 def plot_simulated(inps):
 
+    plt.switch_backend('Agg')
+
     fig, axs = plt.subplots(nrows=3, ncols=4, figsize=[12, 10], sharey=True)
 
 
@@ -123,8 +126,8 @@ def plot_simulated(inps):
 
     seasonality = inps.seasonality
 
-    coh_sim_S_v = psq.simulate_coherence_matrix_exponential(temp_baseline_v, 0.8,0, inps.decorr_days, ph_v, seasonal=seasonality)
-    coh_sim_L_v = psq.simulate_coherence_matrix_exponential(temp_baseline_v, 0.8,0.2, inps.decorr_days, ph_v, seasonal=seasonality)
+    coh_sim_S_v = psq.simulate_coherence_matrix_exponential(temp_baseline_v, 0.8,0, inps.decorr_days, ph_v, seasonal=inps.seasonality)
+    coh_sim_L_v = psq.simulate_coherence_matrix_exponential(temp_baseline_v, 0.8,0.2, inps.decorr_days, ph_v, seasonal=inps.seasonality)
 
     Ip_v = np.angle(coh_sim_L_v)
 
@@ -188,16 +191,16 @@ def plot_simulated(inps):
     plt.setp(plt.getp(cbar.ax.axes, 'xticklabels'), color='black')
 
 
-    temp_baseline, displacement = psq.simulate_constant_vel_phase(n_img,tmp_bl)
-    ph0 = np.matrix((displacement*4*np.pi*deformation_rate/(lamda)).reshape(len(displacement),1))
+    temp_baseline, displacement = psq.simulate_constant_vel_phase(inps.n_img,inps.tmp_bl)
+    ph0 = np.matrix((displacement*4*np.pi*inps.deformation_rate/(inps.lamda)).reshape(len(displacement),1))
 
-    coh_sim_S = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8,0, decorr_days, ph0, seasonal=True)
-    coh_sim_L = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8,0.2, decorr_days, ph0, seasonal=True)
+    coh_sim_S = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8,0, inps.decorr_days, ph0, seasonal=True)
+    coh_sim_L = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8,0.2, inps.decorr_days, ph0, seasonal=True)
 
     Ip = np.angle(coh_sim_L)
 
-    CCGsam_Sterm = psq.simulate_neighborhood_stack(coh_sim_S, neighborSamples=n_shp)
-    CCGsam_Lterm = psq.simulate_neighborhood_stack(coh_sim_L, neighborSamples=n_shp)
+    CCGsam_Sterm = psq.simulate_neighborhood_stack(coh_sim_S, neighborSamples=inps.n_shp)
+    CCGsam_Lterm = psq.simulate_neighborhood_stack(coh_sim_L, neighborSamples=inps.n_shp)
 
     coh_est_S = psq.est_corr(CCGsam_Sterm)
     coh_est_L = psq.est_corr(CCGsam_Lterm)
@@ -242,10 +245,12 @@ def plot_simulated(inps):
     cbar.outline.set_edgecolor('black')
     plt.setp(plt.getp(cbar.ax.axes, 'xticklabels'), color='black')
 
+    outfile = os.path.join(os.getenv('SCRATCHDIR'),'simulation')
+
     if seasonality:
-        plt.savefig('Coherence_mat_seasonal.png', bbox_inches='tight', transparent=True)
+        plt.savefig(os.path.join(outfile,'Coherence_mat_seasonal.png'), bbox_inches='tight', transparent=True)
     else:
-        plt.savefig('Coherence_mat.png', bbox_inches='tight', transparent=True)
+        plt.savefig(os.path.join(outfile,'Coherence_mat.png'), bbox_inches='tight', transparent=True)
 
     return None
 
@@ -379,9 +384,9 @@ def main(iargs=None):
 
 
     inps.coh_sim_S = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0, inps.decorr_days,
-                                                          ph0, seasonal=inps.seasonality)
+                                                          inps.ph0, seasonal=inps.seasonality)
     inps.coh_sim_L = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0.2, inps.decorr_days,
-                                                          ph0, seasonal=inps.seasonality)
+                                                          inps.ph0, seasonal=inps.seasonality)
 
     repeat_simulation(numr=inps.n_sim, n_img=inps.n_img, n_shp=inps.n_shp,
                       phas=inps.ph0, coh_sim_S=inps.coh_sim_S, coh_sim_L=inps.coh_sim_L, outname=inps.outname)
