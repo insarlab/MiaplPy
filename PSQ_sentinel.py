@@ -16,7 +16,6 @@ from scipy.stats import anderson_ksamp
 from skimage.measure import label
 from dask import compute, delayed
 
-
 #################################
 def create_parser():
     """ Creates command line argument parser object. """
@@ -187,6 +186,7 @@ def main(iargs=None):
                 quality[:,:] = -1
 
             for item in range(len(shp_df)):
+
 
                 ref_row, ref_col = (shp_df.at[item,'ref_pixel'][0], shp_df.at[item,'ref_pixel'][1])
                 rr = shp_df.at[item,'rows'].astype(int)

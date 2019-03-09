@@ -115,7 +115,7 @@ class config(object):
     def timeseries(self, function):
         self.f.write('###################################' + '\n')
         self.f.write(function + '\n')
-        self.f.write('plApp : ' + '\n')
+        self.f.write('timeseries_corrections : ' + '\n')
         self.f.write('template : ' + self.template + '\n')
 
 
@@ -616,57 +616,6 @@ class sentinelSLC(object):
                   print("downloaded restituted orbit.")
                   self.orbitType = 'restituted'
 
-
-
-# an example for writing job files when using clusters
-
-"""
-def writeJobFile(runFile):
-
-  jobName = runFile + '.job'
-  dirName = os.path.dirname(runFile)
-  with open(runFile) as ff:
-    nodes = len(ff.readlines())
-  if nodes >maxNodes:
-     nodes = maxNodes
-
-  f = open (jobName,'w')
-  f.write('#!/bin/bash '+ '\n')
-  f.write('#PBS -N Parallel_GNU'+ '\n')
-  f.write('#PBS -l nodes=' + str(nodes) + '\n')
-
-  jobTxt='''#PBS -V
-#PBS -l walltime=05:00:00
-#PBS -q default
-#PBS -m bae -M hfattahi@gps.caltech.edu
-
-echo Working directory is $PBS_O_WORKDIR
-cd $PBS_O_WORKDIR
-
-echo Running on host `hostname`
-echo Time is `date`
-
-### Define number of processors
-NPROCS=`wc -l < $PBS_NODEFILE`
-echo This job has allocated $NPROCS cpus
-
-# Tell me which nodes it is run on
-echo " "
-echo This jobs runs on the following processors:
-echo `cat $PBS_NODEFILE`
-echo " "
-
-# 
-# Run the parallel with the nodelist and command file
-#
-
-'''
-  f.write(jobTxt+ '\n')
-  f.write('parallel --sshloginfile $PBS_NODEFILE  -a ' + os.path.basename(runFile) + '\n')
-  f.write('')
-  f.close()
-  
-"""
 
 
 

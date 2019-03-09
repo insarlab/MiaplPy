@@ -464,7 +464,7 @@ def phase_linking_process(ccg_sample, stepp, method, squeez=True):
 
 
     if squeez:
-        squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, 0])
+        squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, :])
         return res, La, squeezed
     else:
         return res, La

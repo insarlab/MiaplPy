@@ -6,6 +6,8 @@ import argparse
 import os
 import sys
 import time
+from datetime import datetime
+
 sys.path.insert(0, os.getenv('SQUEESAR'))
 import _pysqsar_utilities as pysq
 #from dask import delayed, compute
@@ -55,10 +57,12 @@ def create_patch(inps, name):
             data_name = inps.slave_dir + '/' + dirs + '/' + dirs + '.slc'
             slc = np.memmap(data_name, dtype=np.complex64, mode='r', shape=(inps.lin, inps.sam))
 
+
             rslc[count, :, :] = slc[inps.patch_rows[0][0][patch_row]:inps.patch_rows[1][0][patch_row],
                                 inps.patch_cols[0][0][patch_col]:inps.patch_cols[1][0][patch_col]]
             count += 1
             del slc
+
         del rslc
 
         np.save(patch_name + '/count.npy', [inps.n_image,line,sample])
@@ -78,6 +82,9 @@ def main(iargs=None):
     inps.sq_dir = inps.output_dir
     inps.patch_dir = inps.sq_dir + '/PATCH'
     inps.list_slv = os.listdir(inps.slave_dir)
+    inps.list_slv = [datetime.strptime(x, '%Y%m%d') for x in inps.list_slv]
+    inps.list_slv = np.sort(inps.list_slv)
+    inps.list_slv = [x.strftime('%Y%m%d') for x in inps.list_slv]
 
     inps.range_win = int(inps.range_win)
     inps.azimuth_win = int(inps.azimuth_win)
