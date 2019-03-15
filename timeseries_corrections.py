@@ -31,8 +31,7 @@ def create_parser():
                                      formatter_class=argparse.RawTextHelpFormatter,
                                      epilog=EXAMPLE)
 
-    parser.add_argument('--template', dest='customTemplateFile', type=str, help='custom template with option settings.\n' +
-                             "It's equivalent to None if default pysarApp_template.txt is input.")
+    parser.add_argument('customTemplateFile', nargs='?', help='custom template with option settings\n')
     parser.add_argument('--dir', dest='workDir',
                         help='PySAR working directory, default is:\n' +
                              'a) current directory, or\n' +
