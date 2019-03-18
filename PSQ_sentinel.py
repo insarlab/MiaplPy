@@ -10,7 +10,7 @@ import time
 import argparse
 from numpy import linalg as LA
 import numpy as np
-import _pysqsar_utilities as pysq
+import pysqsar_utilities as pysq
 import pandas as pd
 from scipy.stats import anderson_ksamp
 from skimage.measure import label
