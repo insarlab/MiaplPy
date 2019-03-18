@@ -56,14 +56,14 @@ def main(iargs=None):
 
     inps = command_line_parse(iargs)
 
-    
+
     patch_list = glob.glob(inps.squeesar_dir+'/PATCH*')
     patch_list = list(map(lambda x: x.split('/')[-1], patch_list))
-    
-    
+
+
     range_win = int(inps.range_win)
     azimuth_win = int(inps.azimuth_win)
-    
+
 
     patch_rows = np.load(inps.squeesar_dir + '/rowpatch.npy')
     patch_cols = np.load(inps.squeesar_dir + '/colpatch.npy')
@@ -195,7 +195,3 @@ if __name__ == '__main__':
     """
 
     main()
-
-
-
-

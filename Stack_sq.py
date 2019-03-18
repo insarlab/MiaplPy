@@ -144,7 +144,7 @@ class config(object):
 
     def finalize(self):
         self.f.close()
- 
+
 
 class run(object):
     """
@@ -393,7 +393,7 @@ class sentinelSLC(object):
             start = '<coordinates>'
             end = '</coordinates>'
             pnts = xmlstr[xmlstr.find(start)+len(start):xmlstr.find(end)].split()
-        
+
         else:
             file=os.path.join(safe,'preview/map-overlay.kml')
             kmlFile = open( file, 'r' ).read(-1)
@@ -401,7 +401,7 @@ class sentinelSLC(object):
             kmlData = ET.fromstring( kmlFile )
             document = kmlData.find('Document/Folder/GroundOverlay/gxLatLonQuad')
             pnts = document.find('coordinates').text.split()
-    
+
         # convert the pnts to a list
         from scipy.spatial import distance as dist
         import numpy as np
@@ -440,7 +440,7 @@ class sentinelSLC(object):
         # our bottom-right point
         D = dist.cdist(tl[np.newaxis], rightMost, "euclidean")[0]
         (br, tr) = rightMost[np.argsort(D)[::-1], :]
-        
+
         # return the coordinates in top-left, top-right,
         # bottom-right, and bottom-left order
         temp = np.array([tl, tr, br, bl], dtype="float32")
@@ -463,7 +463,7 @@ class sentinelSLC(object):
         for safe in self.safe_file.split():
            safeObj=sentinelSLC(safe)
            pnts = safeObj.getkmlQUAD(safe)
-           # The coordinates must be specified in counter-clockwise order with the first coordinate corresponding 
+           # The coordinates must be specified in counter-clockwise order with the first coordinate corresponding
            # to the lower-left corner of the overlayed image
            counter=0
            for pnt in pnts:
@@ -476,7 +476,7 @@ class sentinelSLC(object):
               elif counter==3:
                   lat_frame_max.append(float(pnt.split(',')[1]))
               counter+=1
-        
+
         self.SNWE=[min(lats),max(lats),min(lons),max(lons)]
 
         # checking for missing gaps, by doing a difference between end and start of frames
@@ -488,7 +488,7 @@ class sentinelSLC(object):
         lat_frame_min.sort()
         lat_frame_max.append(temp2)
         lat_frame_max.sort()
-        
+
         # combining the frame north and south left edge
         lat_frame_min = np.transpose(np.array(lat_frame_min))
         lat_frame_max = np.transpose(np.array(lat_frame_max))
@@ -506,7 +506,7 @@ class sentinelSLC(object):
             print(lat_frame_max)
             print(lat_frame_min-lat_frame_max)
             print("gap")"""
-        
+
         #raise Exception("STOP")
         self.frame_nogap=overlap_check
 
@@ -523,7 +523,7 @@ class sentinelSLC(object):
            print(obj.polarization)
            # add by Minyan
            obj.polarization='vv'
-          #obj.output = '{0}-SW{1}'.format(safe,swathnum)    
+          #obj.output = '{0}-SW{1}'.format(safe,swathnum)
            obj.parse()
 
            s,n,w,e = obj.product.bursts[0].getBbox()
@@ -615,7 +615,3 @@ class sentinelSLC(object):
               else:
                   print("downloaded restituted orbit.")
                   self.orbitType = 'restituted'
-
-
-
-
