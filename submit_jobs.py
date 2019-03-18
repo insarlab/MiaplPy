@@ -5,7 +5,7 @@
 
 import os
 import sys
-from messageRsmas import Message as msg
+from insar.objects.messageRsmas import Message as msg
 import argparse
 
 #################################
