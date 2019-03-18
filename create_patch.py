@@ -6,8 +6,7 @@ import argparse
 import os
 import sys
 import time
-sys.path.insert(0, os.getenv('SQUEESAR'))
-import _pysqsar_utilities as pysq
+import pysqsar_utilities as pysq
 #from dask import delayed, compute
 #######################
 
