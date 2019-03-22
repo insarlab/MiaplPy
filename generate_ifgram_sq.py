@@ -56,14 +56,14 @@ def main(iargs=None):
 
     inps = command_line_parse(iargs)
 
-    
+
     patch_list = glob.glob(inps.squeesar_dir+'/PATCH*')
     patch_list = list(map(lambda x: x.split('/')[-1], patch_list))
-    
-    
+
+
     range_win = int(inps.range_win)
     azimuth_win = int(inps.azimuth_win)
-    
+
 
     patch_rows = np.load(inps.squeesar_dir + '/rowpatch.npy')
     patch_cols = np.load(inps.squeesar_dir + '/colpatch.npy')
@@ -137,6 +137,7 @@ def main(iargs=None):
             master = rslc_patch[0,:,:]
             slave = rslc_patch[np.int(inps.ifg_index),:,:]
 
+
             for kk in range(0, patch_lines):
                 ifg_patch[kk, 0:patch_samples + 1] = master[kk, 0:patch_samples + 1] * np.conj(slave[kk, 0:patch_samples + 1])
 
@@ -194,7 +195,3 @@ if __name__ == '__main__':
     """
 
     main()
-
-
-
-

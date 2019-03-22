@@ -51,7 +51,7 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
 
     image_coord = [first_row, last_row, first_col, last_col]
 
-    
+
     return image_coord
 
 ################################################################################
@@ -73,11 +73,11 @@ def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
 
 def read_image(image_file):
     """ Reads images from isce. """
-    
+
     ds = gdal.Open(image_file + '.vrt', gdal.GA_ReadOnly)
     image = ds.GetRasterBand(1).ReadAsArray()
     del ds
-    
+
     return image
 
 ###############################################################################
@@ -85,22 +85,22 @@ def read_image(image_file):
 
 def corr2cov(corr_matrix = [],sigma = []):
     """ Converts correlation matrix to covariance matrix if std of variables are known. """
-    
+
     D = np.diagflat(sigma)
     cov_matrix = D*corr_matrix*D
-    
+
     return cov_matrix
 
 ###############################################################################
-    
-    
+
+
 def cov2corr(cov_matrix):
     """ Converts covariance matrix to correlation/coherence matrix. """
-    
+
     D = LA.pinv(np.diagflat(np.sqrt(np.diag(cov_matrix))))
     y = np.matmul(D, cov_matrix)
     corr_matrix = np.matmul(y, np.transpose(D))
-    
+
     return corr_matrix
 
 ###############################################################################
@@ -108,20 +108,20 @@ def cov2corr(cov_matrix):
 
 def is_semi_pos_def_chol(x):
     """ Checks the positive semi definitness of a matrix. """
-    
+
     try:
         np.linalg.cholesky(x)
         return True
     except np.linalg.linalg.LinAlgError:
-        
+
         return False
-    
-###############################################################################    
+
+###############################################################################
 
 
 def L2norm_rowwis(M):
     """ Returns L2 norm of a matrix rowwise. """
-    
+
     s = np.shape(M)
     return (LA.norm(M, axis=1)).reshape(s[0],1)
 
@@ -129,8 +129,8 @@ def L2norm_rowwis(M):
 
 
 def regularize_matrix(M):
-    """ Regularizes a matrix to make it positive semi definite. """ 
-    
+    """ Regularizes a matrix to make it positive semi definite. """
+
     sh = np.shape(M)
     N = np.zeros([sh[0], sh[1]])
     N[:,:] = M[:,:]
@@ -138,12 +138,12 @@ def regularize_matrix(M):
     t = 0
     while t<500:
         if is_semi_pos_def_chol(N):
-            return N 
+            return N
         else:
             N[:,:] = N[:,:] + en*np.identity(len(N))
             en = 2*en
             t = t+1
-            
+
     return 0
 
 ###############################################################################
@@ -151,21 +151,21 @@ def regularize_matrix(M):
 
 def gam_pta_f(g1, g2):
     """ Returns squeesar PTA coherence between the initial and estimated phase vectors. """
-    
+
     n1 = g1.shape[0]
     [r, c] = np.where(g1 != 0)
     g11 = g1[r,c].reshape(len(r))
     g22 = g2[r,c].reshape(len(r))
     gam = np.real(np.dot(np.exp(1j * g11), np.exp(-1j * g22))) * 2 / (n1 ** 2 - n1)
-    
+
     return gam
 
 ###############################################################################
 
 
 def optphase(x0, inverse_gam):
-    """ Returns the PTA maximum likelihood function value. """ 
-    
+    """ Returns the PTA maximum likelihood function value. """
+
     n = len(x0)
     x = np.ones([n+1,1])+0j
     x[1::,0] = np.exp(1j*x0[:])#.reshape(n,1)
@@ -173,15 +173,15 @@ def optphase(x0, inverse_gam):
     y = -np.matmul(x.getH(), inverse_gam)
     y = np.matmul(y, x)
     f = np.abs(np.log(y))
-    
+
     return f
 
 ###############################################################################
 
 
-def PTA_L_BFGS(xm): 
-    """ Uses L-BFGS method to optimize PTA function and estimate phase values. """ 
-    
+def PTA_L_BFGS(xm):
+    """ Uses L-BFGS method to optimize PTA function and estimate phase values. """
+
     n = len(xm)
     x0 = np.zeros([n-1,1])
     x0[:,0] = np.real(xm[1::,0])
@@ -190,10 +190,10 @@ def PTA_L_BFGS(xm):
     abs_coh = regularize_matrix(np.abs(coh))
     if np.size(abs_coh) == np.size(coh):
         inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh),coh))
-        res = minimize(optphase, x0, args = inverse_gam, method='L-BFGS-B', 
-                       bounds=Bounds(-100, 100, keep_feasible=False), 
+        res = minimize(optphase, x0, args = inverse_gam, method='L-BFGS-B',
+                       bounds=Bounds(-100, 100, keep_feasible=False),
                        tol=None, options={'gtol': 1e-6, 'disp': False})
-        
+
         out = np.zeros([n,1])
         out[1::,0] = res.x
         out = np.unwrap(out,np.pi,axis=0)
@@ -214,14 +214,14 @@ def PTA_L_BFGS(xm):
 
 def EVD_phase_estimation(coh0):
     """ Estimates the phase values based on eigen value decomosition """
-    
+
     w,v = LA.eigh(coh0)
     f = np.where(np.abs(w) == np.sort(np.abs(w))[len(coh0)-1])
     vec = v[:,f].reshape(len(w),1)
     x0 = np.angle(vec)
     x0 = x0 - x0[0,0]
     x0 = np.unwrap(x0,np.pi,axis=0)
-    
+
     return x0, w[f]
 
 ###############################################################################
@@ -229,7 +229,7 @@ def EVD_phase_estimation(coh0):
 
 def EMI_phase_estimation(coh0):
     """ Estimates the phase values based on EMI decomosition (Homa Ansari, 2018 paper) """
-    
+
     abscoh = regularize_matrix(np.abs(coh0))
     if np.size(abscoh) == np.size(coh0):
         M = np.multiply(LA.pinv(abscoh),coh0)
@@ -250,14 +250,14 @@ def EMI_phase_estimation(coh0):
 
 def trwin(x):
     """ Transpose each layer of a 3 dimentional array."""
-    
+
     n1 = np.size(x, axis=0)
     n2 = np.size(x, axis=1)
     n3 = np.size(x, axis=2)
     x1 = np.zeros((n1, n3, n2))
     for t in range(n1):
         x1[t, :, :] = x[t, :, :].transpose()
-        
+
     return x1
 
 ###############################################################################
@@ -265,7 +265,7 @@ def trwin(x):
 
 def patch_slice(lin,sam,waz,wra,patch_size=200):
     """ Devides an image into patches of size 300 by 300 by considering the overlay of the size of multilook window."""
-    
+
     pr1 = np.ogrid[0:lin-50:patch_size]
     pr2 = pr1+patch_size
     pr2[-1] = lin
@@ -281,7 +281,7 @@ def patch_slice(lin,sam,waz,wra,patch_size=200):
     for n1 in range(len(pr1)):
         for n2 in range(len(pc1)):
             patchlist.append(str(n1) + '_' + str(n2))
-            
+
     return pr,pc,patchlist
 
 ###############################################################################
@@ -289,14 +289,14 @@ def patch_slice(lin,sam,waz,wra,patch_size=200):
 
 def comp_matr(x, y):
     """ Returns a complex matrix given the amplitude and phase."""
-    
+
     a1 = np.size(x, axis=0)
     a2 = np.size(x, axis=1)
     out = np.empty((a1, a2), dtype=complex)
     for a in range(a1):
         for b in range(a2):
             out[a, b] = cmath.rect(x[a, b], y[a, b])
-            
+
     return out
 
 ###############################################################################
@@ -353,6 +353,22 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
     return C
 
 ################################################################################
+
+def simulate_noise(corr_matrix):
+    N = corr_matrix.shape[0]
+
+    nsar = corr_matrix.shape[0]
+    w, v = np.linalg.eigh(corr_matrix)
+    msk = (w < 1e-3)
+    w[msk] = 0.
+    #corr_matrix =  np.dot(v, np.dot(np.diag(w), np.matrix.getH(v)))
+
+    #C = np.linalg.cholesky(corr_matrix)
+    C = np.dot(v, np.dot(np.diag(np.sqrt(w)), np.matrix.getH(v)))
+    Z = (np.random.randn(N) +1j*np.random.randn(N)) / np.sqrt(2)
+    noise = np.dot(C,Z)
+
+    return noise
 
 
 def simulate_neighborhood_stack(corr_matrix, neighborSamples=300):
@@ -439,7 +455,7 @@ def phase_linking_process(ccg_sample, stepp, method, squeez=True):
 
 
     if squeez:
-        squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, 0])
+        squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, :])
         return res, La, squeezed
     else:
         return res, La
@@ -467,4 +483,3 @@ def CRLB_cov(gama, L):
 
 
 ###############################################################################
-

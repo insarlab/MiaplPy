@@ -16,7 +16,6 @@ from scipy.stats import anderson_ksamp
 from skimage.measure import label
 from dask import compute, delayed
 
-
 #################################
 def create_parser():
     """ Creates command line argument parser object. """
@@ -188,6 +187,7 @@ def main(iargs=None):
 
             for item in range(len(shp_df)):
 
+
                 ref_row, ref_col = (shp_df.at[item,'ref_pixel'][0], shp_df.at[item,'ref_pixel'][1])
                 rr = shp_df.at[item,'rows'].astype(int)
                 cc = shp_df.at[item,'cols'].astype(int)
@@ -247,7 +247,8 @@ def main(iargs=None):
                                 phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
                                 squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
                             Laq = np.max([La[0],Laq])
-                        res_d,Lad = pysq.phase_linking_process(squeezed_pixels, 0, inps.phase_linking_method, squeez=False)
+                        res_d,Lad = pysq.phase_linking_process(squeezed_pixels, 0, 'EMI', squeez=False)
+                        res_d = np.unwrap(res_d, np.pi, axis=0)
 
                         for stepp in range(step_0, len(res_d)):
                             first_line = stepp * 10

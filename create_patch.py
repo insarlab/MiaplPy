@@ -6,7 +6,9 @@ import argparse
 import os
 import sys
 import time
-import pysqsar_utilities as pysq
+from datetime import datetime
+import SQUEESAR.pysqsar_utilities as pysq
+
 #from dask import delayed, compute
 #######################
 
@@ -58,6 +60,7 @@ def create_patch(inps, name):
                                 inps.patch_cols[0][0][patch_col]:inps.patch_cols[1][0][patch_col]]
             count += 1
             del slc
+
         del rslc
 
         np.save(patch_name + '/count.npy', [inps.n_image,line,sample])
@@ -77,6 +80,9 @@ def main(iargs=None):
     inps.sq_dir = inps.output_dir
     inps.patch_dir = inps.sq_dir + '/PATCH'
     inps.list_slv = os.listdir(inps.slave_dir)
+    inps.list_slv = [datetime.strptime(x, '%Y%m%d') for x in inps.list_slv]
+    inps.list_slv = np.sort(inps.list_slv)
+    inps.list_slv = [x.strftime('%Y%m%d') for x in inps.list_slv]
 
     inps.range_win = int(inps.range_win)
     inps.azimuth_win = int(inps.azimuth_win)
@@ -115,7 +121,7 @@ def main(iargs=None):
 
 if __name__ == '__main__':
     '''
-    Divides the whole scene into patches for parallel processing. 
- 
+    Divides the whole scene into patches for parallel processing.
+
     '''
     main()

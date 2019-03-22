@@ -25,7 +25,7 @@ def create_parser():
     parser.add_argument('-p', dest='projectID', type=str, default='insarlab', help='project name')
     parser.add_argument('-w', dest='walltime', type=str, default='1:00', help='wall time')
     parser.add_argument('-r', dest='memory', type=int, default=3600, help='memory use')
-    
+
 
     return parser
 
@@ -39,15 +39,15 @@ def command_line_parse(args):
 
 ###################################
 def main(iargs=None):
-  
+
     inps = command_line_parse(iargs)
     inps.work_dir = os.path.dirname(os.path.realpath(inps.runfile))
     jname = os.path.basename(inps.runfile)
     os.chdir(inps.work_dir)
-    
+
     with open (inps.runfile,'r') as f:
         inps.runlist = f.readlines()
-        
+
     jobsname = list(map(lambda x: jname + '_' + str(x), range(len(inps.runlist))))
     count = 0
     for jobn in jobsname:
@@ -67,14 +67,11 @@ def main(iargs=None):
             fjob.write('\ncd '+inps.work_dir)
             fjob.write('\n'+inps.runlist[count])
         count += 1
-        
-        submitCmd = 'bsub -q ' + inps.queue+' < z_input_' + jobn + '.job';   msg('\n'+submitCmd);   os.system(submitCmd) 
-            
-          
+
+        submitCmd = 'bsub -q ' + inps.queue+' < z_input_' + jobn + '.job'; print(submitCmd); os.system(submitCmd)
+
+
 #####################################################################
 
 if __name__ == '__main__':
   main(sys.argv[1:])
-       
-        
-    
