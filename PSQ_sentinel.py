@@ -218,7 +218,7 @@ def main(iargs=None):
                         num_lines = last_line - first_line
                         ccg_sample = CCG[first_line:last_line, :]
                         res, La, squeezed_pixels = pysq.phase_linking_process(ccg_sample, 0, inps.phase_linking_method)
-                        phase_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
+                        phase_ref[first_line:last_line, 0:1] = res[0::].reshape(num_lines, 1)
                         Laq = np.max([La[0], Laq])
 
                     else:
