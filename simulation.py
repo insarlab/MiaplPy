@@ -8,13 +8,13 @@ import numpy as np
 from matplotlib import pyplot as plt, ticker
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from numpy import linalg as LA
-import _pysqsar_utilities as psq
+import minopy_utilities as mnp
 import cmath
 import pandas as pd
 import time
 import argparse
 
-from pysar.utils import ptime, utils as ut, network as pnet, plot as pp
+from mintpy.utils import ptime, utils as ut, network as pnet, plot as pp
 
 #displacement = 1mm/y = (1 mm *4pi / lambda(mm)) rad/y  --> 6 day = 4pi*6/lambda*365
 #displacement = lambda*phi/ 4*pi.
@@ -74,7 +74,7 @@ def sequential_phase_linking(CCG, method, numsq=1):
         if stepp == 0:
 
             ccg_sample = CCG[first_line:last_line, :]
-            res, La, squeezed_pixels = psq.phase_linking_process(ccg_sample, 0, method, squeez=True)
+            res, La, squeezed_pixels = mnp.phase_linking_process(ccg_sample, 0, method, squeez=True)
             ph_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
 
         else:
@@ -83,18 +83,18 @@ def sequential_phase_linking(CCG, method, numsq=1):
                 ccg_sample = np.zeros([1 + num_lines, CCG.shape[1]]) + 1j
                 ccg_sample[0:1, :] = np.complex64(squeezed_pixels[-1, :])
                 ccg_sample[1::, :] = CCG[first_line:last_line, :]
-                res, La, squeezed_p = psq.phase_linking_process(ccg_sample, 1, method, squeez=True)
+                res, La, squeezed_p = mnp.phase_linking_process(ccg_sample, 1, method, squeez=True)
                 ph_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
                 squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
             else:
                 ccg_sample = np.zeros([stepp + num_lines, CCG.shape[1]]) + 1j
                 ccg_sample[0:stepp, :] = np.complex64(squeezed_pixels[0:stepp, :])
                 ccg_sample[stepp::, :] = CCG[first_line:last_line, :]
-                res, La, squeezed_p = psq.phase_linking_process(ccg_sample, stepp, method, squeez=True)
+                res, La, squeezed_p = mnp.phase_linking_process(ccg_sample, stepp, method, squeez=True)
                 ph_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
                 squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
         Laq = np.max([La, Laq])
-    res_d, Lad = psq.phase_linking_process(squeezed_pixels, 0, 'EMI', squeez=False)
+    res_d, Lad = mnp.phase_linking_process(squeezed_pixels, 0, 'EMI', squeez=False)
 
     for stepp in range(0, len(res_d)):
         first_line = stepp * 10
@@ -120,35 +120,35 @@ def plot_simulated(inps):
     fig, axs = plt.subplots(nrows=3, ncols=4, figsize=[12, 10], sharey=True)
 
 
-    temp_baseline_v, displacement_v = psq.simulate_volcano_def_phase(inps.n_img,inps.tmp_bl)   #(displacement in cm)
-    #temp_baseline, displacement = psq.simulate_constant_vel_phase(n_img,tmp_bl)
+    temp_baseline_v, displacement_v = mnp.simulate_volcano_def_phase(inps.n_img,inps.tmp_bl)   #(displacement in cm)
+    #temp_baseline, displacement = mnp.simulate_constant_vel_phase(n_img,tmp_bl)
     ph_v = np.matrix((displacement_v*4*np.pi*inps.deformation_rate/(inps.lamda)).reshape(len(displacement_v),1))
 
     seasonality = inps.seasonality
 
-    coh_sim_S_v = psq.simulate_coherence_matrix_exponential(temp_baseline_v, 0.8,0, inps.decorr_days, ph_v, seasonal=inps.seasonality)
-    coh_sim_L_v = psq.simulate_coherence_matrix_exponential(temp_baseline_v, 0.8,0.2, inps.decorr_days, ph_v, seasonal=inps.seasonality)
+    coh_sim_S_v = mnp.simulate_coherence_matrix_exponential(temp_baseline_v, 0.8,0, inps.decorr_days, ph_v, seasonal=inps.seasonality)
+    coh_sim_L_v = mnp.simulate_coherence_matrix_exponential(temp_baseline_v, 0.8,0.2, inps.decorr_days, ph_v, seasonal=inps.seasonality)
 
     Ip_v = np.angle(coh_sim_L_v)
 
-    CCGsam_Sterm_v = psq.simulate_neighborhood_stack(coh_sim_S_v, neighborSamples=inps.n_shp)
-    CCGsam_Lterm_v = psq.simulate_neighborhood_stack(coh_sim_L_v, neighborSamples=inps.n_shp)
+    CCGsam_Sterm_v = mnp.simulate_neighborhood_stack(coh_sim_S_v, neighborSamples=inps.n_shp)
+    CCGsam_Lterm_v = mnp.simulate_neighborhood_stack(coh_sim_L_v, neighborSamples=inps.n_shp)
 
-    coh_est_S_v = psq.est_corr(CCGsam_Sterm_v)
-    coh_est_L_v = psq.est_corr(CCGsam_Lterm_v)
+    coh_est_S_v = mnp.est_corr(CCGsam_Sterm_v)
+    coh_est_L_v = mnp.est_corr(CCGsam_Lterm_v)
 
     Ip_S_v = np.angle(coh_est_S_v)
     Ip_L_v = np.angle(coh_est_L_v)
 
 
 
-    cmap, norm = psq.custom_cmap()
+    cmap, norm = mnp.custom_cmap()
     im1=axs[0,0].imshow(np.abs(coh_sim_S_v), cmap='jet', norm=norm)
     im2=axs[0,1].imshow(np.abs(coh_sim_L_v), cmap='jet', norm=norm)
     im3=axs[0,2].imshow(np.abs(coh_est_S_v), cmap='jet', norm=norm)
     im4=axs[0,3].imshow(np.abs(coh_est_L_v), cmap='jet', norm=norm)
 
-    cmap, norm = psq.custom_cmap(-np.pi,np.pi)
+    cmap, norm = mnp.custom_cmap(-np.pi,np.pi)
     im5=axs[1,0].imshow(Ip_v, cmap='jet', norm=norm)
     im6=axs[1,1].imshow(Ip_v, cmap='jet', norm=norm)
     im7=axs[1,2].imshow(Ip_S_v, cmap='jet', norm=norm)
@@ -191,28 +191,28 @@ def plot_simulated(inps):
     plt.setp(plt.getp(cbar.ax.axes, 'xticklabels'), color='black')
 
 
-    temp_baseline, displacement = psq.simulate_constant_vel_phase(inps.n_img,inps.tmp_bl)
+    temp_baseline, displacement = mnp.simulate_constant_vel_phase(inps.n_img,inps.tmp_bl)
     ph0 = np.matrix((displacement*4*np.pi*inps.deformation_rate/(inps.lamda)).reshape(len(displacement),1))
 
-    coh_sim_S = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8,0, inps.decorr_days, ph0, seasonal=True)
-    coh_sim_L = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8,0.2, inps.decorr_days, ph0, seasonal=True)
+    coh_sim_S = mnp.simulate_coherence_matrix_exponential(temp_baseline, 0.8,0, inps.decorr_days, ph0, seasonal=True)
+    coh_sim_L = mnp.simulate_coherence_matrix_exponential(temp_baseline, 0.8,0.2, inps.decorr_days, ph0, seasonal=True)
 
     Ip = np.angle(coh_sim_L)
 
-    CCGsam_Sterm = psq.simulate_neighborhood_stack(coh_sim_S, neighborSamples=inps.n_shp)
-    CCGsam_Lterm = psq.simulate_neighborhood_stack(coh_sim_L, neighborSamples=inps.n_shp)
+    CCGsam_Sterm = mnp.simulate_neighborhood_stack(coh_sim_S, neighborSamples=inps.n_shp)
+    CCGsam_Lterm = mnp.simulate_neighborhood_stack(coh_sim_L, neighborSamples=inps.n_shp)
 
-    coh_est_S = psq.est_corr(CCGsam_Sterm)
-    coh_est_L = psq.est_corr(CCGsam_Lterm)
+    coh_est_S = mnp.est_corr(CCGsam_Sterm)
+    coh_est_L = mnp.est_corr(CCGsam_Lterm)
 
     Ip_S = np.angle(coh_est_S)
     Ip_L = np.angle(coh_est_L)
 
 
-    cmap, norm = psq.custom_cmap(np.min(Ip),np.max(Ip))
+    cmap, norm = mnp.custom_cmap(np.min(Ip),np.max(Ip))
     im9=axs[2,0].imshow(Ip, cmap='jet', norm=norm)
     im10=axs[2,1].imshow(Ip, cmap='jet', norm=norm)
-    cmap, norm = psq.custom_cmap(np.min(Ip_L),np.max(Ip_L))
+    cmap, norm = mnp.custom_cmap(np.min(Ip_L),np.max(Ip_L))
     im11=axs[2,2].imshow(Ip_S, cmap='jet', norm=norm)
     im12=axs[2,3].imshow(Ip_L, cmap='jet', norm=norm)
 
@@ -275,31 +275,31 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname):
     PTA_seq_est_resL = np.zeros([n_img, numr])
 
     for t in range(numr):
-        CCGsam_Sterm = psq.simulate_neighborhood_stack(coh_sim_S, neighborSamples=n_shp)
-        CCGsam_Lterm = psq.simulate_neighborhood_stack(coh_sim_L, neighborSamples=n_shp)
+        CCGsam_Sterm = mnp.simulate_neighborhood_stack(coh_sim_S, neighborSamples=n_shp)
+        CCGsam_Lterm = mnp.simulate_neighborhood_stack(coh_sim_L, neighborSamples=n_shp)
 
         time0 = time.time()
         ####
-        ph_EVD,la = psq.phase_linking_process(CCGsam_Sterm, 0, 'EVD', squeez=False)
+        ph_EVD,la = mnp.phase_linking_process(CCGsam_Sterm, 0, 'EVD', squeez=False)
         EVD_est_resS[:, t:t + 1] = ph_EVD - phas
         time1 = time.time()
-        ph_EVD,la = psq.phase_linking_process(CCGsam_Lterm, 0, 'EVD', squeez=False)
+        ph_EVD,la = mnp.phase_linking_process(CCGsam_Lterm, 0, 'EVD', squeez=False)
         EVD_est_resL[:, t:t + 1] = ph_EVD - phas
         time2 = time.time()
 
         ####
-        ph_EMI,la = psq.phase_linking_process(CCGsam_Sterm, 0, 'EMI', squeez=False)
+        ph_EMI,la = mnp.phase_linking_process(CCGsam_Sterm, 0, 'EMI', squeez=False)
         EMI_est_resS[:, t:t + 1] = ph_EMI - phas
         time3 = time.time()
-        ph_EMI,la = psq.phase_linking_process(CCGsam_Lterm, 0, 'EMI', squeez=False)
+        ph_EMI,la = mnp.phase_linking_process(CCGsam_Lterm, 0, 'EMI', squeez=False)
         EMI_est_resL[:, t:t + 1] = ph_EMI - phas
         time4 = time.time()
 
         ####
-        ph_PTA, la = psq.phase_linking_process(CCGsam_Sterm, 0, 'PTA', squeez=False)
+        ph_PTA, la = mnp.phase_linking_process(CCGsam_Sterm, 0, 'PTA', squeez=False)
         PTA_est_resS[:, t:t + 1] = ph_PTA - phas
         time5 = time.time()
-        ph_PTA, la = psq.phase_linking_process(CCGsam_Lterm, 0, 'PTA', squeez=False)
+        ph_PTA, la = mnp.phase_linking_process(CCGsam_Lterm, 0, 'PTA', squeez=False)
         PTA_est_resL[:, t:t + 1] = ph_PTA - phas
         time6 = time.time()
 
@@ -321,19 +321,19 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname):
 
     rmsemat_est = np.zeros([n_img, 12])
 
-    rmsemat_est[:, 0] = psq.EST_rms(EVD_est_resS)
-    rmsemat_est[:, 1] = psq.EST_rms(EVD_est_resL)
-    rmsemat_est[:, 2] = psq.EST_rms(EMI_est_resS)
-    rmsemat_est[:, 3] = psq.EST_rms(EMI_est_resL)
-    rmsemat_est[:, 4] = psq.EST_rms(PTA_est_resS)
-    rmsemat_est[:, 5] = psq.EST_rms(PTA_est_resL)
+    rmsemat_est[:, 0] = mnp.EST_rms(EVD_est_resS)
+    rmsemat_est[:, 1] = mnp.EST_rms(EVD_est_resL)
+    rmsemat_est[:, 2] = mnp.EST_rms(EMI_est_resS)
+    rmsemat_est[:, 3] = mnp.EST_rms(EMI_est_resL)
+    rmsemat_est[:, 4] = mnp.EST_rms(PTA_est_resS)
+    rmsemat_est[:, 5] = mnp.EST_rms(PTA_est_resL)
 
-    rmsemat_est[:, 6] = psq.EST_rms(EVD_seq_est_resS)
-    rmsemat_est[:, 7] = psq.EST_rms(EVD_seq_est_resL)
-    rmsemat_est[:, 8] = psq.EST_rms(EMI_seq_est_resS)
-    rmsemat_est[:, 9] = psq.EST_rms(EMI_seq_est_resL)
-    rmsemat_est[:, 10] = psq.EST_rms(PTA_seq_est_resS)
-    rmsemat_est[:, 11] = psq.EST_rms(PTA_seq_est_resL)
+    rmsemat_est[:, 6] = mnp.EST_rms(EVD_seq_est_resS)
+    rmsemat_est[:, 7] = mnp.EST_rms(EVD_seq_est_resL)
+    rmsemat_est[:, 8] = mnp.EST_rms(EMI_seq_est_resS)
+    rmsemat_est[:, 9] = mnp.EST_rms(EMI_seq_est_resL)
+    rmsemat_est[:, 10] = mnp.EST_rms(PTA_seq_est_resS)
+    rmsemat_est[:, 11] = mnp.EST_rms(PTA_seq_est_resL)
 
     Timesmat[0:1, t:t + 1] = time1 - time0  # EVD_S
     Timesmat[1:2, t:t + 1] = time2 - time1  # EVD_L
@@ -376,16 +376,16 @@ def main(iargs=None):
 
 
     if inps.signal_type=='linear':
-        temp_baseline, displacement = psq.simulate_constant_vel_phase(inps.n_img, inps.tmp_bl)
+        temp_baseline, displacement = mnp.simulate_constant_vel_phase(inps.n_img, inps.tmp_bl)
     else:
-        temp_baseline, displacement = psq.simulate_volcano_def_phase(inps.n_img, inps.tmp_bl)
+        temp_baseline, displacement = mnp.simulate_volcano_def_phase(inps.n_img, inps.tmp_bl)
 
     inps.ph0 = np.matrix((displacement * 4 * np.pi * inps.deformation_rate / (inps.lamda)).reshape(len(displacement), 1))
 
 
-    inps.coh_sim_S = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0, inps.decorr_days,
+    inps.coh_sim_S = mnp.simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0, inps.decorr_days,
                                                           inps.ph0, seasonal=inps.seasonality)
-    inps.coh_sim_L = psq.simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0.2, inps.decorr_days,
+    inps.coh_sim_L = mnp.simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0.2, inps.decorr_days,
                                                           inps.ph0, seasonal=inps.seasonality)
 
     repeat_simulation(numr=inps.n_sim, n_img=inps.n_img, n_shp=inps.n_shp,

@@ -1,3 +1,3 @@
-# pysqsar
+# MiNoPy
 
-A python package of InSAR processing with SqueeSAR method working with ISCE and PYSAR.
+A python package of InSAR processing with Non Linear inversion method working with ISCE and MintPy.

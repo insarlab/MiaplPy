@@ -1,10 +1,11 @@
 #! /usr/bin/env python3
 ###############################################################################
-# Project: Utilitiels for pysqsar
+# Project: Utilitiels for minopy
 # Author: Sara Mirzaee
 # Created: 10/2018
 ###############################################################################
-import sys, os
+import sys
+import os
 import numpy as np
 import cmath
 from numpy import linalg as LA
@@ -13,7 +14,7 @@ import gdal
 import isce
 import isceobj
 
-######################################################################################
+################################################################################
 
 
 def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east, status='multilook'):
@@ -28,21 +29,16 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
 
     ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
     lon = ds.GetRasterBand(1).ReadAsArray()
-    lon = lon[lat_c,:]
+    lon = lon[lat_c, :]
     del ds
-
 
     idx_lon = np.where((lon >= lon_west) & (lon <= lon_east))
 
-
     lon_c = np.int(np.mean(idx_lon))
 
-
-    lat = lat[:,lon_c]
+    lat = lat[:, lon_c]
 
     idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
-
-
 
     first_row = np.min(idx_lat)
     last_row = np.max(idx_lat)
@@ -54,7 +50,32 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
 
     return image_coord
 
-################################################################################
+##############################################################################
+
+
+def patch_slice(lines, samples, azimuth_window, range_window, patch_size=200):
+    """ Devides an image into patches of size 200 by 200 by considering the overlay of the size of multilook window."""
+
+    patch_row_1 = np.ogrid[0:lines-50:patch_size]
+    patch_row_2 = patch_row_1+patch_size
+    patch_row_2[-1] = lines
+    patch_row_1[1::] = patch_row_1[1::] - 2*azimuth_window
+
+    patch_col_1 = np.ogrid[0:samples-50:patch_size]
+    patch_col_2 = patch_col_1+patch_size
+    patch_col_2[-1] = samples
+    patch_col_1[1::] = patch_col_1[1::] - 2*range_window
+    patch_row = [[patch_row_1], [patch_row_2]]
+    patch_cols = [[patch_col_1], [patch_col_2]]
+    patchlist = []
+
+    for row in range(len(patch_row_1)):
+        for col in range(len(patch_col_1)):
+            patchlist.append(str(row) + '_' + str(col))
+
+    return patch_row, patch_cols, patchlist
+
+##############################################################################
 
 
 def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
@@ -133,14 +154,14 @@ def regularize_matrix(M):
 
     sh = np.shape(M)
     N = np.zeros([sh[0], sh[1]])
-    N[:,:] = M[:,:]
+    N[:, :] = M[:, :]
     en = 1e-6
     t = 0
-    while t<500:
+    while t < 500:
         if is_semi_pos_def_chol(N):
             return N
         else:
-            N[:,:] = N[:,:] + en*np.identity(len(N))
+            N[:, :] = N[:, :] + en*np.identity(len(N))
             en = 2*en
             t = t+1
 
@@ -148,17 +169,33 @@ def regularize_matrix(M):
 
 ###############################################################################
 
+#def gam_pta_f(g1, g2):
+#    """ Returns squeesar PTA coherence between the initial and estimated phase vectors. """
 
-def gam_pta_f(g1, g2):
+#    n1 = g1.shape[0]
+#    [r, c] = np.where(g1 != 0)
+#    g11 = g1[r, c].reshape(len(r))
+#    g22 = g2[r, c].reshape(len(r))
+#    gam = np.real(np.dot(np.exp(1j * g11), np.exp(-1j * g22))) * 2 / (n1 ** 2 - n1)
+
+#    return gam
+
+
+def gam_pta(data):
     """ Returns squeesar PTA coherence between the initial and estimated phase vectors. """
 
-    n1 = g1.shape[0]
-    [r, c] = np.where(g1 != 0)
-    g11 = g1[r,c].reshape(len(r))
-    g22 = g2[r,c].reshape(len(r))
-    gam = np.real(np.dot(np.exp(1j * g11), np.exp(-1j * g22))) * 2 / (n1 ** 2 - n1)
+    phase_initial, phase_refined, row, col = data
+    N = len(phase_initial)
+    phase_ref = np.matrix(np.reshape(phase_refined, [N, 1]))
+    phase_init = np.matrix(phase_initial)
+    phase_n = np.multiply(np.exp(1j * phase_init), np.exp(-1j * phase_ref))
+    A = np.repeat(phase_n, N, axis=1)
+    phase_k = np.multiply(np.exp(-1j * phase_init), np.exp(1j * phase_ref))
+    SUM_Ph = np.sum(np.matmul(np.triu(A), phase_k))
+    gam = np.real(SUM_Ph) * 2 / (N ** 2 - N)
 
-    return gam
+    return gam, row, col
+
 
 ###############################################################################
 
@@ -167,8 +204,8 @@ def optphase(x0, inverse_gam):
     """ Returns the PTA maximum likelihood function value. """
 
     n = len(x0)
-    x = np.ones([n+1,1])+0j
-    x[1::,0] = np.exp(1j*x0[:])#.reshape(n,1)
+    x = np.ones([n+1, 1])+0j
+    x[1::, 0] = np.exp(1j*x0[:])
     x = np.matrix(x)
     y = -np.matmul(x.getH(), inverse_gam)
     y = np.matmul(y, x)
@@ -183,29 +220,25 @@ def PTA_L_BFGS(xm):
     """ Uses L-BFGS method to optimize PTA function and estimate phase values. """
 
     n = len(xm)
-    x0 = np.zeros([n-1,1])
-    x0[:,0] = np.real(xm[1::,0])
-    coh = 1j*np.zeros([n,n])
-    coh[:,:] = xm[:,1::]
+    x0 = np.zeros([n-1, 1])
+    x0[:, 0] = np.real(xm[1::, 0])
+    coh = 1j*np.zeros([n, n])
+    coh[:, :] = xm[:, 1::]
     abs_coh = regularize_matrix(np.abs(coh))
     if np.size(abs_coh) == np.size(coh):
-        inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh),coh))
-        res = minimize(optphase, x0, args = inverse_gam, method='L-BFGS-B',
+        inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh))
+        res = minimize(optphase, x0, args=inverse_gam, method='L-BFGS-B',
                        bounds=Bounds(-100, 100, keep_feasible=False),
                        tol=None, options={'gtol': 1e-6, 'disp': False})
 
-        out = np.zeros([n,1])
-        out[1::,0] = res.x
-        out = np.unwrap(out,np.pi,axis=0)
+        out = np.zeros([n, 1])
+        out[1::, 0] = res.x
+        out = np.unwrap(out, np.pi, axis=0)
 
-        phase_ref = np.matrix(out)
-        phase_init = np.triu(np.angle(coh), 1)
-        phase_optimized = np.triu(np.angle(np.matmul(np.exp(-1j * phase_ref), (np.exp(-1j * phase_ref)).getH())), 1)
-        gam_pta = gam_pta_f(phase_init, phase_optimized)
-
-        return out, gam_pta
+        return out
 
     else:
+
         print('warning: coherence matrix not positive semidifinite, It is switched from PTA to EVD')
         return EVD_phase_estimation(coh)
 
@@ -215,14 +248,14 @@ def PTA_L_BFGS(xm):
 def EVD_phase_estimation(coh0):
     """ Estimates the phase values based on eigen value decomosition """
 
-    w,v = LA.eigh(coh0)
+    w, v = LA.eigh(coh0)
     f = np.where(np.abs(w) == np.sort(np.abs(w))[len(coh0)-1])
-    vec = v[:,f].reshape(len(w),1)
+    vec = v[:, f].reshape(len(w),1)
     x0 = np.angle(vec)
-    x0 = x0 - x0[0,0]
-    x0 = np.unwrap(x0,np.pi,axis=0)
+    x0 = x0 - x0[0, 0]
+    x0 = np.unwrap(x0, np.pi, axis=0)
 
-    return x0, w[f]
+    return x0
 
 ###############################################################################
 
@@ -232,15 +265,14 @@ def EMI_phase_estimation(coh0):
 
     abscoh = regularize_matrix(np.abs(coh0))
     if np.size(abscoh) == np.size(coh0):
-        M = np.multiply(LA.pinv(abscoh),coh0)
-        w,v = LA.eigh(M)
+        M = np.multiply(LA.pinv(abscoh), coh0)
+        w, v = LA.eigh(M)
         f = np.where(np.abs(w) == np.sort(np.abs(w))[0])
-        #vec = LA.pinv(v[:,f].reshape(len(w),1)*np.sqrt(len(coh0)))
-        vec = v[:,f[0][0]].reshape(v.shape[0],1)
-        x0 = np.angle(vec).reshape(len(w),1)
-        x0 = x0 - x0[0,0]
-        x0 = np.unwrap(x0,np.pi,axis=0)
-        return x0,w[f]
+        vec = v[:, f[0][0]].reshape(v.shape[0], 1)
+        x0 = np.angle(vec).reshape(len(w), 1)
+        x0 = x0 - x0[0, 0]
+        x0 = np.unwrap(x0, np.pi, axis=0)
+        return x0
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
         return EVD_phase_estimation(coh0)
@@ -259,30 +291,6 @@ def trwin(x):
         x1[t, :, :] = x[t, :, :].transpose()
 
     return x1
-
-###############################################################################
-
-
-def patch_slice(lin,sam,waz,wra,patch_size=200):
-    """ Devides an image into patches of size 300 by 300 by considering the overlay of the size of multilook window."""
-
-    pr1 = np.ogrid[0:lin-50:patch_size]
-    pr2 = pr1+patch_size
-    pr2[-1] = lin
-    pr1[1::] = pr1[1::] - 2*waz
-
-    pc1 = np.ogrid[0:sam-50:patch_size]
-    pc2 = pc1+patch_size
-    pc2[-1] = sam
-    pc1[1::] = pc1[1::] - 2*wra
-    pr = [[pr1], [pr2]]
-    pc = [[pc1], [pc2]]
-    patchlist = []
-    for n1 in range(len(pr1)):
-        for n2 in range(len(pc1)):
-            patchlist.append(str(n1) + '_' + str(n2))
-
-    return pr,pc,patchlist
 
 ###############################################################################
 
@@ -439,33 +447,35 @@ def phase_linking_process(ccg_sample, stepp, method, squeez=True):
     """Inversion of phase based on a selected method among PTA, EVD and EMI """
 
     coh_mat = est_corr(ccg_sample)
+
     if 'PTA' in method:
-        ph_EMI, La = EMI_phase_estimation(coh_mat)
+        ph_EMI = EMI_phase_estimation(coh_mat)
         xm = np.zeros([len(ph_EMI), len(ph_EMI) + 1]) + 0j
         xm[:, 0:1] = np.reshape(ph_EMI, [len(ph_EMI), 1])
         xm[:, 1::] = coh_mat[:, :]
-        res, La = PTA_L_BFGS(xm)
+        res = PTA_L_BFGS(xm)
 
     elif 'EMI' in method:
-        res, La = EMI_phase_estimation(coh_mat)
+        res = EMI_phase_estimation(coh_mat)
     else:
-        res, La = EVD_phase_estimation(coh_mat)
+        res = EVD_phase_estimation(coh_mat)
 
     res = res.reshape(len(res), 1)
 
-
     if squeez:
-        squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, :])
-        return res, La, squeezed
+        vm = np.matrix(np.exp(1j * res[stepp::, 0:1]) / LA.norm(np.exp(1j * res[stepp::, 0:1])))
+        squeezed = np.matmul(np.conjugate(vm.T), ccg_sample[stepp::, :])
+        #squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, :])
+        return res, squeezed
     else:
-        return res, La
+        return res,
 
 
 def squeez_im(ph, ccg):
     """Squeeze a stack of images in to one (PCA)"""
 
     vm = np.matrix(np.exp(1j * ph) / LA.norm(np.exp(1j * ph)))
-    squeezed = np.matmul(np.conjugate(vm), ccg)
+    squeezed = np.complex64(np.matmul(np.conjugate(vm), ccg))
     return squeezed
 
 
@@ -483,3 +493,64 @@ def CRLB_cov(gama, L):
 
 
 ###############################################################################
+
+
+def sequential_phase_linking(full_stack_complex_samples, method, num_stack=1):
+    """ phase linking of each pixel sequentially and applying a datum shift at the end """
+
+    n_image = full_stack_complex_samples.shape[0]
+    mini_stack_size = 10
+    num_mini_stacks = np.int(np.floor(n_image / mini_stack_size))
+    phas_refined = np.zeros([np.shape(full_stack_complex_samples)[0], 1])
+
+    for step in range(0, num_mini_stacks):
+
+        first_line = step * mini_stack_size
+        if step == num_mini_stacks - 1:
+            last_line = n_image
+        else:
+            last_line = first_line + mini_stack_size
+        num_lines = last_line - first_line
+
+        if step == 0:
+            mini_stack_complex_samples = full_stack_complex_samples[first_line:last_line, :]
+            res, squeezed_images = phase_linking_process(mini_stack_complex_samples, step, method)
+
+            phas_refined[first_line:last_line, 0:1] = res[step::, 0:1]
+        else:
+
+            if num_stack == 1:
+                mini_stack_complex_samples = np.zeros([1 + num_lines, full_stack_complex_samples.shape[1]]) + 1j
+                mini_stack_complex_samples[0, :] = np.complex64(squeezed_images[-1, :])
+                mini_stack_complex_samples[1::, :] = full_stack_complex_samples[first_line:last_line, :]
+                res, new_squeezed_image = phase_linking_process(mini_stack_complex_samples, 1, method)
+                phas_refined[first_line:last_line, 0:1] = res[1::, 0:1]
+                squeezed_images = np.vstack([squeezed_images, new_squeezed_image])
+            else:
+
+                mini_stack_complex_samples = np.zeros([step + num_lines, full_stack_complex_samples.shape[1]]) + 1j
+                mini_stack_complex_samples[0:step, :] = np.complex64(squeezed_images)
+                mini_stack_complex_samples[step::, :] = full_stack_complex_samples[first_line:last_line, :]
+                res, new_squeezed_image = phase_linking_process(mini_stack_complex_samples, step, method)
+                phas_refined[first_line:last_line, 0:1] = res[step::, 0:1]
+                squeezed_images = np.vstack([squeezed_images, new_squeezed_image])
+            ###
+
+    datum_connection_samples = squeezed_images
+    datum_shift, squeezed_datum = phase_linking_process(datum_connection_samples, 0, 'EMI')
+
+    #phas_refined_no_datum_shift = np.zeros(np.shape(phas_refined))
+    #phas_refined_no_datum_shift[:, :] = phas_refined[:, :]
+
+    for step in range(len(datum_shift)):
+        first_line = step * mini_stack_size
+        if step == num_mini_stacks - 1:
+            last_line = n_image
+        else:
+            last_line = first_line + mini_stack_size
+
+        phas_refined[first_line:last_line, 0:1] = phas_refined[first_line:last_line, 0:1] - \
+                                                  datum_shift[step:step + 1, 0:1]
+
+    #return phas_refined_no_datum_shift, phas_refined
+    return phas_refined
