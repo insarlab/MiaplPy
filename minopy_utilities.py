@@ -8,16 +8,100 @@ import sys
 import os
 import numpy as np
 import cmath
+import argparse
 from numpy import linalg as LA
 from scipy.optimize import minimize, Bounds
+from scipy import stats
 import gdal
 import isce
 import isceobj
+from mintpy.prep_isce import *
+from mintpy.utils import readfile
+from minsar.objects.auto_defaults import PathFind
+import minsar.utils.process_utilities as putils
+pathObj = PathFind()
+################################################################################
+
+
+def cmd_line_parse(iargs=None, script=None):
+    """Command line parser."""
+
+    parser = argparse.ArgumentParser(description='MiNoPy scripts parser')
+    parser = add_common_parser(parser)
+
+    if script == 'patch_inversion':
+        parser = add_patch_inversion(parser)
+    if script == 'timeseries_corrections':
+        parser = add_mintpy_corrections(parser)
+
+    inps = parser.parse_args(args=iargs)
+    inps = putils.create_or_update_template(inps)
+
+    return inps
+
+
+def add_common_parser(parser):
+
+    commonp = parser.add_argument_group('General options:')
+    commonp.add_argument('customTemplateFile', nargs='?', help='custom template with option settings.\n')
+    commonp.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
+    commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
+    commonp.add_argument('--walltime', dest='wall_time', default='None',
+                        help='walltime for submitting the script as a job')
+    commonp.add_argument('--wait', dest='wait_time', default='00:00', metavar="Wait time (hh:mm)",
+                         help="wait time to submit a job")
+    return parser
+
+
+def add_minopy_wrapper(parser):
+
+    STEP_LIST, STEP_HELP = pathObj.minopy_help()
+
+    mnp = parser.add_argument_group('MiNoPy Routine InSAR Time Series Analysis. steps processing '
+                                    '(start/end/step)', STEP_HELP)
+    mnp.add_argument('--remove_minopy_dir', dest='remove_minopy_dir', action='store_true',
+                     help='remove directory before download starts')
+    mnp.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
+                      help='start processing at the named step, default: {}'.format(STEP_LIST[0]))
+    mnp.add_argument('--stop', dest='endStep', metavar='STEP', default=STEP_LIST[-1],
+                      help='end processing at the named step, default: {}'.format(STEP_LIST[-1]))
+    mnp.add_argument('--step', dest='step', metavar='STEP',
+                      help='run processing at the named step only')
+
+    return parser
+
+
+def add_patch_inversion(parser):
+
+    pi = parser.add_argument_group('Patch inversion option')
+    pi.add_argument('-p', '--patch', type=str, dest='patch', help='patch directory')
+
+    return parser
+
+
+def add_mintpy_corrections(parser):
+
+    corrections = parser.add_argument_group('Mintpy options')
+
+    corrections.add_argument('--dir', dest='work_dir',
+                        help='MintPy working directory, default is:\n' +
+                             'a) current directory, or\n' +
+                             'b) $SCRATCHDIR/projectName/mintpy, if meets the following 3 requirements:\n' +
+                             '    1) autoPath = True in mintpy/defaults/auto_path.py\n' +
+                             '    2) environmental variable $SCRATCHDIR exists\n' +
+                             '    3) input custom template with basename same as projectName\n')
+    corrections.add_argument('-g', dest='generate_template', action='store_true',
+                        help='Generate default template (and merge with custom template), then exit.')
+    corrections.add_argument('-H', dest='print_auto_template', action='store_true',
+                        help='Print/Show the example template file for routine processing.')
+
+    return parser
 
 ################################################################################
 
 
-def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east, status='multilook'):
+def convert_geo2image_coord_old(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
+
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
     ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
@@ -47,6 +131,68 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
 
     image_coord = [first_row, last_row, first_col, last_col]
 
+    return image_coord
+
+
+def convert_geo2image_coord(geo_master_dir, master_dir, lat_south, lat_north, lon_west, lon_east):
+    """ Finds the corresponding line and sample based on geographical coordinates. """
+
+    master_xml = glob.glob(master_dir + '/IW*.xml')[0]
+    metadata = extract_tops_metadata(master_xml)
+    gmeta = extract_geometry_metadata(geo_master_dir + '/lat.rdr.full.xml', metadata)
+    rmeta = readfile.read_isce_xml(geo_master_dir + '/lat.rdr.full.xml')
+
+    # Read Attributes
+    range_n = float(gmeta['startingRange'])
+    dR = float(gmeta['rangePixelSize'])
+    width = int(rmeta['WIDTH'])
+    Re = float(gmeta['earthRadius'])
+    Height = float(gmeta['altitude'])
+    range_f = range_n + dR * width
+    inc_angle_n = (np.pi - np.arccos((Re ** 2 + range_n ** 2 - (Re + Height) ** 2) / (2 * Re * range_n))) * 180.0 / np.pi
+    inc_angle_f = (np.pi - np.arccos((Re ** 2 + range_f ** 2 - (Re + Height) ** 2) / (2 * Re * range_f))) * 180.0 / np.pi
+
+    inc_angle = (inc_angle_n + inc_angle_f) / 2.0
+    rg_step = float(dR) / np.sin(inc_angle / 180.0 * np.pi)
+    az_step = float(gmeta['azimuthPixelSize']) * Re / (Re + Height)
+
+    lat = [lat_south, lat_north]
+    lon = [lon_west, lon_east]
+
+    lat_c = (np.nanmax(lat) + np.nanmin(lat)) / 2.
+    az_step_deg = 180. / np.pi * az_step / (Re)
+    rg_step_deg = 180. / np.pi * rg_step / (Re * np.cos(lat_c * np.pi / 180.))
+
+    y_factor = 10 * az_step_deg
+    x_factor = 10 * rg_step_deg
+
+    ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
+    lut_y = ds.GetRasterBand(1).ReadAsArray()
+
+    ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
+    lut_x = ds.GetRasterBand(1).ReadAsArray()
+
+    rows = []
+    cols = []
+
+    for lat0 in lat:
+        for lon0 in lon:
+            ymin = lat0 - y_factor;   ymax = lat0 + y_factor
+            xmin = lon0 - x_factor;   xmax = lon0 + x_factor
+
+            mask_y = np.multiply(lut_y >= ymin, lut_y <= ymax)
+            mask_x = np.multiply(lut_x >= xmin, lut_x <= xmax)
+            mask_yx = np.multiply(mask_y, mask_x)
+            row, col = np.nanmean(np.where(mask_yx), axis=1)
+            rows.append(row)
+            cols.append(col)
+
+    first_row = np.rint(np.min(rows)).astype(int)
+    last_row = np.rint(np.max(rows)).astype(int)
+    first_col = np.rint(np.min(cols)).astype(int)
+    last_col = np.rint(np.max(cols)).astype(int)
+
+    image_coord = [first_row, last_row, first_col, last_col]
 
     return image_coord
 
@@ -248,9 +394,9 @@ def PTA_L_BFGS(xm):
 def EVD_phase_estimation(coh0):
     """ Estimates the phase values based on eigen value decomosition """
 
-    w, v = LA.eigh(coh0)
-    f = np.where(np.abs(w) == np.sort(np.abs(w))[len(coh0)-1])
-    vec = v[:, f].reshape(len(w),1)
+    Eigen_value, Eigen_vector = LA.eigh(coh0)
+    f = np.where(np.abs(Eigen_value) == np.sort(np.abs(Eigen_value))[len(coh0)-1])
+    vec = Eigen_vector[:, f].reshape(len(Eigen_value), 1)
     x0 = np.angle(vec)
     x0 = x0 - x0[0, 0]
     x0 = np.unwrap(x0, np.pi, axis=0)
@@ -266,16 +412,37 @@ def EMI_phase_estimation(coh0):
     abscoh = regularize_matrix(np.abs(coh0))
     if np.size(abscoh) == np.size(coh0):
         M = np.multiply(LA.pinv(abscoh), coh0)
-        w, v = LA.eigh(M)
-        f = np.where(np.abs(w) == np.sort(np.abs(w))[0])
-        vec = v[:, f[0][0]].reshape(v.shape[0], 1)
-        x0 = np.angle(vec).reshape(len(w), 1)
+        Eigen_value, Eigen_vector = LA.eigh(M)
+        f = np.where(np.abs(Eigen_value) == np.sort(np.abs(Eigen_value))[0])
+        vec = Eigen_vector[:, f[0][0]].reshape(Eigen_vector.shape[0], 1)
+        x0 = np.angle(vec).reshape(len(Eigen_value), 1)
         x0 = x0 - x0[0, 0]
         x0 = np.unwrap(x0, np.pi, axis=0)
         return x0
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
         return EVD_phase_estimation(coh0)
+
+###############################################################################
+
+
+def test_PS(ccg):
+    """ checks if the pixel is PS """
+
+    coh_mat = est_corr(ccg)
+    Eigen_value, Eigen_vector = LA.eigh(coh_mat)
+    med_w = np.median(Eigen_value)
+    MAD = np.median(np.absolute(Eigen_value - med_w))
+
+    thold1 = np.abs(med_w + 3.5*MAD)
+    thold2 = np.abs(med_w - 3.5*MAD)
+    treshhold = np.max([thold1, thold2])
+    status = len(np.where(np.abs(Eigen_value) > treshhold))
+
+    if status > 0:
+        return True
+    else:
+        return False
 
 ###############################################################################
 
@@ -386,7 +553,6 @@ def simulate_neighborhood_stack(corr_matrix, neighborSamples=300):
     # A 2D matrix for a neighborhood over time. Each column is the neighborhood complex data for each acquisition date
 
     neighbor_stack = np.zeros((numberOfSlc, neighborSamples), dtype=np.complex64)
-
     for ii in range(neighborSamples):
         cpxSLC = simulate_noise(corr_matrix)
         neighbor_stack[:,ii] = cpxSLC
@@ -554,3 +720,13 @@ def sequential_phase_linking(full_stack_complex_samples, method, num_stack=1):
 
     #return phas_refined_no_datum_shift, phas_refined
     return phas_refined
+
+#############################################
+
+
+def create_xml(fname, bands, line, sample, format):
+    from isceobj.Util.ImageUtil import ImageLib as IML
+    rslc = np.memmap(fname, dtype=np.complex64, mode='w+', shape=(bands, line, sample))
+    IML.renderISCEXML(fname, bands, line, sample, format, 'BIL')
+    return rslc
+

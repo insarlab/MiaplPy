@@ -2,21 +2,20 @@
 ############################################################
 # Copyright(c) 2017, Sara Mirzaee                          #
 ############################################################
-import numpy as np
+
 import os
 import sys
 import gdal
 import argparse
-import shutil
+import numpy as np
 import isce
 import isceobj
 import time
-import glob
+import minsar.job_submission as js
 from minsar.objects import message_rsmas
+from minsar.utils.process_utilities import add_pause_to_walltime
 from isceobj.Util.ImageUtil import ImageLib as IML
-from mergeBursts import multilook
-from minsar.utils.process_utilities import create_or_update_template
-from minopy_utilities import convert_geo2image_coord, patch_slice
+import minopy_utilities as mnp
 from minsar.objects.auto_defaults import PathFind
 import dask
 
@@ -24,23 +23,82 @@ pathObj = PathFind()
 ##############################################################################
 
 
-def create_parser():
-    """ Creates command line argument parser object. """
+def main(iargs=None):
+    '''
+    Crop SLCs and geometry.
+    '''
 
-    parser = argparse.ArgumentParser(description='Crops the scene given cropping box in lat/lon (from template)')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-    parser.add_argument('customTemplateFile', nargs='?',
-                        help='custom template with option settings.\n')
-    return parser
+    inps = mnp.cmd_line_parse(iargs)
+
+    config = putils.get_config_defaults(config_file='job_defaults.cfg')
+
+    job_file_name = 'crop_sentinel'
+    job_name = job_file_name
+
+    if inps.wall_time == 'None':
+        inps.wall_time = config[job_file_name]['walltime']
+
+    wait_seconds, new_wall_time = add_pause_to_walltime(inps.wall_time, inps.wait_time)
+
+    #########################################
+    # Submit job
+    #########################################
+
+    if inps.submit_flag:
+
+        js.submit_script(job_name, job_file_name, sys.argv[:], inp.work_dir, new_wall_time)
+        sys.exit(0)
+
+    time.sleep(wait_seconds)
+
+    message_rsmas.log(inps.work_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
+
+    inps.geo_master = os.path.join(inps.work_dir, pathObj.geomasterdir)
+    inps.master_dir = os.path.join(inps.work_dir, pathObj.masterdir)
+
+    slc_list = os.listdir(os.path.join(inps.work_dir, pathObj.mergedslcdir))
+    slc_list = [os.path.join(inps.work_dir, pathObj.mergedslcdir, x, x + '.slc.full') for x in slc_list]
+
+    meta_data = pathObj.get_geom_master_lists()
+
+    cbox = [val for val in inps.cropbox.split()]
+    if len(cbox) != 4:
+        raise Exception('Bbox should contain 4 floating point values')
+
+    crop_area = np.array(
+        mnp.convert_geo2image_coord(inps.geo_master, inps.master_dir, np.float32(cbox[0]), np.float32(cbox[1]),
+                                np.float32(cbox[2]), np.float32(cbox[3])))
+
+    pathObj.first_row = crop_area[0]
+    pathObj.last_row = crop_area[1]
+    pathObj.first_col = crop_area[2]
+    pathObj.last_col = crop_area[3]
+
+    pathObj.n_lines = pathObj.last_row - pathObj.first_row
+    pathObj.width = pathObj.last_col - pathObj.first_col
+
+    run_list_slc = []
+    run_list_geo = []
+
+    for item in slc_list:
+        run_list_slc.append((item, item.split('.full')[0]))
+
+    for item in meta_data:
+        run_list_geo.append((os.path.join(inps.geo_master, item + '.rdr.full'),
+                                  os.path.join(inps.geo_master, item + '.rdr')))
 
 
-def command_line_parse(iargs=None):
-    """ Parses command line agurments into inps variable. """
+    for item in run_list_slc:
+        cropSLC(item)
 
-    parser = create_parser()
-    inps = parser.parse_args(args=iargs)
+    for item in run_list_geo:
+        cropQualitymap(item)
 
-    return inps
+    print('Done cropping images.')
+
+    return None
+
+##############################################################################
 
 
 def cropSLC(data):
@@ -52,7 +110,7 @@ def cropSLC(data):
     inp_file = ds.GetRasterBand(1).ReadAsArray()[pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
     data_type = inp_file.dtype.type
     del ds
-
+    
     out_map = np.memmap(output_file, dtype=data_type, mode='write', shape=(pathObj.n_lines, pathObj.width))
     out_map[:, :] = inp_file[:, :]
 
@@ -66,6 +124,9 @@ def cropSLC(data):
     del inp_file, out_map
 
     return output_file
+
+
+##############################################################################
 
 
 def cropQualitymap(data):
@@ -83,7 +144,8 @@ def cropQualitymap(data):
     inp_file = ds.GetRasterBand(1).ReadAsArray()[pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
 
     if bands == 2:
-        inp_file2 = ds.GetRasterBand(2).ReadAsArray()[pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
+        inp_file2 = ds.GetRasterBand(2).ReadAsArray()[pathObj.first_row:pathObj.last_row,
+                    pathObj.first_col:pathObj.last_col]
 
     del ds, img
 
@@ -115,59 +177,10 @@ def cropQualitymap(data):
 
     return output_file
 
+##############################################################################
+
 
 if __name__ == '__main__':
-    '''
-    Crop SLCs and geometry.
-    '''
-    message_rsmas.log(os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
-    
-    inps = command_line_parse()
-    inps = create_or_update_template(inps)
-    inps.geo_master = os.path.join(inps.work_dir, pathObj.geomasterdir)
+    main()
 
-    slc_list = os.listdir(os.path.join(inps.work_dir, pathObj.mergedslcdir))
-    slc_list = [os.path.join(inps.work_dir, pathObj.mergedslcdir, x, x + '.slc.full') for x in slc_list]
-
-    meta_data = pathObj.get_geom_master_lists()
-
-    cbox = [val for val in inps.cropbox.split()]
-    if len(cbox) != 4:
-        raise Exception('Bbox should contain 4 floating point values')
-
-    crop_area = np.array(
-        convert_geo2image_coord(inps.geo_master, np.float32(cbox[0]), np.float32(cbox[1]),
-                                np.float32(cbox[2]), np.float32(cbox[3])))
-
-    pathObj.first_row = np.int(crop_area[0])
-    pathObj.last_row = np.int(crop_area[1])
-    pathObj.first_col = np.int(crop_area[2])
-    pathObj.last_col = np.int(crop_area[3])
-
-    pathObj.n_lines = pathObj.last_row - pathObj.first_row
-    pathObj.width = pathObj.last_col - pathObj.first_col
-
-    run_list_slc = []
-    run_list_geo = []
-
-    for item in slc_list:
-        run_list_slc.append((item, item.split('.full')[0]))
-
-    for item in meta_data:
-        run_list_geo.append((os.path.join(inps.geo_master, item + '.rdr.full'),
-                                  os.path.join(inps.geo_master, item + '.rdr')))
-
-    futures = []
-    start_time = time.time()
-
-    for item in run_list_slc:
-        future = dask.delayed(cropSLC)(item)
-        futures.append(future)
-
-    for item in run_list_geo:
-        future = dask.delayed(cropQualitymap)(item)
-        futures.append(future)
-
-    results = dask.compute(*futures)
-
-    print('Done cropping images.')
+  

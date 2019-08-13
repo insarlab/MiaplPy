@@ -100,7 +100,7 @@ def main(iargs=None):
             os.mkdir(inps.output_dir)
 
         outputint = inps.output_dir + '/filt_fine.int'
-        ifg = np.memmap(outputint , dtype=np.complex64, mode='w+', shape=(n_line, width))
+        ifg = np.memmap(outputint, dtype=np.complex64, mode='w+', shape=(n_line, width))
         doq = False
 
     for patch in patch_list:
@@ -175,7 +175,6 @@ def main(iargs=None):
         corfile = os.path.join(inps.output_dir, 'filt_fine.cor')
 
         estCoherence(outputint, corfile)
-
 
 
 if __name__ == '__main__':
