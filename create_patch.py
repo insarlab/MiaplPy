@@ -6,19 +6,19 @@ import os
 import sys
 import shutil
 import numpy as np
-import argparse
 import dask
 from datetime import datetime
 import time
 import minsar.job_submission as js
 from minsar.objects import message_rsmas
 import minopy_utilities as mnp
-from minsar.utils.process_utilities import add_pause_to_walltime
+from minsar.utils.process_utilities import add_pause_to_walltime, get_config_defaults
 from minsar.objects.auto_defaults import PathFind
 
 
 pathObj = PathFind()
 #######################
+
 
 def main(iargs=None):
     """
@@ -27,7 +27,7 @@ def main(iargs=None):
 
     inps = mnp.cmd_line_parse(iargs)
 
-    config = putils.get_config_defaults(config_file='job_defaults.cfg')
+    config = get_config_defaults(config_file='job_defaults.cfg')
 
     job_file_name = 'create_patch'
     job_name = job_file_name

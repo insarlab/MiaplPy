@@ -4,16 +4,11 @@
 ############################################################
 
 import os
-import sys
 import time
-
-import argparse
-from numpy import linalg as LA
 import numpy as np
 import minopy_utilities as mnp
 import dask
-import pandas as pd
-from scipy.stats import anderson_ksamp, ttest_ind
+from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 from skimage.measure import label
 from minsar.objects.auto_defaults import PathFind
 
@@ -44,6 +39,8 @@ def main(iargs=None):
     # Quality (temporal coherence) calculation based on PTA
 
     inversionObj.get_pta_coherence()
+
+    print('{} is done successfuly'.format(inps.patch))
 
     return None
 
@@ -106,6 +103,8 @@ class PhaseLink:
     def find_shp(self):
 
         time0 = time.time()
+        
+        print('Find SHP for {}'.format(self.patch_dir))
 
         if not os.path.isfile(self.patch_dir + '/shp_flag'):
             for coord in self.coords:
@@ -125,7 +124,7 @@ class PhaseLink:
 
     def get_shp_row_col(self, data):
 
-        # print(data)
+        print(data)
 
         row_0, col_0 = data
 
@@ -141,7 +140,7 @@ class PhaseLink:
 
         win = np.abs(self.rslc[0:self.num_slc, y, x])
         testvec = win.reshape(self.num_slc, self.azimuth_window * self.range_window)
-        adres = np.zeros(self.azimuth_window * self.range_window).astype(int)
+        ksres = np.zeros(self.azimuth_window * self.range_window).astype(int)
 
         S1 = np.abs(self.rslc[0:self.num_slc, row_0, col_0])
         S1 = S1.flatten()
@@ -155,19 +154,23 @@ class PhaseLink:
                 S2 = S2.flatten()
 
                 try:
-                    test = anderson_ksamp([S1, S2])
+                    # test = anderson_ksamp([S1, S2])
+                    test = ks_2samp(S1, S2)
                     # test = ttest_ind(S1, S2, equal_var=False)
-                    if test.significance_level > 0.01:
-                        adres[m] = 1
+                    if test[1] > 0.95:
+                        ksres[m] = 1
+                    # if test.significance_level > 0.01:
+                    #    adres[m] = 1
                     # if test[1] > 0.05:
                     #    adres[m] = 1
                 except:
-                    adres[m] = 0
+                    ksres[m] = 0
+                    #adres[m] = 0
 
-        ks_label = label(adres.reshape(self.azimuth_window, self.range_window), background=False, connectivity=2)
-        adres = 1 * (ks_label == ks_label[self.reference_row, self.reference_col])
+        ks_label = label(ksres.reshape(self.azimuth_window, self.range_window), background=False, connectivity=2)
+        ksres = 1 * (ks_label == ks_label[self.reference_row, self.reference_col])
 
-        self.shp[:, row_0:row_0 + 1, col_0:col_0 + 1] = adres.reshape(self.azimuth_window * self.range_window, 1, 1)
+        self.shp[:, row_0:row_0 + 1, col_0:col_0 + 1] = ksres.reshape(self.azimuth_window * self.range_window, 1, 1)
 
         return
 
@@ -232,21 +235,23 @@ class PhaseLink:
 
     def patch_phase_linking(self):
 
+        print('Inversion for {}'.format(self.patch_dir))
+
         if not os.path.exists(self.patch_dir + '/RSLC_ref'):
 
-            self.rslc_ref = np.memmap(inps.patch + '/RSLC_ref', dtype='complex64', mode='w+',
+            self.rslc_ref = np.memmap(self.patch_dir + '/RSLC_ref', dtype='complex64', mode='w+',
                                          shape=(self.n_image, self.length, self.width))
 
-            self.progress = np.memmap(inps.patch + '/progress', dtype='int8', mode='w+',
+            self.progress = np.memmap(self.patch_dir + '/progress', dtype='int8', mode='w+',
                                          shape=(self.length, self.width))
 
             self.rslc_ref[:, :, :] = self.rslc[:, :, :]
 
         else:
-            self.rslc_ref = np.memmap(inps.patch + '/RSLC_ref', dtype='complex64', mode='r+',
+            self.rslc_ref = np.memmap(self.patch_dir + '/RSLC_ref', dtype='complex64', mode='r+',
                                          shape=(self.n_image, self.length, self.width))
 
-            self.progress = np.memmap(inps.patch + '/progress', dtype='int8', mode='r+',
+            self.progress = np.memmap(self.patch_dir + '/progress', dtype='int8', mode='r+',
                                          shape=(self.length, self.width))
 
         # futures = []
@@ -256,6 +261,8 @@ class PhaseLink:
         if not os.path.isfile('inversion_flag'):
 
             for coord in self.coords:
+
+                print(coord)
 
                 num_shp = len(self.shp[self.shp[:, coord[0], coord[1]] == 1])
                 if num_shp > 0:
@@ -298,7 +305,7 @@ class PhaseLink:
             self.quality[:, :] = -1
 
             if self.rslc_ref is None:
-                self.rslc_ref = np.memmap(inps.patch + '/RSLC_ref', dtype='complex64', mode='r',
+                self.rslc_ref = np.memmap(self.patch_dir + '/RSLC_ref', dtype='complex64', mode='r',
                                           shape=(self.n_image, self.length, self.width))
 
             futures = []

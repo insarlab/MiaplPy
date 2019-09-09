@@ -6,18 +6,16 @@
 import os
 import sys
 import gdal
-import argparse
 import numpy as np
 import isce
 import isceobj
 import time
 import minsar.job_submission as js
 from minsar.objects import message_rsmas
-from minsar.utils.process_utilities import add_pause_to_walltime
+from minsar.utils.process_utilities import add_pause_to_walltime, get_config_defaults
 from isceobj.Util.ImageUtil import ImageLib as IML
-import minopy_utilities as mnp
+from minopy_utilities import cmd_line_parse, convert_geo2image_coord
 from minsar.objects.auto_defaults import PathFind
-import dask
 
 pathObj = PathFind()
 ##############################################################################
@@ -28,9 +26,9 @@ def main(iargs=None):
     Crop SLCs and geometry.
     '''
 
-    inps = mnp.cmd_line_parse(iargs)
+    inps = cmd_line_parse(iargs)
 
-    config = putils.get_config_defaults(config_file='job_defaults.cfg')
+    config = get_config_defaults(config_file='job_defaults.cfg')
 
     job_file_name = 'crop_sentinel'
     job_name = job_file_name
@@ -46,7 +44,7 @@ def main(iargs=None):
 
     if inps.submit_flag:
 
-        js.submit_script(job_name, job_file_name, sys.argv[:], inp.work_dir, new_wall_time)
+        js.submit_script(job_name, job_file_name, sys.argv[:], inps.work_dir, new_wall_time)
         sys.exit(0)
 
     time.sleep(wait_seconds)
@@ -61,13 +59,17 @@ def main(iargs=None):
 
     meta_data = pathObj.get_geom_master_lists()
 
+    if inps.template['minopy.subset'] == 'None':
+        print('WARNING: No crop area given in minopy.subset, the whole image is going to be used.')
+        print('WARNING: May take days to process!')
+
     cbox = [val for val in inps.cropbox.split()]
+
     if len(cbox) != 4:
         raise Exception('Bbox should contain 4 floating point values')
 
-    crop_area = np.array(
-        mnp.convert_geo2image_coord(inps.geo_master, inps.master_dir, np.float32(cbox[0]), np.float32(cbox[1]),
-                                np.float32(cbox[2]), np.float32(cbox[3])))
+    crop_area = np.array(convert_geo2image_coord(inps.geo_master, np.float32(cbox[0]),
+                                                 np.float32(cbox[1]), np.float32(cbox[2]), np.float32(cbox[3])))
 
     pathObj.first_row = crop_area[0]
     pathObj.last_row = crop_area[1]
@@ -86,7 +88,6 @@ def main(iargs=None):
     for item in meta_data:
         run_list_geo.append((os.path.join(inps.geo_master, item + '.rdr.full'),
                                   os.path.join(inps.geo_master, item + '.rdr')))
-
 
     for item in run_list_slc:
         cropSLC(item)
@@ -183,4 +184,3 @@ def cropQualitymap(data):
 if __name__ == '__main__':
     main()
 
-  

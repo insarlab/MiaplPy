@@ -9,19 +9,18 @@
 import os
 import sys
 import time
-import argparse
 import numpy as np
 import gdal
 import mintpy
 import mintpy.workflow
 from mintpy.utils import readfile, utils as ut
 import minsar.job_submission as js
-from minsar.utils.process_utilities import get_project_name, get_work_directory, add_pause_to_walltime
+from minsar.utils.process_utilities import add_pause_to_walltime
 from minsar.objects.auto_defaults import PathFind
 from minsar.objects import message_rsmas
-import minopy_utilities as mnp
-pathObj = PathFind()
+import minopy.minopy_utilities as mnp
 
+pathObj = PathFind()
 ##########################################################################
 
 
@@ -68,8 +67,6 @@ def main(iargs=None):
     else:
         inps.customTemplateFile = os.path.abspath(inps.customTemplateFile)
 
-    inps.project_name = get_project_name(inps.customTemplateFile)
-    inps.project_dir = get_work_directory(None, inps.project_name)
     inps.mintpy_dir = os.path.join(inps.project_dir, pathObj.mintpydir)
 
     app = mintpy.smallbaselineApp.TimeSeriesAnalysis(inps.customTemplateFile, inps.mintpy_dir)

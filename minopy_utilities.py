@@ -4,21 +4,24 @@
 # Author: Sara Mirzaee
 # Created: 10/2018
 ###############################################################################
+from mintpy.prep_isce import extract_tops_metadata, extract_geometry_metadata
 import sys
 import os
 import numpy as np
 import cmath
 import argparse
+import glob
 from numpy import linalg as LA
 from scipy.optimize import minimize, Bounds
 from scipy import stats
 import gdal
 import isce
 import isceobj
-from mintpy.prep_isce import *
 from mintpy.utils import readfile
 from minsar.objects.auto_defaults import PathFind
 import minsar.utils.process_utilities as putils
+
+
 pathObj = PathFind()
 ################################################################################
 
@@ -57,16 +60,18 @@ def add_minopy_wrapper(parser):
 
     STEP_LIST, STEP_HELP = pathObj.minopy_help()
 
-    mnp = parser.add_argument_group('MiNoPy Routine InSAR Time Series Analysis. steps processing '
+    minp = parser.add_argument_group('MiNoPy Routine InSAR Time Series Analysis. steps processing '
                                     '(start/end/step)', STEP_HELP)
-    mnp.add_argument('--remove_minopy_dir', dest='remove_minopy_dir', action='store_true',
+    minp.add_argument('--remove_minopy_dir', dest='remove_minopy_dir', action='store_true',
                      help='remove directory before download starts')
-    mnp.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
+    minp.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
                       help='start processing at the named step, default: {}'.format(STEP_LIST[0]))
-    mnp.add_argument('--stop', dest='endStep', metavar='STEP', default=STEP_LIST[-1],
+    minp.add_argument('--stop', dest='endStep', metavar='STEP', default=STEP_LIST[-1],
                       help='end processing at the named step, default: {}'.format(STEP_LIST[-1]))
-    mnp.add_argument('--step', dest='step', metavar='STEP',
+    minp.add_argument('--step', dest='step', metavar='STEP',
                       help='run processing at the named step only')
+    minp.add_argument('--email', action='store_true', dest='email', default=False,
+                    help='opt to email results')
 
     return parser
 
@@ -100,42 +105,79 @@ def add_mintpy_corrections(parser):
 ################################################################################
 
 
-def convert_geo2image_coord_old(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
-
+def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
     ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
-    lat = ds.GetRasterBand(1).ReadAsArray()
+    lat_lut = ds.GetRasterBand(1).ReadAsArray()
     del ds
 
-    idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
-    lat_c = np.int(np.mean(idx_lat[0]))
+    #idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
+    #lat_c = np.int(np.mean(idx_lat[0]))
 
     ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
-    lon = ds.GetRasterBand(1).ReadAsArray()
-    lon = lon[lat_c, :]
+    lon_lut = ds.GetRasterBand(1).ReadAsArray()
+    #lon = lon[lat_c, :]
     del ds
 
-    idx_lon = np.where((lon >= lon_west) & (lon <= lon_east))
+    mask_y = np.multiply(lat_lut >= lat_south, lat_lut <= lat_north)
+    mask_x = np.multiply(lon_lut >= lon_west, lon_lut <= lon_east)
+    mask_yx = np.multiply(mask_y, mask_x)
 
-    lon_c = np.int(np.mean(idx_lon))
+    rows, cols = np.where(mask_yx)
 
-    lat = lat[:, lon_c]
-
-    idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
-
-    first_row = np.min(idx_lat)
-    last_row = np.max(idx_lat)
-    first_col = np.min(idx_lon)
-    last_col = np.max(idx_lon)
+    first_row = np.rint(np.min(rows)).astype(int)
+    last_row = np.rint(np.max(rows)).astype(int)
+    first_col = np.rint(np.min(cols)).astype(int)
+    last_col = np.rint(np.max(cols)).astype(int)
 
     image_coord = [first_row, last_row, first_col, last_col]
+
+    #idx_lon = np.where((lon >= lon_west) & (lon <= lon_east))
+
+    #lon_c = np.int(np.mean(idx_lon))
+
+    #lat = lat[:, lon_c]
+
+    #idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
+
+    #first_row = np.min(idx_lat)
+    #last_row = np.max(idx_lat)
+    #first_col = np.min(idx_lon)
+    #last_col = np.max(idx_lon)
+
+    #image_coord = [first_row, last_row, first_col, last_col]
 
     return image_coord
 
 
-def convert_geo2image_coord(geo_master_dir, master_dir, lat_south, lat_north, lon_west, lon_east):
+def convert_geo2image_coord_old(geo_master_dir, master_dir, lat_south, lat_north, lon_west, lon_east):
     """ Finds the corresponding line and sample based on geographical coordinates. """
+
+    from iscesys.Component.ProductManager import ProductManager as PM
+    import isceobj.Planet.AstronomicalHandbook as AstronomicalHandbook
+    from isceobj.Planet.Ellipsoid import Ellipsoid
+
+    rmeta = readfile.read_isce_xml(geo_master_dir + '/lat.rdr.full.xml')
+    master_xml = glob.glob(master_dir + '/IW*.xml')[0]
+    pm = PM()
+    pm.configure()
+    obj = pm.loadProduct(xmlname)
+    burst = obj.bursts[0]
+    burstEnd = obj.bursts[-1]
+    orbit = burst.orbit
+    peg = orbit.interpolateOrbit(burst.sensingMid, method='hermite')
+
+
+
+    # Read Attributes
+    range_n = float(burst.startingRange)
+    dR = float(burst.rangePixelSize)
+    width = int(rmeta['WIDTH'])
+    Re = float(gmeta['earthRadius'])
+    Height = float(gmeta['altitude'])
+    range_f = range_n + dR * width
+
 
     master_xml = glob.glob(master_dir + '/IW*.xml')[0]
     metadata = extract_tops_metadata(master_xml)
@@ -315,7 +357,7 @@ def regularize_matrix(M):
 
 ###############################################################################
 
-#def gam_pta_f(g1, g2):
+# def gam_pta_f(g1, g2):
 #    """ Returns squeesar PTA coherence between the initial and estimated phase vectors. """
 
 #    n1 = g1.shape[0]
@@ -475,7 +517,7 @@ def comp_matr(x, y):
     return out
 
 ###############################################################################
-################# Simulation:
+# Simulation:
 
 
 def simulate_volcano_def_phase(n_img=100, tmp_bl=6):
@@ -529,6 +571,7 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
 
 ################################################################################
 
+
 def simulate_noise(corr_matrix):
     N = corr_matrix.shape[0]
 
@@ -536,12 +579,12 @@ def simulate_noise(corr_matrix):
     w, v = np.linalg.eigh(corr_matrix)
     msk = (w < 1e-3)
     w[msk] = 0.
-    #corr_matrix =  np.dot(v, np.dot(np.diag(w), np.matrix.getH(v)))
+    # corr_matrix =  np.dot(v, np.dot(np.diag(w), np.matrix.getH(v)))
 
-    #C = np.linalg.cholesky(corr_matrix)
+    # C = np.linalg.cholesky(corr_matrix)
     C = np.dot(v, np.dot(np.diag(np.sqrt(w)), np.matrix.getH(v)))
-    Z = (np.random.randn(N) +1j*np.random.randn(N)) / np.sqrt(2)
-    noise = np.dot(C,Z)
+    Z = (np.random.randn(N) + 1j*np.random.randn(N)) / np.sqrt(2)
+    noise = np.dot(C, Z)
 
     return noise
 
@@ -631,7 +674,7 @@ def phase_linking_process(ccg_sample, stepp, method, squeez=True):
     if squeez:
         vm = np.matrix(np.exp(1j * res[stepp::, 0:1]) / LA.norm(np.exp(1j * res[stepp::, 0:1])))
         squeezed = np.matmul(np.conjugate(vm.T), ccg_sample[stepp::, :])
-        #squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, :])
+        # squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, :])
         return res, squeezed
     else:
         return res,
@@ -705,8 +748,8 @@ def sequential_phase_linking(full_stack_complex_samples, method, num_stack=1):
     datum_connection_samples = squeezed_images
     datum_shift, squeezed_datum = phase_linking_process(datum_connection_samples, 0, 'EMI')
 
-    #phas_refined_no_datum_shift = np.zeros(np.shape(phas_refined))
-    #phas_refined_no_datum_shift[:, :] = phas_refined[:, :]
+    # phas_refined_no_datum_shift = np.zeros(np.shape(phas_refined))
+    # phas_refined_no_datum_shift[:, :] = phas_refined[:, :]
 
     for step in range(len(datum_shift)):
         first_line = step * mini_stack_size
@@ -718,15 +761,18 @@ def sequential_phase_linking(full_stack_complex_samples, method, num_stack=1):
         phas_refined[first_line:last_line, 0:1] = phas_refined[first_line:last_line, 0:1] - \
                                                   datum_shift[step:step + 1, 0:1]
 
-    #return phas_refined_no_datum_shift, phas_refined
+    # return phas_refined_no_datum_shift, phas_refined
     return phas_refined
 
 #############################################
 
 
 def create_xml(fname, bands, line, sample, format):
+
     from isceobj.Util.ImageUtil import ImageLib as IML
+
     rslc = np.memmap(fname, dtype=np.complex64, mode='w+', shape=(bands, line, sample))
     IML.renderISCEXML(fname, bands, line, sample, format, 'BIL')
+
     return rslc
 
