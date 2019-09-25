@@ -11,7 +11,7 @@ import gdal
 import isce
 import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
-from FilterAndCoherence import estCoherence
+from FilterAndCoherence import estCoherence, runFilter
 
 
 ##############################################################################
@@ -77,6 +77,8 @@ def main(iargs=None):
     patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win + 1
     patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + range_win - 1
 
+    print(patch_rows_overlap, patch_cols_overlap)
+
     first_row = patch_rows_overlap[0, 0, 0]
     last_row = patch_rows_overlap[1, 0, -1]
     first_col = patch_cols_overlap[0, 0, 0]
@@ -90,17 +92,20 @@ def main(iargs=None):
         if not os.path.isdir(inps.output_dir):
             os.mkdir(inps.output_dir)
 
-        outputq = inps.output_dir + '/Quality.rdr'
-        Quality = IML.memmap(outputq, mode='write', nchannels=1,
+        output_quality = inps.output_dir + '/Quality.rdr'
+        output_shp = inps.output_dir + '/SHP.rdr'
+        Quality = IML.memmap(output_quality, mode='write', nchannels=1,
                              nxx=width, nyy=n_line, scheme='BIL', dataType='f')
+        SHP = IML.memmap(output_shp, mode='write', nchannels=1,
+                             nxx=width, nyy=n_line, scheme='BIL', dataType='int')
         doq = True
     else:
 
         if not os.path.isdir(inps.output_dir):
             os.mkdir(inps.output_dir)
 
-        outputint = inps.output_dir + '/filt_fine.int'
-        ifg = np.memmap(outputint, dtype=np.complex64, mode='w+', shape=(n_line, width))
+        output_int = inps.output_dir + '/fine.int'
+        ifg = np.memmap(output_int, dtype=np.complex64, mode='w+', shape=(n_line, width))
         doq = False
 
     for patch in patch_list:
@@ -112,27 +117,33 @@ def main(iargs=None):
         col1 = patch_cols_overlap[0, 0, col]
         col2 = patch_cols_overlap[1, 0, col]
 
-        patch_lines = patch_rows[1][0][row] - patch_rows[0][0][row]
-        patch_samples = patch_cols[1][0][col] - patch_cols[0][0][col]
+        patch_lines = patch_rows[1, 0, row] - patch_rows[0, 0, row]
+        patch_samples = patch_cols[1, 0, col] - patch_cols[0, 0, col]
 
-        f_row = (row1 - patch_rows[0, 0, row])
-        l_row = patch_lines - (patch_rows[1, 0, row] - row2)
-        f_col = (col1 - patch_cols[0, 0, col])
-        l_col = patch_samples - (patch_cols[1, 0, col] - col2)
+        f_row = row1 - patch_rows[0, 0, row]
+        l_row = row2 - patch_rows[0, 0, row]
+        f_col = col1 - patch_cols[0, 0, col]
+        l_col = col2 - patch_cols[0, 0, col]
 
         if doq:
-            qlty = np.memmap(inps.minopy_dir + '/' + patch  + '/quality',
+            qlty = np.memmap(inps.minopy_dir + '/' + patch + '/quality',
                              dtype=np.float32, mode='r', shape=(patch_lines, patch_samples))
             Quality.bands[0][row1:row2 + 1, col1:col2 + 1] = qlty[f_row:l_row + 1, f_col:l_col + 1]
+
+            shp_p = np.memmap(inps.minopy_dir + '/' + patch + '/SHP',
+                             dtype='byte', mode='r', shape=(range_win*azimuth_win, patch_lines, patch_samples))
+
+            SHP.bands[0][row1:row2 + 1, col1:col2 + 1] = np.sum(shp_p[:, f_row:l_row + 1, f_col:l_col + 1], axis=0)
+
         else:
-            rslc_patch = np.memmap(inps.minopy_dir + '/' + patch  + '/RSLC_ref',
+            rslc_patch = np.memmap(inps.minopy_dir + '/' + patch + '/RSLC_ref',
                                dtype=np.complex64, mode='r', shape=(np.int(inps.n_image), patch_lines, patch_samples))
             ifg_patch = np.zeros([patch_lines, patch_samples])+0j
-            master = rslc_patch[0,:,:]
-            slave = rslc_patch[np.int(inps.ifg_index),:,:]
+            master = rslc_patch[0, :, :]
+            slave = rslc_patch[np.int(inps.ifg_index), :, :]
 
             for kk in range(0, patch_lines):
-                ifg_patch[kk, 0:patch_samples + 1] = master[kk, 0:patch_samples + 1] * np.conj(slave[kk, 0:patch_samples + 1])
+                ifg_patch[kk, f_col:l_col + 1] = master[kk, f_col:l_col + 1] * np.conj(slave[kk, f_col:l_col + 1])
 
             ifg[row1:row2 + 1, col1:col2 + 1] = ifg_patch[f_row:l_row + 1, f_col:l_col + 1]
 
@@ -140,41 +151,57 @@ def main(iargs=None):
 
         Quality = None
 
-        IML.renderISCEXML(outputq, 1, n_line, width, 'f', 'BIL')
+        IML.renderISCEXML(output_quality, 1, n_line, width, 'f', 'BIL')
 
         out_img = isceobj.createImage()
-        out_img.load(outputq + '.xml')
+        out_img.load(output_quality + '.xml')
         out_img.imageType = 'f'
         out_img.renderHdr()
         try:
-            out_map.bands[0].base.base.flush()
+            out_img.bands[0].base.base.flush()
         except:
             pass
 
-        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + outputq + '.vrt ' + outputq
+        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + output_quality + '.vrt ' + output_quality
         os.system(cmd)
 
-        ds = gdal.Open(outputq, gdal.GA_ReadOnly)
+        ## SHP
 
-        ds.SetMetadata({'plmethod': inps.plmethod})
+        SHP = None
 
-        ds = None
+        IML.renderISCEXML(output_shp, 1, n_line, width, 'int', 'BIL')
+        out_img = isceobj.createImage()
+        out_img.load(output_shp + '.xml')
+        out_img.imageType = 'int'
+        out_img.renderHdr()
+        try:
+            out_img.bands[0].base.base.flush()
+        except:
+            pass
+
+        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + output_shp + '.vrt ' + output_shp
+        os.system(cmd)
 
     else:
 
         ifg = None
 
         obj_int = isceobj.createIntImage()
-        obj_int.setFilename(outputint)
+        obj_int.setFilename(output_int)
         obj_int.setWidth(width)
         obj_int.setLength(n_line)
         obj_int.setAccessMode('READ')
         obj_int.renderHdr()
         obj_int.renderVRT()
 
-        corfile = os.path.join(inps.output_dir, 'filt_fine.cor')
+        filt_file = inps.output_dir + '/filt_fine.int'
+        filter_strength = 0.5
 
-        estCoherence(outputint, corfile)
+        runFilter(output_int, filt_file, filter_strength)
+
+        cor_file = os.path.join(inps.output_dir, 'filt_fine.cor')
+
+        estCoherence(filt_file, cor_file)
 
 
 if __name__ == '__main__':

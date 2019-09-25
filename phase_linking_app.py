@@ -6,8 +6,11 @@
 import os
 import sys
 import time
+import datetime
 from minopy.minopy_utilities import cmd_line_parse
 import glob
+import subprocess
+import contextlib
 from minsar.objects import message_rsmas
 import minsar.utils.process_utilities as putils
 from minsar.objects.auto_defaults import PathFind
@@ -39,7 +42,7 @@ def main(iargs=None):
     #########################################
 
     if inps.submit_flag:
-        js.submit_script(job_name, job_file_name, sys.argv[:], inp.work_dir, new_wall_time)
+        js.submit_script(job_name, job_file_name, sys.argv[:], inps.work_dir, new_wall_time)
         sys.exit(0)
 
     time.sleep(wait_seconds)
@@ -51,14 +54,16 @@ def main(iargs=None):
 
     os.system('python -W ignore patch_inversion.py')
 
-    run_minopy_inversion = os.path.join(inps.minopy_dir, 'run_minopy_inversion')
+    run_minopy_inversion = os.path.join(inps.work_dir, 'run_files', 'run_minopy_inversion')
 
     with open(run_minopy_inversion, 'w') as f:
         for item in patch_list:
-            cmd = 'patch_inversion.py {a0} -p {a1} \n'.format(a0=inps.customTemplateFile, a1=item)
+            cmd = 'patch_inversion.py {a0} -p {a1} \n'.format(a0=inps.custom_template_file, a1=item)
             f.write(cmd)
 
-    if os.getenv('JOBSCHEDULER') == 'LSF' or os.getenv('JOBSCHEDULER') == 'PBS':
+    supported_schedulers = ['LSF', 'PBS', 'SLURM']
+
+    if os.getenv('JOBSCHEDULER') in supported_schedulers:
 
         config = putils.get_config_defaults(config_file='job_defaults.cfg')
 
@@ -80,15 +85,40 @@ def main(iargs=None):
 
         putils.remove_last_job_running_products(run_file=run_minopy_inversion)
 
-        jobs = js.submit_batch_jobs(batch_file=run_minopy_inversion,
-                                    out_dir=inps.minopy_dir,
-                                    work_dir=inps.work_dir, memory=memorymax,
-                                    walltime=walltimelimit, queue=queuename)
+        if os.getenv('JOBSCHEDULER') in ['SLURM', 'sge']:
 
-        putils.remove_zero_size_or_length_error_files(run_file=run_minopy_inversion)
-        putils.raise_exception_if_job_exited(run_file=run_minopy_inversion)
-        putils.concatenate_error_files(run_file=run_minopy_inversion, work_dir=inps.work_dir)
-        putils.move_out_job_files_to_stdout(run_file=run_minopy_inversion)
+            hostname = subprocess.Popen("hostname", shell=True, stdout=subprocess.PIPE).stdout.read().decode(
+                "utf-8")
+            if hostname.startswith('login'):
+
+                js.submit_job_with_launcher(batch_file=run_minopy_inversion, work_dir=inps.work_dir,
+                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
+            else:
+
+                try:
+                    with open('{}.o'.format(run_minopy_inversion), 'w') as f:
+                        with contextlib.redirect_stdout(f):
+                            js.submit_job_with_launcher(batch_file=run_minopy_inversion, work_dir=inps.work_dir,
+                                                        memory=memorymax, walltime=walltimelimit, queue=queuename)
+                except:
+                    with open('{}.e'.format(run_minopy_inversion), 'w') as g:
+                        with contextlib.redirect_stderr(g):
+                            js.submit_job_with_launcher(batch_file=run_minopy_inversion, work_dir=inps.work_dir,
+                                                        memory=memorymax, walltime=walltimelimit, queue=queuename)
+
+        else:
+
+            jobs = js.submit_batch_jobs(batch_file=run_minopy_inversion, out_dir=os.path.join(inps.work_dir, 'run_files'),
+                                        work_dir=inps.work_dir, memory=memorymax, walltime=walltimelimit,
+                                        queue=queuename)
+
+            putils.remove_zero_size_or_length_error_files(run_file=run_minopy_inversion)
+            putils.raise_exception_if_job_exited(run_file=run_minopy_inversion)
+            putils.concatenate_error_files(run_file=run_minopy_inversion, work_dir=inps.work_dir)
+            putils.move_out_job_files_to_stdout(run_file=run_minopy_inversion)
+
+        date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+        print(date_str + ' * Job {} completed'.format(run_minopy_inversion))
 
     else:
 

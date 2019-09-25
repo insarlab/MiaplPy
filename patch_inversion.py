@@ -8,6 +8,7 @@ import time
 import numpy as np
 import minopy_utilities as mnp
 import dask
+import pandas as pd
 from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 from skimage.measure import label
 from minsar.objects.auto_defaults import PathFind
@@ -28,17 +29,9 @@ def main(iargs=None):
 
     inversionObj = PhaseLink(inps)
 
-    # Find SHPs:
-
-    inversionObj.find_shp()
-
     # Phase linking inversion:
 
     inversionObj.patch_phase_linking()
-
-    # Quality (temporal coherence) calculation based on PTA
-
-    inversionObj.get_pta_coherence()
 
     print('{} is done successfuly'.format(inps.patch))
 
@@ -55,6 +48,15 @@ class PhaseLink:
         self.range_window = int(inps.template['minopy.range_window'])
         self.azimuth_window = int(inps.template['minopy.azimuth_window'])
         self.patch_dir = inps.patch
+        self.shp_test = inps.template['minopy.shp_test']
+        if self.shp_test == 'ks':
+            self.shp_function = mnp.ks2smapletest
+        elif self.shp_test == 'ad':
+            self.shp_function = mnp.ADtest
+        elif self.shp_test == 'ttest':
+            self.shp_function = mnp.ttest_indtest
+        else:   # default is KS 2 sample test
+            self.shp_function = mnp.ks2smapletest
 
         count_dim = np.load(inps.patch + '/count.npy')
         self.n_image = count_dim[0]
@@ -65,6 +67,8 @@ class PhaseLink:
             self.num_slc = self.n_image
         else:
             self.num_slc = 20
+
+        self.distance_thresh = mnp.ks_lut(self.num_slc, self.num_slc, alpha=0.05)
 
         lin = np.ogrid[0:self.length]
         sam = np.ogrid[0:self.width]
@@ -94,37 +98,29 @@ class PhaseLink:
             self.shp = np.memmap(self.patch_dir + '/SHP', dtype='byte', mode='r+',
                                  shape=(shp_size, self.length, self.width))
 
-        self.rslc_ref = None
-        self.progress = None
-        self.quality = None
+        if not os.path.exists(self.patch_dir + '/RSLC_ref'):
 
-        return
+            self.rslc_ref = np.memmap(self.patch_dir + '/RSLC_ref', dtype='complex64', mode='w+',
+                                         shape=(self.n_image, self.length, self.width))
 
-    def find_shp(self):
+            self.rslc_ref[:, :, :] = self.rslc[:, :, :]
 
-        time0 = time.time()
-        
-        print('Find SHP for {}'.format(self.patch_dir))
+        else:
+            self.rslc_ref = np.memmap(self.patch_dir + '/RSLC_ref', dtype='complex64', mode='r+',
+                                         shape=(self.n_image, self.length, self.width))
 
-        if not os.path.isfile(self.patch_dir + '/shp_flag'):
-            for coord in self.coords:
-                if not self.shp[:, coord[0], coord[1]].any():
-                    self.get_shp_row_col(coord)
-                else:
-                    print('coord {} done before'.format(coord))
+        if not os.path.exists(self.patch_dir + '/quality'):
 
-        with open(self.patch_dir + '/shp_flag', 'w') as f:
-            f.write('shp step done')
-
-        timep = time.time() - time0
-
-        print('time spent to find SHPs {}: min'.format(timep / 60))
+            self.quality = np.memmap(self.patch_dir + '/quality', dtype='float32', mode='w+',
+                                        shape=(self.length, self.width))
+            self.quality[:, :] = -1
+        else:
+            self.quality = np.memmap(self.patch_dir + '/quality', dtype='float32', mode='r+',
+                                     shape=(self.length, self.width))
 
         return
 
     def get_shp_row_col(self, data):
-
-        print(data)
 
         row_0, col_0 = data
 
@@ -139,11 +135,11 @@ class PhaseLink:
         x, y = np.meshgrid(sample_cols.astype(int), sample_rows.astype(int), sparse=False)
 
         win = np.abs(self.rslc[0:self.num_slc, y, x])
-        testvec = win.reshape(self.num_slc, self.azimuth_window * self.range_window)
+        testvec = np.sort(win.reshape(self.num_slc, self.azimuth_window * self.range_window), axis=0)
         ksres = np.zeros(self.azimuth_window * self.range_window).astype(int)
 
-        S1 = np.abs(self.rslc[0:self.num_slc, row_0, col_0])
-        S1 = S1.flatten()
+        S1 = np.abs(self.rslc[0:self.num_slc, row_0, col_0]).reshape(self.num_slc, 1)
+        S1 = np.sort(S1.flatten())
 
         x = x.flatten()
         y = y.flatten()
@@ -151,186 +147,76 @@ class PhaseLink:
         for m in range(testvec.shape[1]):
             if x[m] >= 0 and y[m] >= 0:
                 S2 = testvec[:, m]
-                S2 = S2.flatten()
-
-                try:
-                    # test = anderson_ksamp([S1, S2])
-                    test = ks_2samp(S1, S2)
-                    # test = ttest_ind(S1, S2, equal_var=False)
-                    if test[1] > 0.95:
-                        ksres[m] = 1
-                    # if test.significance_level > 0.01:
-                    #    adres[m] = 1
-                    # if test[1] > 0.05:
-                    #    adres[m] = 1
-                except:
-                    ksres[m] = 0
-                    #adres[m] = 0
+                S2 = np.sort(S2.flatten())
+                ksres[m] = self.shp_function(S1, S2, threshold=self.distance_thresh)
 
         ks_label = label(ksres.reshape(self.azimuth_window, self.range_window), background=False, connectivity=2)
         ksres = 1 * (ks_label == ks_label[self.reference_row, self.reference_col])
 
         self.shp[:, row_0:row_0 + 1, col_0:col_0 + 1] = ksres.reshape(self.azimuth_window * self.range_window, 1, 1)
 
-        return
+        return ksres
 
-    def inversion_sequential(self, data):
-
-        ref_row, ref_col, shp_rows, shp_cols, phase_linking_method = data
-
-        CCG = np.matrix(1.0 * np.arange(self.n_image * len(shp_rows)).reshape(self.n_image, len(shp_rows)))
-        CCG = np.exp(1j * CCG)
-        CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
+    def inversion_sequential(self, CCG, phase_linking_method):
 
         phase_refined = mnp.sequential_phase_linking(CCG, phase_linking_method, num_stack=1)
-
         amp_refined = np.array(np.mean(np.abs(CCG), axis=1))
         phase_refined = np.array(phase_refined)
 
-        self.rslc_ref[:, ref_row:ref_row + 1, ref_col:ref_col + 1] = \
-            np.complex64(np.multiply(amp_refined, np.exp(1j * phase_refined))).reshape(self.n_image, 1, 1)
+        return amp_refined, phase_refined
 
-        self.progress[ref_row:ref_row + 1, ref_col:ref_col + 1] = 1
-
-        # print(ref_row, ref_col, 'DS')
-
-        return None
-
-    def inversion_all(self, data):
-        ref_row, ref_col, shp_rows, shp_cols, phase_linking_method = data
-
-        CCG = np.matrix(1.0 * np.arange(self.n_image * len(shp_rows)).reshape(self.n_image, len(shp_rows)))
-        CCG = np.exp(1j * CCG)
-        CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
+    def inversion_all(self, CCG, phase_linking_method):
 
         phase_refined = mnp.phase_linking_process(CCG, 1, phase_linking_method, squeez=False)
-
         amp_refined = np.array(np.mean(np.abs(CCG), axis=1))
         phase_refined = np.array(phase_refined)
 
-        self.rslc_ref[:, ref_row:ref_row + 1, ref_col:ref_col + 1] = \
-            np.complex64(np.multiply(amp_refined, np.exp(1j * phase_refined))).reshape(self.n_image, 1, 1)
-
-        self.progress[ref_row:ref_row + 1, ref_col:ref_col + 1] = 1
-
-        # print(ref_row, ref_col, 'DS')
-
-        return None
-
-    def filter_persistent_scatterer(self, data):
-        ref_row, ref_col, shp_rows, shp_cols = data
-
-        CCG = np.matrix(1.0 * np.arange(self.n_image * len(shp_rows)).reshape(self.n_image, len(shp_rows)))
-        CCG = np.exp(1j * CCG)
-        CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
-
-        status = mnp.test_PS(CCG)
-
-        if status:
-            data_invert = (ref_row, ref_col, shp_rows, shp_cols, 'EMI')
-            self.inversion_all(data_invert)
-            # print(ref_row, ref_col, 'PS')
-
-        return None
+        return amp_refined, phase_refined
 
     def patch_phase_linking(self):
 
         print('Inversion for {}'.format(self.patch_dir))
 
-        if not os.path.exists(self.patch_dir + '/RSLC_ref'):
-
-            self.rslc_ref = np.memmap(self.patch_dir + '/RSLC_ref', dtype='complex64', mode='w+',
-                                         shape=(self.n_image, self.length, self.width))
-
-            self.progress = np.memmap(self.patch_dir + '/progress', dtype='int8', mode='w+',
-                                         shape=(self.length, self.width))
-
-            self.rslc_ref[:, :, :] = self.rslc[:, :, :]
-
-        else:
-            self.rslc_ref = np.memmap(self.patch_dir + '/RSLC_ref', dtype='complex64', mode='r+',
-                                         shape=(self.n_image, self.length, self.width))
-
-            self.progress = np.memmap(self.patch_dir + '/progress', dtype='int8', mode='r+',
-                                         shape=(self.length, self.width))
-
-        # futures = []
-
         time0 = time.time()
 
-        if not os.path.isfile('inversion_flag'):
+        if os.path.exists(self.patch_dir + '/inversion_flag'):
+            return print('Inversion is already done for {}'.format(self.patch_dir))
 
-            for coord in self.coords:
-
-                print(coord)
-
-                num_shp = len(self.shp[self.shp[:, coord[0], coord[1]] == 1])
+        for coord in self.coords:
+            if not self.shp[:, coord[0], coord[1]].any():
+                shp = self.get_shp_row_col(coord)
+                num_shp = len(shp[np.nonzero(shp > 0)])
                 if num_shp > 0:
 
-                    ad_label = self.shp[:, coord[0], coord[1]].reshape(self.azimuth_window, self.range_window)
-                    shp_rows, shp_cols = np.where(ad_label == 1)
+                    shp_rows, shp_cols = np.where(shp == 1)
                     shp_rows = np.array(shp_rows + coord[0] - (self.azimuth_window - 1) / 2).astype(int)
                     shp_cols = np.array(shp_cols + coord[1] - (self.range_window - 1) / 2).astype(int)
 
-                    if num_shp < 20:
-                        data = (coord[0], coord[1], shp_rows, shp_cols)
-                        self.filter_persistent_scatterer(data)
-                        # futures.append(dask.delayed(self.filter_persistent_scatterer)(data))
-                    else:
-                        data = (coord[0], coord[1], shp_rows, shp_cols, self.phase_linking_method)
+                    CCG = np.matrix(1.0 * np.arange(self.n_image * len(shp_rows)).reshape(self.n_image, len(shp_rows)))
+                    CCG = np.exp(1j * CCG)
+                    CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
 
+                    if num_shp > 20:
                         if 'sequential' in self.phase_linking_method:
-                            self.inversion_sequential(data)
-                            # futures.append(dask.delayed(self.inversion_sequential)(data))
+                            amp_refined, phase_refined = self.inversion_sequential(CCG, self.phase_linking_method)
                         else:
-                            self.inversion_all(data)
-                            # futures.append(dask.delayed(self.inversion_all)(data))
+                            amp_refined, phase_refined = self.inversion_all(CCG, self.phase_linking_method)
+                    else:
+                        status = mnp.test_PS(CCG)
+                        if status:
+                            amp_refined, phase_refined = self.inversion_all(CCG, 'EMI')
 
-        # results = dask.compute(*futures)
+                    self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
+                        np.complex64(np.multiply(amp_refined, np.exp(1j * phase_refined))).reshape(self.n_image, 1, 1)
+
+                    ph_filt = np.angle(mnp.est_corr(CCG))
+                    self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(ph_filt, phase_refined)
 
         timep = time.time() - time0
         print('time spent to do phase linking {}: min'.format(timep / 60))
 
         with open(self.patch_dir + '/inversion_flag', 'w') as f:
             f.write('Inversion done')
-
-        return
-
-    def get_pta_coherence(self):
-
-        if not os.path.exists(self.patch_dir + '/quality'):
-
-            self.quality = np.memmap(self.patch_dir + '/quality', dtype='float32', mode='w+',
-                                        shape=(self.length, self.width))
-            self.quality[:, :] = -1
-
-            if self.rslc_ref is None:
-                self.rslc_ref = np.memmap(self.patch_dir + '/RSLC_ref', dtype='complex64', mode='r',
-                                          shape=(self.n_image, self.length, self.width))
-
-            futures = []
-
-            for coord in self.coords:
-
-                if self.progress[coord[0], coord[1]] == 1:
-
-                    phase_initial = np.angle(self.rslc[:, coord[0], coord[1]]).reshape(self.n_image, 1)
-                    phase_refined = np.angle(self.rslc_ref[:, coord[0], coord[1]]).reshape(self.n_image, 1)
-                    data = (phase_initial, phase_refined, coord[0], coord[1])
-
-                    future = dask.delayed(mnp.gam_pta)(data)
-                    futures.append(future)
-
-            results = dask.compute(*futures)
-
-            for result in results:
-                gam, row, col = result
-                self.quality[row:row + 1, col:col + 1] = gam
-
-        else:
-            print('Done with the inversion of {}'.format(self.patch_dir))
-
-        del self.rslc_ref, self.rslc, self.quality, self.progress, self.shp
 
         return
 

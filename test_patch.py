@@ -61,7 +61,7 @@ def create_parser():
     """ Creates command line argument parser object. """
     parser = argparse.ArgumentParser(description='Divides the whole scene into patches for parallel processing')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-    parser.add_argument('customTemplateFile', nargs='?', help='custom template with option settings.\n')
+    parser.add_argument('custom_template_file', nargs='?', help='custom template with option settings.\n')
 
     return parser
 

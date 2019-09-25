@@ -7,6 +7,9 @@ import os
 import sys
 import argparse
 import time
+import subprocess
+import datetime
+import contextlib
 import minopy
 import minopy.workflow
 import minopy.minopy_utilities as mnp
@@ -22,8 +25,8 @@ pathObj = PathFind()
 ###########################################################################################
 step_list, step_help = pathObj.minopy_help()
 EXAMPLE = """example: 
-      minopy_wrapper.py  <customTemplateFile>              # run with default and custom templates
-      minopy_wrapper.py  <customTemplateFile>  --submit    # submit as job
+      minopy_wrapper.py  <custom_template_file>              # run with default and custom templates
+      minopy_wrapper.py  <custom_template_file>  --submit    # submit as job
       minopy_wrapper.py  -h / --help                       # help 
       minopy_wrapper.py  -H                                # print    default template options
       # Run with --start/stop/step options
@@ -69,7 +72,7 @@ def main(iargs=None):
 
     if inps.submit_flag:
 
-        js.submit_script(job_name, job_file_name, sys.argv[:], inp.work_dir, new_wall_time)
+        js.submit_script(job_name, job_file_name, sys.argv[:], inps.work_dir, new_wall_time)
         sys.exit(0)
 
     time.sleep(wait_seconds)
@@ -129,30 +132,33 @@ class NoLI:
 
     def __init__(self, inps):
         self.inps = inps
-        self.customTemplateFile = inps.customTemplateFile
+        self.custom_template_file = inps.custom_template_file
         self.work_dir = inps.work_dir
         self.run_dir = os.path.join(inps.work_dir, pathObj.rundir)
         self.cwd = os.path.abspath(os.getcwd())
-        self.minopy_dir = inps.minopy_dir
+        self.mintpy_dir = os.path.join(self.work_dir, pathObj.mintpydir)
 
         return
 
     def run_crop(self):
         """ Cropping images using crop_sentinel.py script.
         """
-        minopy.crop_sentinel.main([self.customTemplateFile])
+        message_rsmas.log(self.work_dir, 'crop_sentinel.py {}'.format(self.custom_template_file))
+        minopy.crop_sentinel.main([self.custom_template_file])
         return
 
     def run_create_patch(self):
         """ Dividing the area into patches.
         """
-        minopy.create_patch.main([self.customTemplateFile])
+        message_rsmas.log(self.work_dir, 'create_patch.py {}'.format(self.custom_template_file))
+        minopy.create_patch.main([self.custom_template_file])
         return
 
     def run_phase_linking(self):
         """ Non-Linear phase inversion.
         """
-        minopy.phase_linking_app.main([self.customTemplateFile])
+        message_rsmas.log(self.work_dir, 'phase_linking_app.py {}'.format(self.custom_template_file))
+        minopy.phase_linking_app.main([self.custom_template_file])
         return
 
     def run_interferogram(self, config):
@@ -165,7 +171,9 @@ class NoLI:
             runObj = CreateRun(inps)
             runObj.run_post_stack()
 
-        if os.getenv('JOBSCHEDULER') == 'LSF' or os.getenv('JOBSCHEDULER') == 'PBS':
+        supported_schedulers = ['LSF', 'PBS', 'SLURM']
+
+        if os.getenv('JOBSCHEDULER') in supported_schedulers:
 
             step_name = 'single_master_interferograms'
             try:
@@ -183,16 +191,46 @@ class NoLI:
 
             queuename = os.getenv('QUEUENAME')
 
+            message_rsmas.log(self.work_dir, 'job_submission.py {} --memory {} --walltime {}'.format(run_file_int,
+                                                                                                     memorymax,
+                                                                                                     walltimelimit))
+
             putils.remove_last_job_running_products(run_file=run_file_int)
 
-            jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=self.run_dir,
-                                        work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
-                                        queue=queuename)
+            if os.getenv('JOBSCHEDULER') in ['SLURM', 'sge']:
 
-            putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
-            putils.raise_exception_if_job_exited(run_file=run_file_int)
-            putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
-            putils.move_out_job_files_to_stdout(run_file=run_file_int)
+                hostname = subprocess.Popen("hostname", shell=True, stdout=subprocess.PIPE).stdout.read().decode(
+                    "utf-8")
+                if hostname.startswith('login'):
+
+                    js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
+                                                memory=memorymax, walltime=walltimelimit, queue=queuename)
+                else:
+
+                    try:
+                        with open('{}.o'.format(run_file_int), 'w') as f:
+                            with contextlib.redirect_stdout(f):
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
+                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
+                    except:
+                        with open('{}.e'.format(run_file_int), 'w') as g:
+                            with contextlib.redirect_stderr(g):
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
+                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
+
+            else:
+
+                jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=os.path.join(self.work_dir, 'run_files'),
+                                            work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
+                                            queue=queuename)
+
+                putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
+                putils.raise_exception_if_job_exited(run_file=run_file_int)
+                putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
+                putils.move_out_job_files_to_stdout(run_file=run_file_int)
+
+            date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+            print(date_str + ' * Job {} completed'.format(run_file_int))
         
 
         else:
@@ -215,7 +253,9 @@ class NoLI:
             runObj = CreateRun(inps)
             runObj.run_post_stack()
 
-        if os.getenv('JOBSCHEDULER') == 'LSF' or os.getenv('JOBSCHEDULER') == 'PBS':
+        supported_schedulers = ['LSF', 'PBS', 'SLURM']
+
+        if os.getenv('JOBSCHEDULER') in supported_schedulers:
 
             step_name = 'unwrap'
             try:
@@ -233,16 +273,46 @@ class NoLI:
 
             queuename = os.getenv('QUEUENAME')
 
+            message_rsmas.log(self.work_dir, 'job_submission.py {} --memory {} --walltime {}'.format(run_file_int,
+                                                                                                     memorymax,
+                                                                                                     walltimelimit))
+
             putils.remove_last_job_running_products(run_file=run_file_int)
 
-            jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=self.run_dir,
-                                        work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
-                                        queue=queuename)
+            if os.getenv('JOBSCHEDULER') in ['SLURM', 'sge']:
 
-            putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
-            putils.raise_exception_if_job_exited(run_file=run_file_int)
-            putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
-            putils.move_out_job_files_to_stdout(run_file=run_file_int)
+                hostname = subprocess.Popen("hostname", shell=True, stdout=subprocess.PIPE).stdout.read().decode(
+                    "utf-8")
+                if hostname.startswith('login'):
+
+                    js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
+                                                memory=memorymax, walltime=walltimelimit, queue=queuename)
+                else:
+
+                    try:
+                        with open('{}.o'.format(run_file_int), 'w') as f:
+                            with contextlib.redirect_stdout(f):
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
+                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
+                    except:
+                        with open('{}.e'.format(run_file_int), 'w') as g:
+                            with contextlib.redirect_stderr(g):
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
+                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
+
+            else:
+
+                jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=os.path.join(self.work_dir, 'run_files'),
+                                            work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
+                                            queue=queuename)
+
+                putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
+                putils.raise_exception_if_job_exited(run_file=run_file_int)
+                putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
+                putils.move_out_job_files_to_stdout(run_file=run_file_int)
+
+            date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+            print(date_str + ' * Job {} completed'.format(run_file_int))
 
         else:
             with open(run_file_int, 'r') as f:
@@ -256,15 +326,15 @@ class NoLI:
     def run_mintpy(self):
         """ Time series corrections
         """
-
-        minopy.timeseries_corrections.main([self.customTemplateFile, '--submit'])
+        message_rsmas.log(self.work_dir, 'timeseries_correction.py {}'.format(self.custom_template_file))
+        minopy.timeseries_corrections.main([self.custom_template_file])
         return
 
     def run_email_results(self):
         """ Time series corrections
         """
-
-        email_results.main([self.customTemplateFile])
+        message_rsmas.log(self.work_dir, 'email_results.py {}'.format(self.custom_template_file))
+        email_results.main([self.custom_template_file])
         return
 
     def run(self, steps, config):

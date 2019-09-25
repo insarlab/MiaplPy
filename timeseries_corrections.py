@@ -13,9 +13,10 @@ import numpy as np
 import gdal
 import mintpy
 import mintpy.workflow
+from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from mintpy.utils import readfile, utils as ut
 import minsar.job_submission as js
-from minsar.utils.process_utilities import add_pause_to_walltime
+from minsar.utils.process_utilities import add_pause_to_walltime, get_config_defaults
 from minsar.objects.auto_defaults import PathFind
 from minsar.objects import message_rsmas
 import minopy.minopy_utilities as mnp
@@ -29,7 +30,7 @@ def main(iargs=None):
     start_time = time.time()
     inps = mnp.cmd_line_parse(iargs, script='timeseries_corrections')
 
-    config = putils.get_config_defaults(config_file='job_defaults.cfg')
+    config = get_config_defaults(config_file='job_defaults.cfg')
 
     job_file_name = 'timeseries_corrections'
     job_name = job_file_name
@@ -61,15 +62,15 @@ def main(iargs=None):
             print(f.read())
         raise SystemExit()
 
-    if (inps.customTemplateFile
-            and os.path.basename(inps.customTemplateFile) == 'smallbaselineApp_auto.cfg'):
-        inps.customTemplateFile = None
+    if (inps.custom_template_file
+            and os.path.basename(inps.custom_template_file) == 'smallbaselineApp_auto.cfg'):
+        inps.custom_template_file = None
     else:
-        inps.customTemplateFile = os.path.abspath(inps.customTemplateFile)
+        inps.custom_template_file = os.path.abspath(inps.custom_template_file)
 
-    inps.mintpy_dir = os.path.join(inps.project_dir, pathObj.mintpydir)
+    inps.mintpy_dir = os.path.join(inps.work_dir, pathObj.mintpydir)
 
-    app = mintpy.smallbaselineApp.TimeSeriesAnalysis(inps.customTemplateFile, inps.mintpy_dir)
+    app = TimeSeriesAnalysis(inps.custom_template_file, inps.mintpy_dir)
     app.startup()
 
     if app.template['mintpy.unwrapError.method']:
@@ -96,13 +97,12 @@ def main(iargs=None):
 def get_phase_linking_coherence_mask(inps, template):
     """Generate reliable pixel mask from temporal coherence"""
 
-    geom_file = ut.check_loaded_dataset(inps.mintpy_dir, print_msg=False)[2]
     tcoh_file = os.path.join(inps.mintpy_dir, 'temporalCoherence.h5')
     mask_file = os.path.join(inps.mintpy_dir, 'maskTempCoh.h5')
 
-    tcoh_min = 0.4
+    tcoh_min = 0.25
 
-    scp_args = '{} -m {} -o {} --shadow {}'.format(tcoh_file, tcoh_min, mask_file, geom_file)
+    scp_args = '{} --nonzero -o {} --update'.format(tcoh_file, mask_file)
     print('generate_mask.py', scp_args)
 
     # update mode: run only if:
@@ -164,9 +164,6 @@ def write_to_timeseries(inps, template):
 
     num_row = stack_obj.length
     num_col = stack_obj.width
-    num_pixel = num_row * num_col
-    ts_std = np.zeros((num_date, num_pixel), np.float32)
-    ts_std = ts_std.reshape(num_date, num_row, num_col)
 
     phase2range = -1 * float(stack_obj.metadata['WAVELENGTH']) / (4. * np.pi)
 
@@ -174,7 +171,7 @@ def write_to_timeseries(inps, template):
     ref_phase = stack_obj.get_reference_phase(dropIfgram=False)
     unwDatasetName = 'unwrapPhase'
     mask_dataset_name = None
-    mask_threshold = 0.4
+    mask_threshold = 0.25
 
     pha_data = read_unwrap_phase(stack_obj,
                                  box,
@@ -198,7 +195,6 @@ def write_to_timeseries(inps, template):
     gfilename = os.path.join(os.getenv('SCRATCHDIR'), inps.project_name, 'merged/geom_master/Quality.rdr')
     ds = gdal.Open(gfilename, gdal.GA_ReadOnly)
     quality_map = ds.GetRasterBand(1).ReadAsArray()
-    inps.plmethod = ds.GetMetadata()['plmethod']
 
     if 'SUBSET_XMIN' in metadata:
         first_row = int(metadata['SUBSET_YMIN'])
@@ -208,7 +204,9 @@ def write_to_timeseries(inps, template):
 
         quality_map = quality_map[first_row:last_row, first_col:last_col]
 
-    write2hdf5_file(ifgram_file, metadata, ts, quality_map, ts_std, num_inv_ifg, suffix='', inps=inps)
+    os.chdir(inps.mintpy_dir)
+
+    write2hdf5_file(ifgram_file, metadata, ts, quality_map, num_inv_ifg, suffix='', inps=inps)
 
     get_phase_linking_coherence_mask(inps, template)
 
