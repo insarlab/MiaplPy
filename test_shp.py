@@ -12,6 +12,7 @@ from datetime import datetime
 import minopy_utilities as mnp
 from minsar.utils.process_utilities import create_or_update_template
 from minsar.objects.auto_defaults import PathFind
+from minopy_utilities import cmd_line_parse
 import dask
 
 pathObj = PathFind()
@@ -24,8 +25,7 @@ def main(iargs=None):
         Divides the whole scene into patches for parallel processing
     """
 
-    inps = command_line_parse(iargs)
-    inps = create_or_update_template(inps)
+    inps = cmd_line_parse(iargs)
 
     inps.minopy_dir = os.path.join(inps.work_dir, pathObj.minopydir)
     pathObj.patch_dir = inps.minopy_dir + '/PATCH'
@@ -104,7 +104,7 @@ def main(iargs=None):
 
             rslc = np.memmap(patch_name + '/RSLC', dtype=np.complex64, mode='r', shape=(n_image, line, sample))
             rslc_ref = np.memmap(patch_name + '/RSLC_ref', dtype=np.complex64, mode='r', shape=(n_image, line, sample))
-            shp = np.memmap(patch_name + '/SHP', dtype='byte', mode='r', shape=(15 * 21, count[1], count[2]))
+            shp = np.memmap(patch_name + '/SHP', dtype='byte', mode='r', shape=(azimuth_win * range_win, count[1], count[2]))
 
             Amplitude[row1:row2 + 1, col1:col2 + 1] = np.abs(rslc[t, f_row:l_row + 1, f_col:l_col + 1])
 

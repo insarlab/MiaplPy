@@ -199,35 +199,19 @@ class NoLI:
 
             if os.getenv('JOBSCHEDULER') in ['SLURM', 'sge']:
 
-                hostname = subprocess.Popen("hostname", shell=True, stdout=subprocess.PIPE).stdout.read().decode(
-                    "utf-8")
-                if hostname.startswith('login'):
-
-                    js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
+                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.run_dir,
                                                 memory=memorymax, walltime=walltimelimit, queue=queuename)
-                else:
-
-                    try:
-                        with open('{}.o'.format(run_file_int), 'w') as f:
-                            with contextlib.redirect_stdout(f):
-                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
-                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
-                    except:
-                        with open('{}.e'.format(run_file_int), 'w') as g:
-                            with contextlib.redirect_stderr(g):
-                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
-                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
 
             else:
 
-                jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=os.path.join(self.work_dir, 'run_files'),
+                jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=self.run_dir,
                                             work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
                                             queue=queuename)
 
-                putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
-                putils.raise_exception_if_job_exited(run_file=run_file_int)
-                putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
-                putils.move_out_job_files_to_stdout(run_file=run_file_int)
+            putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
+            putils.raise_exception_if_job_exited(run_file=run_file_int)
+            putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
+            putils.move_out_job_files_to_stdout(run_file=run_file_int)
 
             date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
             print(date_str + ' * Job {} completed'.format(run_file_int))
@@ -281,35 +265,19 @@ class NoLI:
 
             if os.getenv('JOBSCHEDULER') in ['SLURM', 'sge']:
 
-                hostname = subprocess.Popen("hostname", shell=True, stdout=subprocess.PIPE).stdout.read().decode(
-                    "utf-8")
-                if hostname.startswith('login'):
-
-                    js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
+                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.run_dir,
                                                 memory=memorymax, walltime=walltimelimit, queue=queuename)
-                else:
-
-                    try:
-                        with open('{}.o'.format(run_file_int), 'w') as f:
-                            with contextlib.redirect_stdout(f):
-                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
-                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
-                    except:
-                        with open('{}.e'.format(run_file_int), 'w') as g:
-                            with contextlib.redirect_stderr(g):
-                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
-                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
 
             else:
 
-                jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=os.path.join(self.work_dir, 'run_files'),
+                jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=self.run_dir,
                                             work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
                                             queue=queuename)
 
-                putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
-                putils.raise_exception_if_job_exited(run_file=run_file_int)
-                putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
-                putils.move_out_job_files_to_stdout(run_file=run_file_int)
+            putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
+            putils.raise_exception_if_job_exited(run_file=run_file_int)
+            putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
+            putils.move_out_job_files_to_stdout(run_file=run_file_int)
 
             date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
             print(date_str + ' * Job {} completed'.format(run_file_int))

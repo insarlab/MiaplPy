@@ -10,6 +10,7 @@ import numpy as np
 import isce
 import isceobj
 import time
+from scipy import ndimage
 import minsar.job_submission as js
 from minsar.objects import message_rsmas
 from minsar.utils.process_utilities import add_pause_to_walltime, get_config_defaults
@@ -111,9 +112,10 @@ def cropSLC(data):
     inp_file = ds.GetRasterBand(1).ReadAsArray()[pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
     data_type = inp_file.dtype.type
     del ds
-    
+    # ampl_ovs = ndimage.zoom(np.abs(inp_file), (3, 1), output=None, order=3, mode='nearest')
+    # ph_ovs = ndimage.zoom(np.angle(inp_file), (3, 1), output=None, order=3, mode='nearest')
     out_map = np.memmap(output_file, dtype=data_type, mode='write', shape=(pathObj.n_lines, pathObj.width))
-    out_map[:, :] = inp_file[:, :]
+    out_map[:, :] = inp_file[:, :]  # np.multiply(ampl_ovs[:,:], np.exp(1j * ph_ovs[:,:]))
 
     IML.renderISCEXML(output_file, 1, pathObj.n_lines, pathObj.width, IML.NUMPY_type(str(inp_file.dtype)), 'BIL')
 
@@ -143,10 +145,12 @@ def cropQualitymap(data):
 
     ds = gdal.Open(input_file + '.vrt', gdal.GA_ReadOnly)
     inp_file = ds.GetRasterBand(1).ReadAsArray()[pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
+    # inp_file = ndimage.zoom(inp_file, (3, 1), output=None, order=3, mode='nearest')
 
     if bands == 2:
         inp_file2 = ds.GetRasterBand(2).ReadAsArray()[pathObj.first_row:pathObj.last_row,
                     pathObj.first_col:pathObj.last_col]
+        # inp_file2 = ndimage.zoom(inp_file2, (3, 1), output=None, order=3, mode='nearest')
 
     del ds, img
 

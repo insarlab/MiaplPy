@@ -37,6 +37,8 @@ def cmd_line_parse(iargs=None, script=None):
         parser = add_patch_inversion(parser)
     if script == 'timeseries_corrections':
         parser = add_mintpy_corrections(parser)
+    if script == 'oversample_minopy':
+        parser = add_oversample(parser)
 
     inps = parser.parse_args(args=iargs)
     inps = putils.create_or_update_template(inps)
@@ -54,6 +56,13 @@ def add_common_parser(parser):
                         help='walltime for submitting the script as a job')
     commonp.add_argument('--wait', dest='wait_time', default='00:00', metavar="Wait time (hh:mm)",
                          help="wait time to submit a job")
+    return parser
+
+
+def add_oversample(parser):
+    crp = parser.add_argument_group('Crop options:')
+    crp.add_argument('--ox', dest='over_sample_x', default=3, help='Oversampling in azimuth direction')
+    crp.add_argument('--oy', dest='over_sample_y', default=1, help='Oversampling in range direction')
     return parser
 
 
@@ -123,10 +132,10 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
 
     rows, cols = np.where(mask_yx)
 
-    first_row = np.rint(np.min(rows)).astype(int)
-    last_row = np.rint(np.max(rows)).astype(int)
-    first_col = np.rint(np.min(cols)).astype(int)
-    last_col = np.rint(np.max(cols)).astype(int)
+    first_row = np.rint(np.min(rows)).astype(int) - 10
+    last_row = np.rint(np.max(rows)).astype(int) + 10
+    first_col = np.rint(np.min(cols)).astype(int) - 10
+    last_col = np.rint(np.max(cols)).astype(int) + 10
 
     image_coord = [first_row, last_row, first_col, last_col]
 
@@ -136,30 +145,8 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
 def convert_geo2image_coord_old(geo_master_dir, master_dir, lat_south, lat_north, lon_west, lon_east):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
-    from iscesys.Component.ProductManager import ProductManager as PM
     import isceobj.Planet.AstronomicalHandbook as AstronomicalHandbook
     from isceobj.Planet.Ellipsoid import Ellipsoid
-
-    rmeta = readfile.read_isce_xml(geo_master_dir + '/lat.rdr.full.xml')
-    master_xml = glob.glob(master_dir + '/IW*.xml')[0]
-    pm = PM()
-    pm.configure()
-    obj = pm.loadProduct(xmlname)
-    burst = obj.bursts[0]
-    burstEnd = obj.bursts[-1]
-    orbit = burst.orbit
-    peg = orbit.interpolateOrbit(burst.sensingMid, method='hermite')
-
-
-
-    # Read Attributes
-    range_n = float(burst.startingRange)
-    dR = float(burst.rangePixelSize)
-    width = int(rmeta['WIDTH'])
-    Re = float(gmeta['earthRadius'])
-    Height = float(gmeta['altitude'])
-    range_f = range_n + dR * width
-
 
     master_xml = glob.glob(master_dir + '/IW*.xml')[0]
     metadata = extract_tops_metadata(master_xml)[0]
@@ -184,7 +171,7 @@ def convert_geo2image_coord_old(geo_master_dir, master_dir, lat_south, lat_north
     lon = [lon_west, lon_east]
 
     lat_c = (np.nanmax(lat) + np.nanmin(lat)) / 2.
-    az_step_deg = 180. / np.pi * az_step / (Re)
+    az_step_deg = 180. / np.pi * az_step / Re
     rg_step_deg = 180. / np.pi * rg_step / (Re * np.cos(lat_c * np.pi / 180.))
 
     y_factor = 10 * az_step_deg
@@ -344,15 +331,16 @@ def gam_pta(ph_filt, ph_refined):
     """ Returns squeesar PTA coherence between the initial and estimated phase vectors. """
 
     n = np.shape(ph_filt)[0]
-    phi_mat = np.exp(1j * (np.triu(ph_filt) - np.multiply(np.diag(np.ones([n])), np.triu(ph_filt))))
+    indx = np.triu_indices(n, 1)
+    phi_mat = ph_filt[indx]
     g1 = np.exp(1j * ph_refined).reshape(n, 1)
     g2 = np.exp(-1j * ph_refined).reshape(1, n)
-    theta_mat = np.triu(np.matmul(g1, g2))
-    theta_mat = np.conj(theta_mat - np.multiply(np.diag(np.ones([n])), np.triu(theta_mat)))
-    SUM_ph = np.sum(np.multiply(phi_mat, theta_mat))
-    gam = np.real(SUM_ph) * 2 / (n ** 2 - n)
+    theta_mat = np.angle(np.matmul(g1, g2))
+    theta_mat = theta_mat[indx]
+    ifgram_diff = phi_mat - theta_mat
+    temp_coh = np.real(np.sum(np.exp(1j * ifgram_diff))) * 2 / (n ** 2 - n)
 
-    return gam
+    return temp_coh
 
 ###############################################################################
 
@@ -816,3 +804,53 @@ def ecdf_distance(S1, S2):
     d = np.max(np.absolute(cdf1 - cdf2))
     return d
 
+
+def affine_transform(rows, cols, ovs_x, ovs_y):
+
+    pts1 = np.float32([0, 0, rows, 0, rows, cols, 0, cols])
+    pts2 = np.float32([[0, 0], [rows * ovs_x, 0], [rows * ovs_x, cols * ovs_y], [0, cols * ovs_y]])
+
+    M = np.zeros([len(pts1), 4])
+    for t in range(4):
+        M[2*t, 0] = pts2[t, 0]
+        M[2*t, 1] = -pts2[t, 1]
+        M[2*t, 2] = 1
+        M[2*t, 3] = 0
+        M[2*t+1, 0] = pts2[t, 1]
+        M[2*t+1, 1] = pts2[t, 0]
+        M[2*t+1, 2] = 0
+        M[2*t+1, 3] = 1
+
+    X = np.matmul(np.linalg.pinv(M), np.transpose(pts1))
+    X = np.matrix([[X[0], -X[1], X[2]], [X[1], X[0], X[3]]])
+    return X
+
+
+def find_coord(transform, coord, rows, cols):
+    M = np.ones([3, 2])
+    M[0, 0] = coord[0]
+    M[1, 0] = coord[1]
+    M[:, 1] = M[:, 0]
+    M[2, 1] = 0
+    out = np.floor(np.matmul(transform, M))
+    out[out < 0] = 0
+    if out[1, 1] > cols:
+        out[1, 1] = cols
+    if out[0, 0] > rows:
+        out[0, 0] = rows
+
+    return int(out[0, 0]), int(out[1, 1])
+
+
+def apply_affine(rows, cols, ovs_x, ovs_y, transf):
+
+    out_row = np.zeros([rows*ovs_x, cols*ovs_y])
+    out_col = np.zeros([rows*ovs_x, cols*ovs_y])
+
+    for row in range(out_row.shape[0]):
+        for col in range(out_row.shape[1]):
+            row0, col0 = find_coord(transf, [row, col], rows, cols)
+            out_row[row, col] = row0
+            out_col[row, col] = col0
+
+    return out_row, out_col
