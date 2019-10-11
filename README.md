@@ -17,7 +17,7 @@ To start working you need to specify following parameters in your template file:
 
 After Processing with ISCE through SLC or interferogram workflow, you will have coregistered SLCs. Then you can follow the workflow given by minopy_wrapper.py
 
-It has 5 steps:
+It has 7 steps:
 - 'crop',
 - 'patch',
 - 'inversion',
