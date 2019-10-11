@@ -2,6 +2,7 @@
 
 A python package of InSAR processing with Non Linear inversion method working with ISCE and MintPy.
 This package depends on MintPy and MinSAR now but will be independent from MinSAR in the near future.
+It can only process Sentinel tops Satck (Isce outputs).
 
 To start working you need to specify following parameters in your template file:
 
