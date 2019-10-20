@@ -9,8 +9,9 @@ import sys
 import os
 import numpy as np
 import cmath
-import argparse
 import glob
+import shutil
+import datetime
 from numpy import linalg as LA
 from scipy.optimize import minimize, Bounds
 from scipy import stats
@@ -19,89 +20,17 @@ import gdal
 import isce
 import isceobj
 from mintpy.utils import readfile
-from minsar.objects.auto_defaults import PathFind
-import minsar.utils.process_utilities as putils
+
+###############################################################################
 
 
-pathObj = PathFind()
-################################################################################
-
-
-def cmd_line_parse(iargs=None, script=None):
-    """Command line parser."""
-
-    parser = argparse.ArgumentParser(description='MiNoPy scripts parser')
-    parser = add_common_parser(parser)
-
-    if script == 'patch_inversion':
-        parser = add_patch_inversion(parser)
-    if script == 'timeseries_corrections':
-        parser = add_mintpy_corrections(parser)
-
-    inps = parser.parse_args(args=iargs)
-    inps = putils.create_or_update_template(inps)
-
-    return inps
-
-
-def add_common_parser(parser):
-
-    commonp = parser.add_argument_group('General options:')
-    commonp.add_argument('custom_template_file', nargs='?', help='custom template with option settings.\n')
-    commonp.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-    commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
-    commonp.add_argument('--walltime', dest='wall_time', default='None',
-                        help='walltime for submitting the script as a job')
-    commonp.add_argument('--wait', dest='wait_time', default='00:00', metavar="Wait time (hh:mm)",
-                         help="wait time to submit a job")
-    return parser
-
-
-def add_minopy_wrapper(parser):
-
-    STEP_LIST, STEP_HELP = pathObj.minopy_help()
-
-    minp = parser.add_argument_group('MiNoPy Routine InSAR Time Series Analysis. steps processing '
-                                    '(start/end/step)', STEP_HELP)
-    minp.add_argument('--remove_minopy_dir', dest='remove_minopy_dir', action='store_true',
-                     help='remove directory before download starts')
-    minp.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
-                      help='start processing at the named step, default: {}'.format(STEP_LIST[0]))
-    minp.add_argument('--stop', dest='endStep', metavar='STEP', default=STEP_LIST[-1],
-                      help='end processing at the named step, default: {}'.format(STEP_LIST[-1]))
-    minp.add_argument('--step', dest='step', metavar='STEP',
-                      help='run processing at the named step only')
-    minp.add_argument('--email', action='store_true', dest='email', default=False,
-                    help='opt to email results')
-
-    return parser
-
-
-def add_patch_inversion(parser):
-
-    pi = parser.add_argument_group('Patch inversion option')
-    pi.add_argument('-p', '--patch', type=str, dest='patch', help='patch directory')
-
-    return parser
-
-
-def add_mintpy_corrections(parser):
-
-    corrections = parser.add_argument_group('Mintpy options')
-
-    corrections.add_argument('--dir', dest='work_dir',
-                        help='MintPy working directory, default is:\n' +
-                             'a) current directory, or\n' +
-                             'b) $SCRATCHDIR/projectName/mintpy, if meets the following 3 requirements:\n' +
-                             '    1) autoPath = True in mintpy/defaults/auto_path.py\n' +
-                             '    2) environmental variable $SCRATCHDIR exists\n' +
-                             '    3) input custom template with basename same as projectName\n')
-    corrections.add_argument('-g', dest='generate_template', action='store_true',
-                        help='Generate default template (and merge with custom template), then exit.')
-    corrections.add_argument('-H', dest='print_auto_template', action='store_true',
-                        help='Print/Show the example template file for routine processing.')
-
-    return parser
+def log_message(logdir='.', msg=''):
+    f = open(os.path.join(logdir, 'log'), 'a')
+    dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+    string = dateStr + " * " + msg
+    print(string)
+    f.write(string + "\n")
+    f.close()
 
 ################################################################################
 
@@ -139,26 +68,6 @@ def convert_geo2image_coord_old(geo_master_dir, master_dir, lat_south, lat_north
     from iscesys.Component.ProductManager import ProductManager as PM
     import isceobj.Planet.AstronomicalHandbook as AstronomicalHandbook
     from isceobj.Planet.Ellipsoid import Ellipsoid
-
-    rmeta = readfile.read_isce_xml(geo_master_dir + '/lat.rdr.full.xml')
-    master_xml = glob.glob(master_dir + '/IW*.xml')[0]
-    pm = PM()
-    pm.configure()
-    obj = pm.loadProduct(xmlname)
-    burst = obj.bursts[0]
-    burstEnd = obj.bursts[-1]
-    orbit = burst.orbit
-    peg = orbit.interpolateOrbit(burst.sensingMid, method='hermite')
-
-
-
-    # Read Attributes
-    range_n = float(burst.startingRange)
-    dR = float(burst.rangePixelSize)
-    width = int(rmeta['WIDTH'])
-    Re = float(gmeta['earthRadius'])
-    Height = float(gmeta['altitude'])
-    range_f = range_n + dR * width
 
 
     master_xml = glob.glob(master_dir + '/IW*.xml')[0]
@@ -262,12 +171,18 @@ def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
 ################################################################################
 
 
-def read_image(image_file):
+def read_image(image_file, box=None):
     """ Reads images from isce. """
 
     ds = gdal.Open(image_file + '.vrt', gdal.GA_ReadOnly)
     image = ds.GetRasterBand(1).ReadAsArray()
     del ds
+
+    length, width = image.shape
+    if not box:
+        box = (0, 0, width, length)
+
+    image = image[box[1]:box[3], box[0]:box[2]]
 
     return image
 

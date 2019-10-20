@@ -9,11 +9,9 @@ import numpy as np
 import minopy_utilities as mnp
 import dask
 import pandas as pd
-from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 from skimage.measure import label
-from minsar.objects.auto_defaults import PathFind
+from minopy.objects.arg_parser import MinoPyParser
 
-pathObj = PathFind()
 #################################
 
 
@@ -22,9 +20,10 @@ def main(iargs=None):
         Phase linking process.
     '''
 
-    inps = mnp.cmd_line_parse(iargs, script='patch_inversion')
+    Parser = MinoPyParser(iargs, script='patch_inversion')
+    inps = Parser.parse()
 
-    if not inps.patch:
+    if not inps.patch_dir:
         raise Exception('No patch specified')
 
     inversionObj = PhaseLink(inps)
@@ -33,22 +32,21 @@ def main(iargs=None):
 
     inversionObj.patch_phase_linking()
 
-    print('{} is done successfuly'.format(inps.patch))
+    print('{} is done successfuly'.format(inps.patch_dir))
 
     return None
 
 
 class PhaseLink:
     def __init__(self, inps):
-
-        self.minopydir = os.path.join(inps.work_dir, pathObj.minopydir)
-        self.patch_rows = np.load(os.path.join(self.minopydir, 'rowpatch.npy'))
-        self.patch_cols = np.load(os.path.join(self.minopydir, 'colpatch.npy'))
-        self.phase_linking_method = inps.template['minopy.plmethod']
-        self.range_window = int(inps.template['minopy.range_window'])
-        self.azimuth_window = int(inps.template['minopy.azimuth_window'])
-        self.patch_dir = inps.patch
-        self.shp_test = inps.template['minopy.shp_test']
+        self.work_dir = inps.work_dir
+        self.patch_rows = np.load(os.path.join(self.work_dir, 'patches/rowpatch.npy'))
+        self.patch_cols = np.load(os.path.join(self.work_dir, 'patches/colpatch.npy'))
+        self.phase_linking_method = inps.inversion_method
+        self.range_window = inps.range_window
+        self.azimuth_window = inps.azimuth_window
+        self.patch_dir = os.path.join(inps.work_dir,'patches', inps.patch_dir)
+        self.shp_test = inps.shp_test
         if self.shp_test == 'ks':
             self.shp_function = mnp.ks2smapletest
         elif self.shp_test == 'ad':
@@ -58,7 +56,7 @@ class PhaseLink:
         else:   # default is KS 2 sample test
             self.shp_function = mnp.ks2smapletest
 
-        count_dim = np.load(inps.patch + '/count.npy')
+        count_dim = np.load(self.patch_dir + '/count.npy')
         self.n_image = count_dim[0]
         self.length = count_dim[1]
         self.width = count_dim[2]
@@ -87,26 +85,26 @@ class PhaseLink:
         self.reference_col = np.array([(self.range_window - 1) / 2]).astype(int)
         self.reference_col = self.reference_col - (self.range_window - len(self.sample_cols))
 
-        self.rslc = np.memmap(self.patch_dir + '/RSLC', dtype=np.complex64, mode='r',
+        self.rslc = np.memmap(self.patch_dir + '/rslc', dtype=np.complex64, mode='r',
                                  shape=(self.n_image, self.length, self.width))
 
         shp_size = self.range_window * self.azimuth_window
-        if not os.path.isfile(self.patch_dir + '/SHP'):
-            self.shp = np.memmap(self.patch_dir + '/SHP', dtype='byte', mode='write',
+        if not os.path.isfile(self.patch_dir + '/shp'):
+            self.shp = np.memmap(self.patch_dir + '/shp', dtype='byte', mode='write',
                                  shape=(shp_size, self.length, self.width))
         else:
-            self.shp = np.memmap(self.patch_dir + '/SHP', dtype='byte', mode='r+',
+            self.shp = np.memmap(self.patch_dir + '/shp', dtype='byte', mode='r+',
                                  shape=(shp_size, self.length, self.width))
 
-        if not os.path.exists(self.patch_dir + '/RSLC_ref'):
+        if not os.path.exists(self.patch_dir + '/rslc_ref'):
 
-            self.rslc_ref = np.memmap(self.patch_dir + '/RSLC_ref', dtype='complex64', mode='w+',
+            self.rslc_ref = np.memmap(self.patch_dir + '/rslc_ref', dtype='complex64', mode='w+',
                                          shape=(self.n_image, self.length, self.width))
 
             self.rslc_ref[:, :, :] = self.rslc[:, :, :]
 
         else:
-            self.rslc_ref = np.memmap(self.patch_dir + '/RSLC_ref', dtype='complex64', mode='r+',
+            self.rslc_ref = np.memmap(self.patch_dir + '/rslc_ref', dtype='complex64', mode='r+',
                                          shape=(self.n_image, self.length, self.width))
 
         if not os.path.exists(self.patch_dir + '/quality'):
