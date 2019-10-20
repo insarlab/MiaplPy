@@ -181,6 +181,7 @@ class PhaseLink:
             return print('Inversion is already done for {}'.format(self.patch_dir))
 
         for coord in self.coords:
+
             if not self.shp[:, coord[0], coord[1]].any():
                 shp = self.get_shp_row_col(coord)
                 num_shp = len(shp[np.nonzero(shp > 0)])
@@ -195,6 +196,7 @@ class PhaseLink:
                     CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
 
                     if num_shp > 20:
+
                         if 'sequential' in self.phase_linking_method:
                             amp_refined, phase_refined = self.inversion_sequential(CCG, self.phase_linking_method)
                         else:
@@ -204,11 +206,16 @@ class PhaseLink:
                         if status:
                             amp_refined, phase_refined = self.inversion_all(CCG, 'EMI')
 
-                    self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
-                        np.complex64(np.multiply(amp_refined, np.exp(1j * phase_refined))).reshape(self.n_image, 1, 1)
-
                     ph_filt = np.angle(mnp.est_corr(CCG))
                     self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(ph_filt, phase_refined)
+
+                    if self.quality[coord[0], coord[1]] < 0.3:
+                        phase_refined = np.angle(self.rslc[:, coord[0], coord[1]])
+                        phase_refined = phase_refined - phase_refined[0]
+                        amp_refined = np.abs(self.rslc[:, coord[0], coord[1]])
+
+                    self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
+                        np.complex64(np.multiply(amp_refined, np.exp(1j * phase_refined))).reshape(self.n_image, 1, 1)
 
         timep = time.time() - time0
         print('time spent to do phase linking {}: min'.format(timep / 60))

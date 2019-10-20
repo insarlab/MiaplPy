@@ -5,6 +5,7 @@
 ###############################################################################
 import argparse
 from minopy.defaults import auto_path
+import mintpy
 
 class MinoPyParser:
 
@@ -32,33 +33,116 @@ class MinoPyParser:
         inps = self.parser.parse_args(args=self.iargs)
 
         if self.script == 'crop_images':
+            inps = self.out_crop_image(inps)
 
-            DEFAULT_TEMPLATE = """template:
-            ########## 1. Load Data (--load to exit after this step)
-            {}\n
-            {}\n
-            {}\n
-            """.format(auto_path.isceAutoPath,
-                       auto_path.roipacAutoPath,
-                       auto_path.gammaAutoPath)
-
-            if inps.template_file:
-                pass
-            elif inps.print_example_template:
-                raise SystemExit(DEFAULT_TEMPLATE)
-            else:
-                parser.print_usage()
-                print(('{}: error: one of the following arguments are required:'
-                       ' -t/--template, -H'.format(os.path.basename(__file__))))
-                print('{} -H to show the example template file'.format(os.path.basename(__file__)))
-                sys.exit(1)
-
-            inps.outfile = [os.path.abspath(i) for i in inps.outfile]
-            inps.outdir = os.path.dirname(inps.outfile[0])
+        if self.script == 'minopy_wrapper':
+            inps = self.out_minopy_wrapper(inps)
 
         return inps
 
-    def crop_image_parser(self):
+    def out_crop_image(self, sinps):
+        inps = sinps
+        DEFAULT_TEMPLATE = """template:
+                    ########## 1. Load Data (--load to exit after this step)
+                    {}\n
+                    {}\n
+                    {}\n
+                    """.format(auto_path.isceAutoPath,
+                               auto_path.roipacAutoPath,
+                               auto_path.gammaAutoPath)
+
+        if inps.template_file:
+            pass
+        elif inps.print_example_template:
+            raise SystemExit(DEFAULT_TEMPLATE)
+        else:
+            parser.print_usage()
+            print(('{}: error: one of the following arguments are required:'
+                   ' -t/--template, -H'.format(os.path.basename(__file__))))
+            print('{} -H to show the example template file'.format(os.path.basename(__file__)))
+            sys.exit(1)
+
+        inps.outfile = [os.path.abspath(i) for i in inps.outfile]
+        inps.outdir = os.path.dirname(inps.outfile[0])
+        return inps
+
+    def out_minopy_wrapper(self, sinps):
+        inps = sinps
+        template_file = os.path.join(os.path.dirname(os.getenv('MINOPY_HOME')), 'defaults/minopy_templates.cfg')
+
+        # print default template
+        if inps.print_template:
+            raise SystemExit(open(template_file, 'r').read(), )
+
+        # print software version
+        if inps.version:
+            raise SystemExit(mintpy.version.description)
+
+        if (not inps.customTemplateFile
+                and not os.path.isfile(os.path.basename(template_file))
+                and not inps.generate_template):
+            parser.print_usage()
+            print(EXAMPLE)
+            msg = "ERROR: no template file found! It requires:"
+            msg += "\n  1) input a custom template file, OR"
+            msg += "\n  2) there is a default template 'smallbaselineApp.cfg' in current directory."
+            print(msg)
+            raise SystemExit()
+
+        # invalid input of custom template
+        if inps.customTemplateFile:
+            inps.customTemplateFile = os.path.abspath(inps.customTemplateFile)
+            if not os.path.isfile(inps.customTemplateFile):
+                raise FileNotFoundError(inps.customTemplateFile)
+            elif os.path.basename(inps.customTemplateFile) == os.path.basename(template_file):
+                # ignore if smallbaselineApp.cfg is input as custom template
+                inps.customTemplateFile = None
+
+        # check input --start/end/dostep
+        for key in ['startStep', 'endStep', 'doStep']:
+            value = vars(inps)[key]
+            if value and value not in STEP_LIST:
+                msg = 'Input step not found: {}'.format(value)
+                msg += '\nAvailable steps: {}'.format(STEP_LIST)
+                raise ValueError(msg)
+
+        # ignore --start/end input if --dostep is specified
+        if inps.doStep:
+            inps.startStep = inps.doStep
+            inps.endStep = inps.doStep
+
+        # get list of steps to run
+        idx0 = STEP_LIST.index(inps.startStep)
+        idx1 = STEP_LIST.index(inps.endStep)
+        if idx0 > idx1:
+            msg = 'input start step "{}" is AFTER input end step "{}"'.format(inps.startStep, inps.endStep)
+            raise ValueError(msg)
+        inps.runSteps = STEP_LIST[idx0:idx1 + 1]
+
+        # empty the step list for -g option
+        if inps.generate_template:
+            inps.runSteps = []
+
+        # message - software version
+        if len(inps.runSteps) <= 1:
+            print(mintpy.version.description)
+        else:
+            print(mintpy.version.logo)
+
+        # mssage - processing steps
+        if len(inps.runSteps) > 0:
+            print('--RUN-at-{}--'.format(datetime.datetime.now()))
+            print('Run routine processing with {} on steps: {}'.format(os.path.basename(__file__), inps.runSteps))
+            if inps.doStep:
+                print('Remaining steps: {}'.format(STEP_LIST[idx0 + 1:]))
+                print('--dostep option enabled, disable the plotting at the end of the processing.')
+                inps.plot = False
+
+        print('-' * 50)
+        return inps
+
+    @staticmethod
+    def crop_image_parser():
 
         TEMPLATE = """template:
         ########## 1. Load Data
@@ -172,6 +256,96 @@ class MinoPyParser:
         parser.add_argument('-R', '--range_looks', type=str, dest='range_looks', default='9', help='range looks')
 
         return parser
+
+    @staticmethod
+    def minopy_wrapper_parser():
+
+        STEP_LIST = [
+            'crop',
+            'create_patch',
+            'inversion',
+            'ifgrams',
+            'unwrap'
+            'load_data',
+            'modify_network',
+            'reference_point',
+            'write_to_timeseries',
+            'correct_unwrap_error',
+            'stack_interferograms',
+            'correct_LOD',
+            'correct_troposphere',
+            'deramp',
+            'correct_topography',
+            'residual_RMS',
+            'reference_date',
+            'velocity',
+            'geocode',
+            'google_earth',
+            'hdfeos5',
+            'email', ]
+
+        STEP_HELP = """Command line options for steps processing with names are chosen from the following list:
+        {}
+        {}
+        {}
+
+        In order to use either --start or --step, it is necessary that a
+        previous run was done using one of the steps options to process at least
+        through the step immediately preceding the starting step of the current run.
+        """.format(STEP_LIST[0:7], STEP_LIST[7:14], STEP_LIST[14:])
+
+        EXAMPLE = """example: 
+              minopy_wrapper.py  <custom_template_file>              # run with default and custom templates
+              minopy_wrapper.py  <custom_template_file>  --submit    # submit as job
+              minopy_wrapper.py  -h / --help                       # help 
+              minopy_wrapper.py  -H                                # print    default template options
+              # Run with --start/stop/step options
+              minopy_wrapper.py GalapagosSenDT128.template --step  crop         # run the step 'download' only
+              minopy_wrapper.py GalapagosSenDT128.template --start crop         # start from the step 'download' 
+              minopy_wrapper.py GalapagosSenDT128.template --stop  unwrap       # end after step 'interferogram'
+              """
+
+        parser = argparse.ArgumentParser(description='Routine Time Series Analysis for Small Baseline InSAR Stack',
+                                         formatter_class=argparse.RawTextHelpFormatter,
+                                         epilog=EXAMPLE)
+
+        parser.add_argument('customTemplateFile', nargs='?',
+                            help='custom template with option settings.\n' +
+                                 "ignored if the default smallbaselineApp.cfg is input.")
+        parser.add_argument('--dir', dest='workDir',
+                            help='specify custom working directory. The default is:\n' +
+                                 'a) current directory, OR\n' +
+                                 'b) $SCRATCHDIR/$projectName/mintpy, if:\n' +
+                                 '    1) autoPath == True in $MINTPY_HOME/mintpy/defaults/auto_path.py AND\n' +
+                                 '    2) environment variable $SCRATCHDIR exists AND\n' +
+                                 '    3) customTemplateFile is specified (projectName.*)\n')
+
+        parser.add_argument('-g', dest='generate_template', action='store_true',
+                            help='generate default template (if it does not exist) and exit.')
+        parser.add_argument('-H', dest='print_template', action='store_true',
+                            help='print the default template file and exit.')
+        parser.add_argument('-v', '--version', action='store_true', help='print software version and exit')
+
+        parser.add_argument('--noplot', dest='plot', action='store_false',
+                            help='do not plot results at the end of the processing.')
+        parser.add_argument('--oy', dest='over_sample_y', default=3, help='Oversampling in azimuth direction')
+        parser.add_argument('--ox', dest='over_sample_x', default=1, help='Oversampling in range direction')
+
+        parser.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
+        parser.add_argument('--walltime', dest='wall_time', default='None',
+                            help='walltime for submitting the script as a job')
+
+        step = parser.add_argument_group('steps processing (start/end/dostep)', STEP_HELP)
+        step.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
+                          help='start processing at the named step, default: {}'.format(STEP_LIST[0]))
+        step.add_argument('--end', '--stop', dest='endStep', metavar='STEP', default=STEP_LIST[-1],
+                          help='end processing at the named step, default: {}'.format(STEP_LIST[-1]))
+        step.add_argument('--dostep', dest='doStep', metavar='STEP',
+                          help='run processing at the named step only')
+
+
+        return parser
+
 
 
 

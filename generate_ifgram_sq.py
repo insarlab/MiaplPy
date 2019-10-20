@@ -109,7 +109,7 @@ def main(iargs=None):
                                dtype=np.complex64, mode='r', shape=(np.int(inps.n_image), patch_lines, patch_samples))
             ifg_patch = np.zeros([patch_lines, patch_samples])+0j
             master = rslc_patch[0, :, :]
-            slave = rslc_patch[np.int(inps.ifg_index), :, :]
+            slave = rslc_patch[np.int(inps.ifg_index) + 1, :, :]
 
             for kk in range(0, patch_lines):
                 ifg_patch[kk, f_col:l_col + 1] = master[kk, f_col:l_col + 1] * np.conj(slave[kk, f_col:l_col + 1])
