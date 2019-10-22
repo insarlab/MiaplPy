@@ -9,9 +9,8 @@ import sys
 import os
 import numpy as np
 import cmath
+import argparse
 import glob
-import shutil
-import datetime
 from numpy import linalg as LA
 from scipy.optimize import minimize, Bounds
 from scipy import stats
@@ -20,16 +19,6 @@ import gdal
 import isce
 import isceobj
 from mintpy.utils import readfile
-
-###############################################################################
-
-def log_message(logdir='.', msg=''):
-    f = open(os.path.join(logdir, 'log'), 'a')
-    dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
-    string = dateStr + " * " + msg
-    print(string)
-    f.write(string + "\n")
-    f.close()
 
 ################################################################################
 
@@ -55,72 +44,6 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
     last_row = np.rint(np.max(rows)).astype(int) + 10
     first_col = np.rint(np.min(cols)).astype(int) - 10
     last_col = np.rint(np.max(cols)).astype(int) + 10
-
-    image_coord = [first_row, last_row, first_col, last_col]
-
-    return image_coord
-
-
-def convert_geo2image_coord_old(geo_master_dir, master_dir, lat_south, lat_north, lon_west, lon_east):
-    """ Finds the corresponding line and sample based on geographical coordinates. """
-
-    import isceobj.Planet.AstronomicalHandbook as AstronomicalHandbook
-    from isceobj.Planet.Ellipsoid import Ellipsoid
-
-    master_xml = glob.glob(master_dir + '/IW*.xml')[0]
-    metadata = extract_tops_metadata(master_xml)[0]
-    gmeta = extract_geometry_metadata(geo_master_dir + '/lat.rdr.full.xml', metadata)
-    rmeta = readfile.read_isce_xml(geo_master_dir + '/lat.rdr.full.xml')
-
-    # Read Attributes
-    range_n = float(gmeta['startingRange'])
-    dR = float(gmeta['rangePixelSize'])
-    width = int(rmeta['WIDTH'])
-    Re = float(gmeta['earthRadius'])
-    Height = float(gmeta['altitude'])
-    range_f = range_n + dR * width
-    inc_angle_n = (np.pi - np.arccos((Re ** 2 + range_n ** 2 - (Re + Height) ** 2) / (2 * Re * range_n))) * 180.0 / np.pi
-    inc_angle_f = (np.pi - np.arccos((Re ** 2 + range_f ** 2 - (Re + Height) ** 2) / (2 * Re * range_f))) * 180.0 / np.pi
-
-    inc_angle = (inc_angle_n + inc_angle_f) / 2.0
-    rg_step = float(dR) / np.sin(inc_angle / 180.0 * np.pi)
-    az_step = float(gmeta['azimuthPixelSize']) * Re / (Re + Height)
-
-    lat = [lat_south, lat_north]
-    lon = [lon_west, lon_east]
-
-    lat_c = (np.nanmax(lat) + np.nanmin(lat)) / 2.
-    az_step_deg = 180. / np.pi * az_step / Re
-    rg_step_deg = 180. / np.pi * rg_step / (Re * np.cos(lat_c * np.pi / 180.))
-
-    y_factor = 10 * az_step_deg
-    x_factor = 10 * rg_step_deg
-
-    ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
-    lut_y = ds.GetRasterBand(1).ReadAsArray()
-
-    ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
-    lut_x = ds.GetRasterBand(1).ReadAsArray()
-
-    rows = []
-    cols = []
-
-    for lat0 in lat:
-        for lon0 in lon:
-            ymin = lat0 - y_factor;   ymax = lat0 + y_factor
-            xmin = lon0 - x_factor;   xmax = lon0 + x_factor
-
-            mask_y = np.multiply(lut_y >= ymin, lut_y <= ymax)
-            mask_x = np.multiply(lut_x >= xmin, lut_x <= xmax)
-            mask_yx = np.multiply(mask_y, mask_x)
-            row, col = np.nanmean(np.where(mask_yx), axis=1)
-            rows.append(row)
-            cols.append(col)
-
-    first_row = np.rint(np.min(rows)).astype(int)
-    last_row = np.rint(np.max(rows)).astype(int)
-    first_col = np.rint(np.min(cols)).astype(int)
-    last_col = np.rint(np.max(cols)).astype(int)
 
     image_coord = [first_row, last_row, first_col, last_col]
 
@@ -168,18 +91,12 @@ def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
 ################################################################################
 
 
-def read_image(image_file, box=None):
+def read_image(image_file):
     """ Reads images from isce. """
 
     ds = gdal.Open(image_file + '.vrt', gdal.GA_ReadOnly)
     image = ds.GetRasterBand(1).ReadAsArray()
     del ds
-
-    length, width = image.shape
-    if not box:
-        box = (0, 0, width, length)
-
-    image = image[box[1]:box[3], box[0]:box[2]]
 
     return image
 
@@ -234,6 +151,8 @@ def L2norm_rowwis(M):
 def regularize_matrix(M):
     """ Regularizes a matrix to make it positive semi definite. """
 
+    import matplotlib.pyplot as plt
+
     sh = np.shape(M)
     N = np.zeros([sh[0], sh[1]])
     N[:, :] = M[:, :]
@@ -246,6 +165,8 @@ def regularize_matrix(M):
             N[:, :] = N[:, :] + en*np.identity(len(N))
             en = 2*en
             t = t+1
+            import pdb;
+            pdb.set_trace()
 
     return 0
 
@@ -264,7 +185,6 @@ def gam_pta(ph_filt, ph_refined):
     theta_mat = theta_mat[indx]
     ifgram_diff = phi_mat - theta_mat
     temp_coh = np.real(np.sum(np.exp(1j * ifgram_diff))) * 2 / (n ** 2 - n)
-
     return temp_coh
 
 ###############################################################################
@@ -274,10 +194,9 @@ def optphase(x0, inverse_gam):
     """ Returns the PTA maximum likelihood function value. """
 
     n = len(x0)
-    x = np.ones([n+1, 1])+0j
-    x[1::, 0] = np.exp(1j*x0[:])
+    x = np.exp(1j * x0).reshape(n, 1)
     x = np.matrix(x)
-    y = -np.matmul(x.getH(), inverse_gam)
+    y = np.matmul(x.getH(), inverse_gam)
     y = np.matmul(y, x)
     f = np.abs(np.log(y))
 
@@ -286,26 +205,22 @@ def optphase(x0, inverse_gam):
 ###############################################################################
 
 
-def PTA_L_BFGS(xm):
+def PTA_L_BFGS(coh0):
     """ Uses L-BFGS method to optimize PTA function and estimate phase values. """
 
-    n = len(xm)
-    x0 = np.zeros([n-1, 1])
-    x0[:, 0] = np.real(xm[1::, 0])
-    coh = 1j*np.zeros([n, n])
-    coh[:, :] = xm[:, 1::]
-    abs_coh = regularize_matrix(np.abs(coh))
-    if np.size(abs_coh) == np.size(coh):
-        inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh))
-        res = minimize(optphase, x0, args=inverse_gam, method='L-BFGS-B',
-                       bounds=Bounds(-100, 100, keep_feasible=False),
+    n = coh0.shape[0]
+    x0 = EMI_phase_estimation(coh0)
+    abs_coh = regularize_matrix(np.abs(coh0))
+    if np.size(abs_coh) == np.size(coh0):
+        inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh0))
+        res = minimize(optphase, np.angle(x0), args=inverse_gam, method='L-BFGS-B',
+                       bounds=Bounds(-500, 500, keep_feasible=False),
                        tol=None, options={'gtol': 1e-6, 'disp': False})
 
-        out = np.zeros([n, 1])
-        out[1::, 0] = res.x
-        #out = np.unwrap(out, np.pi, axis=0)
+        out = res.x.reshape(n, 1)
+        vec = np.multiply(np.abs(x0), np.exp(1j * out)).reshape(n, 1)
 
-        return out
+        return vec
 
     else:
 
@@ -318,14 +233,10 @@ def PTA_L_BFGS(xm):
 def EVD_phase_estimation(coh0):
     """ Estimates the phase values based on eigen value decomosition """
 
-    Eigen_value, Eigen_vector = LA.eigh(coh0)
-    f = np.where(np.abs(Eigen_value) == np.sort(np.abs(Eigen_value))[len(coh0)-1])
-    vec = Eigen_vector[:, f].reshape(len(Eigen_value), 1)
-    x0 = np.angle(vec)
-    x0 = x0 - x0[0, 0]
-    #x0 = np.unwrap(x0, np.pi, axis=0)
+    eigen_value, eigen_vector = LA.eigh(coh0)
+    vec = eigen_vector[:, -1].reshape(len(eigen_value), 1)
 
-    return x0
+    return vec
 
 ###############################################################################
 
@@ -334,15 +245,13 @@ def EMI_phase_estimation(coh0):
     """ Estimates the phase values based on EMI decomosition (Homa Ansari, 2018 paper) """
 
     abscoh = regularize_matrix(np.abs(coh0))
+
     if np.size(abscoh) == np.size(coh0):
         M = np.multiply(LA.pinv(abscoh), coh0)
-        Eigen_value, Eigen_vector = LA.eigh(M)
-        f = np.where(np.abs(Eigen_value) == np.sort(np.abs(Eigen_value))[0])
-        vec = Eigen_vector[:, f[0][0]].reshape(Eigen_vector.shape[0], 1)
-        x0 = np.angle(vec).reshape(len(Eigen_value), 1)
-        x0 = x0 - x0[0, 0]
-        #x0 = np.unwrap(x0, np.pi, axis=0)
-        return x0
+        eigen_value, eigen_vector = LA.eigh(M)
+        vec = eigen_vector[:, 0].reshape(len(eigen_value), 1)
+
+        return vec
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
         return EVD_phase_estimation(coh0)
@@ -480,7 +389,7 @@ def simulate_neighborhood_stack(corr_matrix, neighborSamples=300):
     neighbor_stack = np.zeros((numberOfSlc, neighborSamples), dtype=np.complex64)
     for ii in range(neighborSamples):
         cpxSLC = simulate_noise(corr_matrix)
-        neighbor_stack[:,ii] = cpxSLC
+        neighbor_stack[:, ii] = cpxSLC
     return neighbor_stack
 
 ##############################################################################
@@ -491,7 +400,7 @@ def double_solve(f1,f2,x0,y0):
 
     from scipy.optimize import fsolve
     func = lambda x: [f1(x[0], x[1]), f2(x[0], x[1])]
-    return fsolve(func,[x0,y0])
+    return fsolve(func, [x0, y0])
 
 ###############################################################################
 
@@ -533,19 +442,13 @@ def EST_rms(x):
 
 ###############################################################################
 
-
 def phase_linking_process(ccg_sample, stepp, method, squeez=True):
     """Inversion of phase based on a selected method among PTA, EVD and EMI """
 
     coh_mat = est_corr(ccg_sample)
 
     if 'PTA' in method:
-        ph_EMI = EMI_phase_estimation(coh_mat)
-        xm = np.zeros([len(ph_EMI), len(ph_EMI) + 1]) + 0j
-        xm[:, 0:1] = np.reshape(ph_EMI, [len(ph_EMI), 1])
-        xm[:, 1::] = coh_mat[:, :]
-        res = PTA_L_BFGS(xm)
-
+        res = PTA_L_BFGS(coh_mat)
     elif 'EMI' in method:
         res = EMI_phase_estimation(coh_mat)
     else:
@@ -554,20 +457,14 @@ def phase_linking_process(ccg_sample, stepp, method, squeez=True):
     res = res.reshape(len(res), 1)
 
     if squeez:
-        vm = np.matrix(np.exp(1j * res[stepp::, 0:1]) / LA.norm(np.exp(1j * res[stepp::, 0:1])))
-        squeezed = np.matmul(np.conjugate(vm.T), ccg_sample[stepp::, :])
-        # squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, :])
+
+        vm = np.exp(1j * np.angle(np.matrix(res[stepp::, :])))
+        vm = vm / LA.norm(vm)
+        squeezed = np.matmul(vm.getH(), ccg_sample[stepp::, :])
+
         return res, squeezed
     else:
-        return res,
-
-
-def squeez_im(ph, ccg):
-    """Squeeze a stack of images in to one (PCA)"""
-
-    vm = np.matrix(np.exp(1j * ph) / LA.norm(np.exp(1j * ph)))
-    squeezed = np.complex64(np.matmul(np.conjugate(vm), ccg))
-    return squeezed
+        return res
 
 
 ###############################################################################
@@ -586,65 +483,62 @@ def CRLB_cov(gama, L):
 ###############################################################################
 
 
-def sequential_phase_linking(full_stack_complex_samples, method, num_stack=1):
+def sequential_phase_linking(full_stack_complex_samples, method, num_stack=10):
     """ phase linking of each pixel sequentially and applying a datum shift at the end """
 
     n_image = full_stack_complex_samples.shape[0]
     mini_stack_size = 10
     num_mini_stacks = np.int(np.floor(n_image / mini_stack_size))
-    phas_refined = np.zeros([np.shape(full_stack_complex_samples)[0], 1])
+    vec_refined = np.zeros([np.shape(full_stack_complex_samples)[0], 1]) + 0j
 
-    for step in range(0, num_mini_stacks):
+    for sstep in range(0, num_mini_stacks):
 
-        first_line = step * mini_stack_size
-        if step == num_mini_stacks - 1:
+        first_line = sstep * mini_stack_size
+        if sstep == num_mini_stacks - 1:
             last_line = n_image
         else:
             last_line = first_line + mini_stack_size
         num_lines = last_line - first_line
 
-        if step == 0:
-            mini_stack_complex_samples = full_stack_complex_samples[first_line:last_line, :]
-            res, squeezed_images = phase_linking_process(mini_stack_complex_samples, step, method)
+        if sstep == 0:
 
-            phas_refined[first_line:last_line, 0:1] = res[step::, 0:1]
+            mini_stack_complex_samples = full_stack_complex_samples[first_line:last_line, :]
+            res, squeezed_images = phase_linking_process(mini_stack_complex_samples, sstep, method)
+
+            vec_refined[first_line:last_line, 0:1] = res[sstep::, 0:1]
         else:
 
             if num_stack == 1:
-                mini_stack_complex_samples = np.zeros([1 + num_lines, full_stack_complex_samples.shape[1]]) + 1j
+                mini_stack_complex_samples = np.zeros([1 + num_lines, full_stack_complex_samples.shape[1]]) + 0j
                 mini_stack_complex_samples[0, :] = np.complex64(squeezed_images[-1, :])
                 mini_stack_complex_samples[1::, :] = full_stack_complex_samples[first_line:last_line, :]
                 res, new_squeezed_image = phase_linking_process(mini_stack_complex_samples, 1, method)
-                phas_refined[first_line:last_line, 0:1] = res[1::, 0:1]
+                vec_refined[first_line:last_line, :] = res[1::, :]
                 squeezed_images = np.vstack([squeezed_images, new_squeezed_image])
             else:
-
-                mini_stack_complex_samples = np.zeros([step + num_lines, full_stack_complex_samples.shape[1]]) + 1j
-                mini_stack_complex_samples[0:step, :] = np.complex64(squeezed_images)
-                mini_stack_complex_samples[step::, :] = full_stack_complex_samples[first_line:last_line, :]
-                res, new_squeezed_image = phase_linking_process(mini_stack_complex_samples, step, method)
-                phas_refined[first_line:last_line, 0:1] = res[step::, 0:1]
+                mini_stack_complex_samples = np.zeros([sstep + num_lines, full_stack_complex_samples.shape[1]]) + 0j
+                mini_stack_complex_samples[0:sstep, :] = squeezed_images
+                mini_stack_complex_samples[sstep::, :] = full_stack_complex_samples[first_line:last_line, :]
+                res, new_squeezed_image = phase_linking_process(mini_stack_complex_samples, sstep, method)
+                vec_refined[first_line:last_line, :] = res[sstep::, :]
                 squeezed_images = np.vstack([squeezed_images, new_squeezed_image])
             ###
 
     datum_connection_samples = squeezed_images
-    datum_shift, squeezed_datum = phase_linking_process(datum_connection_samples, 0, 'EMI')
+    datum_shift = np.angle(phase_linking_process(datum_connection_samples, 0, 'PTA', squeez=False))
 
-    # phas_refined_no_datum_shift = np.zeros(np.shape(phas_refined))
-    # phas_refined_no_datum_shift[:, :] = phas_refined[:, :]
-
-    for step in range(len(datum_shift)):
-        first_line = step * mini_stack_size
-        if step == num_mini_stacks - 1:
+    for sstep in range(len(datum_shift)):
+        first_line = sstep * mini_stack_size
+        if sstep == num_mini_stacks - 1:
             last_line = n_image
         else:
             last_line = first_line + mini_stack_size
 
-        phas_refined[first_line:last_line, 0:1] = phas_refined[first_line:last_line, 0:1] - \
-                                                  datum_shift[step:step + 1, 0:1]
+        vec_refined[first_line:last_line, 0:1] = np.multiply(vec_refined[first_line:last_line, 0:1],
+                                                  np.exp(1j * datum_shift[sstep:sstep + 1, 0:1]))
 
-    # return phas_refined_no_datum_shift, phas_refined
-    return phas_refined
+    # return vec_refined_no_datum_shift, vec_refined
+    return vec_refined
 
 #############################################
 

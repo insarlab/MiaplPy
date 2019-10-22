@@ -6,7 +6,6 @@ import os
 import time
 import datetime
 import shutil
-import argparse
 import numpy as np
 import gdal
 from mintpy.utils import readfile, utils as ut
@@ -15,7 +14,7 @@ from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from mintpy.objects import ifgramStack
 from mintpy.ifgram_inversion import write2hdf5_file, read_unwrap_phase, mask_unwrap_phase
 import minopy
-from minopy.objects.utils import OutControl
+from minopy.objects.arg_parser import MinoPyParser
 from minopy_utilities import log_message
 import minopy.submit_jobs as js
 
@@ -52,7 +51,8 @@ supported_schedulers = ['LSF', 'PBS', 'SLURM']
 ##########################################################################
 def main(iargs=None):
     start_time = time.time()
-    inps = cmd_line_parse(iargs)
+    Parser = MinoPyParser(iargs, script=='minopy_wrapper')
+    inps = Parser.parse()
 
     job_file_name = 'minopy_wrapper'
     job_name = job_file_name
@@ -487,7 +487,3 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 ###########################################################################################
 if __name__ == '__main__':
     main()
-
-
-
-
