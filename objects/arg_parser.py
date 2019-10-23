@@ -71,6 +71,7 @@ class MinoPyParser:
 
     def out_minopy_wrapper(self, sinps):
         inps = sinps
+        STEP_LIST = self.STEP_LIST
         template_file = os.path.join(os.path.dirname(os.getenv('MINOPY_HOME')), 'defaults/minopy_templates.cfg')
 
         # print default template
@@ -260,8 +261,7 @@ class MinoPyParser:
 
         return parser
 
-    @staticmethod
-    def minopy_wrapper_parser():
+    def minopy_wrapper_parser(self):
 
         STEP_LIST = [
             'crop',
@@ -344,6 +344,7 @@ class MinoPyParser:
         step.add_argument('--dostep', dest='doStep', metavar='STEP',
                           help='run processing at the named step only')
 
+        self.STEP_LIST = STEP_HELP
 
         return parser
 
