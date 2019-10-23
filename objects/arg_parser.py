@@ -29,6 +29,8 @@ class MinoPyParser:
             self.parser = self.patch_inversion_parser()
         elif self.script == 'generate_ifgram':
             self.parser = self.generate_ifgrams_parser()
+        elif self.script == 'minopy_wrapper':
+            self.parser = self.minopy_wrapper_parser()
 
         inps = self.parser.parse_args(args=self.iargs)
 
