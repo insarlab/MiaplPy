@@ -52,7 +52,7 @@ supported_schedulers = ['LSF', 'PBS', 'SLURM']
 ##########################################################################
 def main(iargs=None):
     start_time = time.time()
-    Parser = MinoPyParser(iargs, script=='minopy_wrapper')
+    Parser = MinoPyParser(iargs, script='minopy_wrapper')
     inps = Parser.parse()
 
     job_file_name = 'minopy_wrapper'
