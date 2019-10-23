@@ -6,6 +6,7 @@
 import argparse
 from minopy.defaults import auto_path
 import mintpy
+import os
 
 class MinoPyParser:
 
@@ -302,7 +303,7 @@ class MinoPyParser:
               minopy_wrapper.py  -h / --help                       # help 
               minopy_wrapper.py  -H                                # print    default template options
               # Run with --start/stop/step options
-              minopy_wrapper.py GalapagosSenDT128.template --step  crop         # run the step 'download' only
+              minopy_wrapper.py GalapagosSenDT128.template --dostep  crop       # run the step 'download' only
               minopy_wrapper.py GalapagosSenDT128.template --start crop         # start from the step 'download' 
               minopy_wrapper.py GalapagosSenDT128.template --stop  unwrap       # end after step 'interferogram'
               """
