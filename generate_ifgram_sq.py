@@ -4,16 +4,13 @@
 ############################################################
 import numpy as np
 import os
-import sys
-import argparse
 import glob
-import gdal
 import isce
 import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
 from FilterAndCoherence import estCoherence, runFilter
 from minopy.objects.arg_parser import MinoPyParser
-
+from minopy.objects.slcStack import slcStack
 ########################################
 
 
@@ -24,6 +21,15 @@ def main(iargs=None):
 
     Parser = MinoPyParser(iargs, script='generate_ifgram')
     inps = Parser.parse()
+
+    slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
+    slcObj = slcStack(slc_file)
+    slcObj.open(print_msg=False)
+    date_list = slcObj.get_date_list(dropIfgram=True)
+
+    ifgram = os.path.basename(inps.ifg_dir).split('_')
+    master_ind = date_list.index[ifgram[0]]
+    slave_ind = date_list.index[ifgram[1]]
 
     patch_list = glob.glob(inps.work_dir+'/PATCH*')
     patch_list = list(map(lambda x: x.split('/')[-1], patch_list))
@@ -108,8 +114,8 @@ def main(iargs=None):
             rslc_patch = np.memmap(inps.work_dir + '/' + patch + '/rslc_ref',
                                dtype=np.complex64, mode='r', shape=(np.int(inps.n_image), patch_lines, patch_samples))
             ifg_patch = np.zeros([patch_lines, patch_samples])+0j
-            master = rslc_patch[0, :, :]
-            slave = rslc_patch[np.int(inps.ifg_index) + 1, :, :]
+            master = rslc_patch[master_ind, :, :]
+            slave = rslc_patch[slave_ind + 1, :, :]
 
             for kk in range(0, patch_lines):
                 ifg_patch[kk, f_col:l_col + 1] = master[kk, f_col:l_col + 1] * np.conj(slave[kk, f_col:l_col + 1])

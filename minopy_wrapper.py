@@ -9,15 +9,16 @@ import shutil
 import numpy as np
 import gdal
 from mintpy.utils import readfile, utils as ut
-from minopy.defaults.auto_path import autoPath, PathFind
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from mintpy.objects import ifgramStack
 from mintpy.ifgram_inversion import write2hdf5_file, read_unwrap_phase, mask_unwrap_phase
 import minopy
-from minopy.objects.arg_parser import MinoPyParser
-from minopy_utilities import log_message
 import minopy.submit_jobs as js
-
+from minopy_utilities import log_message
+from minopy.objects.arg_parser import MinoPyParser
+from minopy.objects.slcStack import slcStack
+from minopy.objects.stack_int import MinopyRun
+from minopy.defaults.auto_path import autoPath, PathFind
 
 pathObj = PathFind()
 ###########################################################################################
@@ -142,8 +143,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         self.run_dir = os.path.join(self.workDir, pathObj.rundir)
         self.patch_dir = os.path.join(self.workDir, pathObj.patchdir)
+        self.ifgram_dir = os.path.join(self.workDir, pathObj.intdir)
 
-        for directory in [self.run_dir, self.patch_dir]:
+        for directory in [self.run_dir, self.patch_dir, self.ifgram_dir]:
             if not os.path.isdir(directory):
                 os.mkdir(directory)
 
@@ -178,6 +180,59 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             shutil.copy2(sh_file, self.workDir)
 
         self.plot_sh_cmd = './' + os.path.basename(sh_file)
+
+        return
+
+    def run_crop(self, sname):
+        """ Cropping images using crop_sentinel.py script.
+        """
+
+        os.chdir(self.workDir)
+
+        if self.template['mintpy.susbet.lalo'] == 'None' and self.template['mintpy.susbet.yx'] == 'None':
+            print('WARNING: No crop area given in minopy.subset, the whole image is going to be used.')
+            print('WARNING: May take days to process!')
+        else:
+            scp_args = '--template {}'.format(self.templateFile)
+            print('crop_images.py ', scp_args)
+            minopy.crop_images.main(scp_args.split())
+        return
+
+    def run_create_patch(self, sname):
+        """ Dividing the area into patches.
+        """
+        scp_args = '--workDir {} --rangeWin {} --azimuthWin {} --patchSize {}'.\
+            format(self.workDir, self.patch_dir,
+                   int(self.template['minopy.range_window']),
+                   int(self.template['minopy.azimuth_window']),
+                   int(self.template['minopy.patch_size']))
+        print('create_patch.py ', scp_args)
+        minopy.create_patch.main(scp_args.split())
+
+        return
+
+    def run_phase_linking(self):
+        """ Non-Linear phase inversion.
+        """
+        if not os.path.exists(self.run_dir):
+            os.mkdir(self.run_dir)
+
+        patch_list = glob.glob(self.patch_dir + '/patch*')
+        run_minopy_inversion = os.path.join(self.run_dir, 'run_minopy_inversion')
+        with open(run_minopy_inversion, 'w') as f:
+            for item in patch_list:
+                scp_srgs = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5}'.format(a0=self.workDir,
+                                                                                     a1=self.template['minopy.range_window'],
+                                                                                     a2=self.template['minopy.azimuth_window'],
+                                                                                     a3=self.template['minopy.plmethod'],
+                                                                                     a4=self.template['minopy.shp_test'],
+                                                                                     a5=item.split('/')[-1])
+                command = 'python_inversion.py ' + scp_srgs
+                f.write(command)
+
+        memorymax = '2000'
+        walltime = '2:00'
+        js.scheduler_job_submit(run_minopy_inversion, self.workDir, memorymax, walltime)
 
         return
 
@@ -296,69 +351,26 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         return
 
-    def run_crop(self, sname):
-        """ Cropping images using crop_sentinel.py script.
-        """
-
-        os.chdir(self.workDir)
-
-        if self.template['mintpy.susbet.lalo'] == 'None' and self.template['mintpy.susbet.yx'] == 'None':
-            print('WARNING: No crop area given in minopy.subset, the whole image is going to be used.')
-            print('WARNING: May take days to process!')
-        else:
-            scp_args = '--template {}'.format(self.templateFile)
-            print('crop_images.py ', scp_args)
-            minopy.crop_images.main(scp_args.split())
-        return
-
-    def run_create_patch(self, sname):
-        """ Dividing the area into patches.
-        """
-        scp_args = '--workDir {} --rangeWin {} --azimuthWin {} --patchSize {}'.\
-            format(self.workDir, self.patch_dir,
-                   int(self.template['minopy.range_window']),
-                   int(self.template['minopy.azimuth_window']),
-                   int(self.template['minopy.patch_size']))
-        print('create_patch.py ', scp_args)
-        minopy.create_patch.main(scp_args.split())
-
-        return
-
-    def run_phase_linking(self):
-        """ Non-Linear phase inversion.
-        """
-        if not os.path.exists(self.run_dir):
-            os.mkdir(self.run_dir)
-
-        patch_list = glob.glob(self.patch_dir + '/patch*')
-        run_minopy_inversion = os.path.join(self.run_dir, 'run_minopy_inversion')
-        with open(run_minopy_inversion, 'w') as f:
-            for item in patch_list:
-                scp_srgs = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5}'.format(a0=self.workDir,
-                                                                                     a1=self.template['minopy.range_window'],
-                                                                                     a2=self.template['minopy.azimuth_window'],
-                                                                                     a3=self.template['minopy.plmethod'],
-                                                                                     a4=self.template['minopy.shp_test'],
-                                                                                     a5=item.split('/')[-1])
-                command = 'python_inversion.py ' + scp_srgs
-                f.write(command)
-
-        memorymax = '2000'
-        walltime = '2:00'
-        js.scheduler_job_submit(run_minopy_inversion, self.workDir, memorymax, walltime)
-
-        return
-
     def run_interferogram(self):
         """ Export single master interferograms
         """
-        run_file_int = os.path.join(self.run_dir, 'run_single_master_interferograms')
+        run_file_int = os.path.join(self.run_dir, 'run_interferograms')
 
         if not os.path.exists(run_file_int):
-            inps = self.inps
-            inps.topsStack_template = pathObj.correct_for_isce_naming_convention(inps)
-            runObj = CreateRun(inps)
-            runObj.run_post_stack()
+
+            slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
+            slcObj = slcStack(slc_file)
+            slcObj.open(print_msg=False)
+            date_list = slcObj.get_date_list(dropIfgram=True)
+
+            pairs = []
+            for i in range(1, len(date_list)):
+                pairs.append((date_list[0], date_list[i]))
+
+            runObj = MinopyRun()
+            runObj.configure(self.inps, 'run_interferograms')
+            runObj.generateIfg(self.inps, pairs)
+            runObj.finalize()
 
         memorymax = '4000'
         walltime = '2:00'
@@ -372,11 +384,21 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """
         run_file_unwrap = os.path.join(self.run_dir, 'run_unwrap')
 
-        if not os.path.exists(run_file_int):
-            inps = self.inps
-            inps.topsStack_template = pathObj.correct_for_isce_naming_convention(inps)
-            runObj = CreateRun(inps)
-            runObj.run_post_stack()
+        if not os.path.exists(run_file_unwrap):
+
+            slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
+            slcObj = slcStack(slc_file)
+            slcObj.open(print_msg=False)
+            date_list = slcObj.get_date_list(dropIfgram=True)
+
+            pairs = []
+            for i in range(1, len(date_list)):
+                pairs.append((date_list[0], date_list[i]))
+
+            runObj = MinopyRun()
+            runObj.configure(self.inps, 'run_unwrap')
+            runObj.generateIfg(self.inps, pairs)
+            runObj.finalize()
 
         memorymax = '5000'
         walltime = '4:00'

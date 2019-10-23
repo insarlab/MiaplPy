@@ -6,9 +6,7 @@
 
 
 import os
-import sys
 import glob
-import argparse
 import warnings
 from minopy.defaults import auto_path
 from mintpy.objects import (geometryDatasetNames,
@@ -18,7 +16,6 @@ from minopy.objects.slcStack import(slcDatasetNames,
                                     slcStack,
                                     slcStackDict,
                                     slcDict)
-from mintpy.objects.stackDict import (geometryDict)
 from mintpy.utils import readfile, ptime, utils as ut
 from mintpy import subset
 import mintpy.load_data as mld
@@ -61,6 +58,7 @@ def main(iargs=None):
     if any([stackObj, geomRadarObj, geomGeoObj]) and not os.path.isdir(inps.outdir):
         os.makedirs(inps.outdir)
         print('create directory: {}'.format(inps.outdir))
+    
     # write
     if stackObj and update_object(inps.outfile[0], stackObj, box, updateMode=updateMode):
         print('-'*50)

@@ -28,9 +28,9 @@ mintpy.load.metaFile       = ${PROJECT_DIR}/master/IW*.xml
 mintpy.load.baselineDir    = ${PROJECT_DIR}/baselines
 
 mintpy.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc.full
-mintpy.load.unwFile        = ${PROJECT_DIR}/merged/interferograms/*/filt*.unw
-mintpy.load.corFile        = ${PROJECT_DIR}/merged/interferograms/*/filt*.cor
-mintpy.load.connCompFile   = ${PROJECT_DIR}/merged/interferograms/*/filt*.unw.conncomp
+mintpy.load.unwFile        = ${PROJECT_DIR}/minopy/merged/interferograms/*/filt*.unw
+mintpy.load.corFile        = ${PROJECT_DIR}/minopy/merged/interferograms/*/filt*.cor
+mintpy.load.connCompFile   = ${PROJECT_DIR}/minopy/merged/interferograms/*/filt*.unw.conncomp
 mintpy.load.ionoFile       = None
 mintpy.load.intFile        = None
 
@@ -42,9 +42,6 @@ mintpy.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_master/los.rdr.full
 mintpy.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_master/shadowMask.rdr.full
 mintpy.load.bperpFile      = None
 
-minopy.load.mergedSLC      = ${PROJECT_DIR}/merged/SLC
-minopy.load.geometry       = ${PROJECT_DIR}/merged/geom_master
-minopy.work_dir            = ${PROJECT_DIR}/minopy
 '''
 
 roipacAutoPath = '''##----------Default file path of ROI_PAC products
@@ -98,8 +95,7 @@ class PathFind:
         self.rundir = 'run_files'
         self.configdir = 'configs'
         self.mergeddir = 'subset'
-        self.mergedslcdir = 'subset/SLC'
-        self.mergedintdir = 'subset/interferograms'
+        self.intdir = 'interferograms'
         self.auto_template = self.defaultdir + '/minopy_template.cfg'
         return
 

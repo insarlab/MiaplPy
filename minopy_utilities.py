@@ -173,18 +173,23 @@ def regularize_matrix(M):
 ###############################################################################
 
 
-def gam_pta(ph_filt, ph_refined):
-    """ Returns squeesar PTA coherence between the initial and estimated phase vectors. """
+def gam_pta(ph_filt, vec_refined):
+    """ Returns squeesar PTA coherence between the initial and estimated phase vectors.
+    :param ph_filt: np.angle(coh) before inversion
+    :param vec_refined: refined complex vector after inversion
+    """
 
     n = np.shape(ph_filt)[0]
     indx = np.triu_indices(n, 1)
     phi_mat = ph_filt[indx]
+    ph_refined = np.angle(vec_refined)
     g1 = np.exp(1j * ph_refined).reshape(n, 1)
     g2 = np.exp(-1j * ph_refined).reshape(1, n)
     theta_mat = np.angle(np.matmul(g1, g2))
     theta_mat = theta_mat[indx]
     ifgram_diff = phi_mat - theta_mat
     temp_coh = np.real(np.sum(np.exp(1j * ifgram_diff))) * 2 / (n ** 2 - n)
+
     return temp_coh
 
 ###############################################################################
@@ -259,10 +264,9 @@ def EMI_phase_estimation(coh0):
 ###############################################################################
 
 
-def test_PS(ccg):
+def test_PS(coh_mat):
     """ checks if the pixel is PS """
 
-    coh_mat = est_corr(ccg)
     Eigen_value, Eigen_vector = LA.eigh(coh_mat)
     med_w = np.median(Eigen_value)
     MAD = np.median(np.absolute(Eigen_value - med_w))
@@ -442,10 +446,8 @@ def EST_rms(x):
 
 ###############################################################################
 
-def phase_linking_process(ccg_sample, stepp, method, squeez=True):
+def phase_linking_process(coh_mat, stepp, method, squeez=True):
     """Inversion of phase based on a selected method among PTA, EVD and EMI """
-
-    coh_mat = est_corr(ccg_sample)
 
     if 'PTA' in method:
         res = PTA_L_BFGS(coh_mat)

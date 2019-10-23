@@ -4,9 +4,7 @@
 
 import os
 import sys
-import shutil
 import numpy as np
-from datetime import datetime
 import time
 from minopy.objects.arg_parser import MinoPyParser
 from minopy_utilities import read_image, patch_slice, log_message
@@ -52,7 +50,6 @@ def main(iargs=None):
 
     dim = slcObj.get_size()
 
-
     patch_rows, patch_cols, patch_list = patch_slice(dim[1], dim[2], inps.azimuth_window,
                                                          inps.range_window, inps.patch_size)
 
@@ -94,10 +91,9 @@ def create_patch(data):
             os.mkdir(patch_name)
 
         rslc = np.memmap(patch_name + '/rslc', dtype=np.complex64, mode='w+', shape=(dim[0], line, sample))
-        rslc[:,:,:] = slcObj.read(datasetName='slc', box=box, print_msg=False)
+        rslc[:, :, :] = slcObj.read(datasetName='slc', box=box, print_msg=False)
 
         np.save(patch_name + '/count.npy', [dim[0], line, sample])
-
 
     return print(os.path.basename(patch_name) + " is created")
 

@@ -4,16 +4,16 @@
 #######################
 
 import os
-from minsar.objects.auto_defaults import PathFind
+from minopy.objects.auto_path import PathFind
 
 noMCF = 'False'
-defoMax = '2'
+defoMax = '4.0'
 maxNodes = 72
 
 pathObj = PathFind()
 ###################################
 
-class rsmasConfig(object):
+class MinopyConfig(object):
     """
        A class representing the config file
     """
@@ -40,7 +40,7 @@ class rsmasConfig(object):
         self.f.write('###################################' + '\n')
         self.f.write(function + '\n')
         self.f.write('generate_ifgram_sq : ' + '\n')
-        self.f.write('minopy_dir : ' + self.sqDir + '\n')
+        self.f.write('work_dir : ' + self.work_dir + '\n')
         self.f.write('ifg_dir : ' + self.ifgDir + '\n')
         self.f.write('ifg_index : ' + self.ifgIndex + '\n')
         self.f.write('range_window : ' + self.rangeWindow + '\n')
@@ -60,7 +60,7 @@ class rsmasConfig(object):
         self.f.write('coh : ' + self.cohName + '\n')
         self.f.write('nomcf : ' + self.noMCF + '\n')
         self.f.write('master : ' + self.master + '\n')
-        # self.f.write('defomax : ' + self.defoMax + '\n')
+        self.f.write('defomax : ' + self.defoMax + '\n')
         self.f.write('alks : ' + self.rangeLooks + '\n')
         self.f.write('rlks : ' + self.azimuthLooks + '\n')
         self.f.write('method : ' + self.unwMethod + '\n')
@@ -74,7 +74,7 @@ class rsmasConfig(object):
         self.f.write('coh : ' + self.cohName + '\n')
         self.f.write('nomcf : ' + self.noMCF + '\n')
         self.f.write('master : ' + self.master + '\n')
-        # self.f.write('defomax : ' + self.defoMax + '\n')
+        self.f.write('defomax : ' + self.defoMax + '\n')
         self.f.write('alks : ' + self.rangeLooks + '\n')
         self.f.write('rlks : ' + self.azimuthLooks + '\n')
 
@@ -85,7 +85,7 @@ class rsmasConfig(object):
 
 ################################################
 
-class rsmasRun(object):
+class MinopyRun(object):
     """
        A class representing a run which may contain several functions
     """
@@ -95,35 +95,29 @@ class rsmasRun(object):
         for k in inps.__dict__.keys():
             setattr(self, k, inps.__dict__[k])
 
-        self.custom_template_file = os.path.expandvars(inps.custom_template_file)
-        
-        self.runDir = os.path.join(self.work_dir, pathObj.rundir)
+        self.work_dir = inps.work_dir
 
-        self.slcDir = os.path.join(self.work_dir, pathObj.mergedslcdir)
+        self.run_dir = inps.run_dir
 
-        if not os.path.exists(self.runDir):
-            os.makedirs(self.runDir)
+        self.ifgram_dir = inps.ifgram_dir
 
-        self.run_outname = os.path.join(self.runDir, runName)
+        if not os.path.exists(self.run_dir):
+            os.makedirs(self.run_dir)
+
+        self.run_outname = os.path.join(self.run_dir, runName)
         print('writing ', self.run_outname)
 
         self.config_path = os.path.join(self.work_dir, pathObj.configdir)
 
         self.runf = open(self.run_outname, 'w')
 
-        try:
-            self.insarmaps_flag = inps.insarmaps_flag
-        except:
-            self.insarmaps_flag = inps.template['insarmaps_flag']
-
     def generateIfg(self, inps, pairs):
-        ifgram_dir = os.path.dirname(self.slcDir) + '/interferograms'
         for ifg in pairs:
             configName = os.path.join(self.config_path, 'config_generate_ifgram_{}_{}'.format(ifg[0], ifg[1]))
-            configObj = rsmasConfig(self.config_path, configName)
+            configObj = MinopyConfig(self.config_path, configName)
             configObj.configure(self)
-            configObj.sqDir = os.path.join(self.work_dir, pathObj.minopydir)
-            configObj.ifgDir = os.path.join(ifgram_dir, '{}_{}'.format(ifg[0], ifg[1]))
+            configObj.work_dir = self.work_dir
+            configObj.ifgDir = os.path.join(self.ifgram_dir, '{}_{}'.format(ifg[0], ifg[1]))
             configObj.ifgIndex = str(pairs.index(ifg))
             configObj.rangeWindow = inps.template['minopy.range_window']
             configObj.azimuthWindow = inps.template['minopy.azimuth_window']
@@ -137,10 +131,10 @@ class rsmasRun(object):
             else:
                 self.runf.write(inps.template['topsStack.textCmd'] + pathObj.wrappercommandtops + configName + '\n')
         configName = os.path.join(self.config_path, 'config_generate_quality_map')
-        configObj = rsmasConfig(self.config_path, configName)
+        configObj = MinopyConfig(self.config_path, configName)
         configObj.configure(self)
-        configObj.sqDir = os.path.join(self.work_dir, pathObj.minopydir)
-        configObj.ifgDir = os.path.join(self.work_dir, pathObj.geomasterdir)
+        configObj.work_dir = self.work_dir
+        configObj.ifgDir = inps.template['minopy.load.geometry']
         configObj.ifgIndex = str(0)
         configObj.rangeWindow = inps.template['minopy.range_window']
         configObj.azimuthWindow = inps.template['minopy.azimuth_window']
@@ -159,15 +153,15 @@ class rsmasRun(object):
         for pair in pairs:
             master = pair[0]
             slave = pair[1]
-            mergedDir = os.path.join(self.work_dir, pathObj.mergedintdir, master + '_' + slave)
+            mergedDir = os.path.join(self.ifgram_dir, master + '_' + slave)
             configName = os.path.join(self.config_path, 'config_igram_unw_' + master + '_' + slave)
-            configObj = rsmasConfig(self.config_path, configName)
+            configObj = MinopyConfig(self.config_path, configName)
             configObj.configure(self)
             configObj.ifgName = os.path.join(mergedDir, 'filt_fine.int')
             configObj.cohName = os.path.join(mergedDir, 'filt_fine.cor')
             configObj.unwName = os.path.join(mergedDir, 'filt_fine.unw')
             configObj.noMCF = noMCF
-            configObj.master = os.path.join(self.work_dir, 'master')
+            configObj.master = os.path.dirname(inps.template['mintpy.load.metaFile'])
             configObj.defoMax = defoMax
             configObj.unwMethod = inps.template['topsStack.unwMethod']
             configObj.rangeLooks = inps.template['topsStack.rangeLooks']

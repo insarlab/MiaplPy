@@ -45,7 +45,7 @@ class PhaseLink:
         self.phase_linking_method = inps.inversion_method
         self.range_window = inps.range_window
         self.azimuth_window = inps.azimuth_window
-        self.patch_dir = os.path.join(inps.work_dir,'patches', inps.patch_dir)
+        self.patch_dir = os.path.join(inps.work_dir, 'patches', inps.patch_dir)
         self.shp_test = inps.shp_test
         if self.shp_test == 'ks':
             self.shp_function = mnp.ks2smapletest
@@ -155,22 +155,6 @@ class PhaseLink:
 
         return ksres
 
-    def inversion_sequential(self, CCG, phase_linking_method):
-
-        phase_refined = mnp.sequential_phase_linking(CCG, phase_linking_method, num_stack=1)
-        amp_refined = np.array(np.mean(np.abs(CCG), axis=1))
-        phase_refined = np.array(phase_refined)
-
-        return amp_refined, phase_refined
-
-    def inversion_all(self, CCG, phase_linking_method):
-
-        phase_refined = mnp.phase_linking_process(CCG, 1, phase_linking_method, squeez=False)
-        amp_refined = np.array(np.mean(np.abs(CCG), axis=1))
-        phase_refined = np.array(phase_refined)
-
-        return amp_refined, phase_refined
-
     def patch_phase_linking(self):
 
         print('Inversion for {}'.format(self.patch_dir))
@@ -195,27 +179,24 @@ class PhaseLink:
                     CCG = np.exp(1j * CCG)
                     CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
 
+                    coh_mat = mnp.est_corr(CCG)
+
                     if num_shp > 20:
 
                         if 'sequential' in self.phase_linking_method:
-                            amp_refined, phase_refined = self.inversion_sequential(CCG, self.phase_linking_method)
+                            vec_refined = mnp.sequential_phase_linking(CCG, self.phase_linking_method, num_stack=100)
                         else:
-                            amp_refined, phase_refined = self.inversion_all(CCG, self.phase_linking_method)
+                            vec_refined = mnp.phase_linking_process(coh_mat, 0, self.phase_linking_method, squeez=False)
                     else:
-                        status = mnp.test_PS(CCG)
+                        status = mnp.test_PS(coh_mat)
                         if status:
-                            amp_refined, phase_refined = self.inversion_all(CCG, 'EMI')
+                            vec_refined = mnp.phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
 
-                    ph_filt = np.angle(mnp.est_corr(CCG))
-                    self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(ph_filt, phase_refined)
+                    self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat), vec_refined)
 
-                    if self.quality[coord[0], coord[1]] < 0.3:
-                        phase_refined = np.angle(self.rslc[:, coord[0], coord[1]])
-                        phase_refined = phase_refined - phase_refined[0]
-                        amp_refined = np.abs(self.rslc[:, coord[0], coord[1]])
-
-                    self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
-                        np.complex64(np.multiply(amp_refined, np.exp(1j * phase_refined))).reshape(self.n_image, 1, 1)
+                    if self.quality[coord[0], coord[1]] >= 0.5:
+                        self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
+                            vec_refined.reshape(self.n_image, 1, 1)
 
         timep = time.time() - time0
         print('time spent to do phase linking {}: min'.format(timep / 60))
