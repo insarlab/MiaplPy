@@ -7,6 +7,7 @@ import argparse
 from minopy.defaults import auto_path
 import mintpy
 import os
+import datetime
 
 class MinoPyParser:
 
