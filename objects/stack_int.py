@@ -4,7 +4,7 @@
 #######################
 
 import os
-from minopy.objects.auto_path import PathFind
+from minopy.defaults.auto_path import PathFind
 
 noMCF = 'False'
 defoMax = '4.0'
