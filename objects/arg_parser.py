@@ -330,8 +330,6 @@ class MinoPyParser:
 
         parser.add_argument('--noplot', dest='plot', action='store_false',
                             help='do not plot results at the end of the processing.')
-        parser.add_argument('--oy', dest='over_sample_y', default=3, help='Oversampling in azimuth direction')
-        parser.add_argument('--ox', dest='over_sample_x', default=1, help='Oversampling in range direction')
 
         parser.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
         parser.add_argument('--walltime', dest='wall_time', default='None',
