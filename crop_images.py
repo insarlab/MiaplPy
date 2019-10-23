@@ -3,8 +3,6 @@
 # Program is part of MiNoPy                                #
 # Author:  Sara Mirzaee, Zhang Yunjun, Heresh Fattahi      #
 ############################################################
-
-
 import os
 import glob
 import warnings
@@ -58,7 +56,7 @@ def main(iargs=None):
     if any([stackObj, geomRadarObj, geomGeoObj]) and not os.path.isdir(inps.outdir):
         os.makedirs(inps.outdir)
         print('create directory: {}'.format(inps.outdir))
-    
+
     # write
     if stackObj and update_object(inps.outfile[0], stackObj, box, updateMode=updateMode):
         print('-'*50)

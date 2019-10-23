@@ -4,21 +4,29 @@
 # Author: Sara Mirzaee
 # Created: 10/2018
 ###############################################################################
-from mintpy.prep_isce import extract_tops_metadata, extract_geometry_metadata
-import sys
+
 import os
 import numpy as np
 import cmath
-import argparse
-import glob
+import datetime
 from numpy import linalg as LA
 from scipy.optimize import minimize, Bounds
-from scipy import stats
 from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 import gdal
 import isce
 import isceobj
-from mintpy.utils import readfile
+
+################################################################################
+
+
+def log_message(logdir, msg):
+    f = open(os.path.join(logdir, 'log'), 'a')
+    dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+    string = dateStr + " * " + msg
+    print(string)
+    f.write(string + "\n")
+    f.close()
+    return
 
 ################################################################################
 
