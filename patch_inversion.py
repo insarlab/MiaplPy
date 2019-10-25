@@ -192,6 +192,8 @@ class PhaseLink:
                         if status:
                             vec_refined = mnp.phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
 
+                    vec_refined = np.array(vec_refined)
+
                     self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat), vec_refined)
 
                     if self.quality[coord[0], coord[1]] >= 0.5:

@@ -95,7 +95,7 @@ class MinopyRun(object):
         for k in inps.__dict__.keys():
             setattr(self, k, inps.__dict__[k])
 
-        self.work_dir = inps.work_dir
+        self.work_dir = inps.workDir
 
         self.run_dir = inps.run_dir
 

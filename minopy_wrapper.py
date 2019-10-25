@@ -233,7 +233,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                                                      a3=self.template['minopy.plmethod'],
                                                                                      a4=self.template['minopy.shp_test'],
                                                                                      a5=item.split('/')[-1])
-                command = 'python_inversion.py ' + scp_srgs
+                command = 'patch_inversion.py ' + scp_srgs
                 f.write(command)
 
         memorymax = '2000'
@@ -367,7 +367,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
             slcObj = slcStack(slc_file)
             slcObj.open(print_msg=False)
-            date_list = slcObj.get_date_list(dropIfgram=True)
+            date_list = slcObj.get_date_list()
 
             pairs = []
             for i in range(1, len(date_list)):
