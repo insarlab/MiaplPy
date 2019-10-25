@@ -20,7 +20,7 @@ import isceobj
 
 
 def log_message(logdir, msg):
-    f = open(os.path.join(logdir, 'log'), 'a')
+    f = open(os.path.join(logdir, 'log'), 'a+')
     dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
     string = dateStr + " * " + msg
     print(string)
@@ -99,11 +99,16 @@ def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
 ################################################################################
 
 
-def read_image(image_file):
+def read_image(image_file, box=None):
     """ Reads images from isce. """
 
     ds = gdal.Open(image_file + '.vrt', gdal.GA_ReadOnly)
-    image = ds.GetRasterBand(1).ReadAsArray()
+    if not box is None:
+        band = ds.GetRasterBand(1)
+        image = band.ReadAsArray()[box[1]:box[3], box[0]:box[2]]
+    else:
+        image = ds.GetRasterBand(1).ReadAsArray()
+        
     del ds
 
     return image
@@ -159,8 +164,6 @@ def L2norm_rowwis(M):
 def regularize_matrix(M):
     """ Regularizes a matrix to make it positive semi definite. """
 
-    import matplotlib.pyplot as plt
-
     sh = np.shape(M)
     N = np.zeros([sh[0], sh[1]])
     N[:, :] = M[:, :]
@@ -173,8 +176,6 @@ def regularize_matrix(M):
             N[:, :] = N[:, :] + en*np.identity(len(N))
             en = 2*en
             t = t+1
-            import pdb;
-            pdb.set_trace()
 
     return 0
 

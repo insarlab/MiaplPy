@@ -9,11 +9,13 @@ import datetime
 import shutil
 import numpy as np
 import gdal
+import glob
 from mintpy.utils import readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from mintpy.objects import ifgramStack
 from mintpy.ifgram_inversion import write2hdf5_file, read_unwrap_phase, mask_unwrap_phase
 import minopy
+import minopy.workflow
 import minopy.submit_jobs as js
 from minopy_utilities import log_message
 from minopy.objects.arg_parser import MinoPyParser
@@ -47,9 +49,6 @@ STEP_LIST = [
     'hdfeos5',
     'email',]
 
-supported_schedulers = ['LSF', 'PBS', 'SLURM']
-
-
 ##########################################################################
 def main(iargs=None):
     start_time = time.time()
@@ -67,7 +66,7 @@ def main(iargs=None):
     #########################################
 
     if inps.submit_flag:
-        js.submit_script(job_name, job_file_name, sys.argv[:], inps.workDir, new_wall_time)
+        js.submit_script(job_name, job_file_name, sys.argv[:], inps.workDir, inps.wall_time)
         sys.exit(0)
 
     if not iargs is None:
@@ -96,23 +95,23 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         super().__init__(customTemplateFile, workDir)
         self.inps = inps
 
-    def startup(self):
-
-        self.custom_template_file = custom_template_file
+        self.customTemplateFile = customTemplateFile
         self.cwd = os.path.abspath(os.getcwd())
         self.workDir = workDir
 
+    def startup(self):
+
         # 1. Get project name
         self.project_name = None
-        if self.custom_template_file:
-            self.project_name = os.path.splitext(os.path.basename(self.custom_template_file))[0]
+        if self.customTemplateFile:
+            self.project_name = os.path.splitext(os.path.basename(self.customTemplateFile))[0]
             print('Project name:', self.project_name)
 
         # 2. Go to the work directory
         # 2.1 Get workDir
         if not self.workDir:
             if autoPath and 'SCRATCHDIR' in os.environ and self.project_name:
-                self.workDir = os.path.join(os.getenv('SCRATCHDIR'), self.projectName, pathObj.minopydir)
+                self.workDir = os.path.join(os.getenv('SCRATCHDIR'), self.project_name, pathObj.minopydir)
             else:
                 self.workDir = os.getcwd()
         self.workDir = os.path.abspath(self.workDir)
@@ -190,11 +189,16 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         os.chdir(self.workDir)
 
-        if self.template['mintpy.susbet.lalo'] == 'None' and self.template['mintpy.susbet.yx'] == 'None':
+        if self.template['mintpy.subset.lalo'] == 'None' and self.template['mintpy.subset.yx'] == 'None':
             print('WARNING: No crop area given in minopy.subset, the whole image is going to be used.')
             print('WARNING: May take days to process!')
         else:
             scp_args = '--template {}'.format(self.templateFile)
+            if self.customTemplateFile:
+                scp_args += ' {}'.format(self.customTemplateFile)
+            if self.project_name:
+                scp_args += ' --project {}'.format(self.project_name)
+
             print('crop_images.py ', scp_args)
             minopy.crop_images.main(scp_args.split())
         return
@@ -202,8 +206,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
     def run_create_patch(self, sname):
         """ Dividing the area into patches.
         """
+
         scp_args = '--workDir {} --rangeWin {} --azimuthWin {} --patchSize {}'.\
-            format(self.workDir, self.patch_dir,
+            format(self.workDir,
                    int(self.template['minopy.range_window']),
                    int(self.template['minopy.azimuth_window']),
                    int(self.template['minopy.patch_size']))
@@ -212,7 +217,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         return
 
-    def run_phase_linking(self):
+    def run_phase_linking(self, sname):
         """ Non-Linear phase inversion.
         """
         if not os.path.exists(self.run_dir):
@@ -280,7 +285,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             raise RuntimeError(msg)
         return
 
-    def write_to_timeseries(self):
+    def write_to_timeseries(self, sname):
 
         inps = self.inps
 
@@ -352,7 +357,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         return
 
-    def run_interferogram(self):
+    def run_interferogram(self, sname):
         """ Export single master interferograms
         """
         run_file_int = os.path.join(self.run_dir, 'run_interferograms')
@@ -380,7 +385,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         return
 
-    def run_unwrap(self, config):
+    def run_unwrap(self, sname):
         """ Unwrapps single master interferograms
         """
         run_file_unwrap = os.path.join(self.run_dir, 'run_unwrap')
@@ -408,11 +413,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         return
 
-    def run_email_results(self):
+    def run_email_results(self, sname):
         """ email Time series results
         """
-        log_message(self.workDir, 'email_results.py {}'.format(self.custom_template_file))
-        email_results.main([self.custom_template_file])
+        log_message(self.workDir, 'email_results.py {}'.format(self.customTemplateFiler))
+        email_results.main([self.customTemplateFiler])
         return
 
     def run(self, steps=STEP_LIST, plot=True):
@@ -422,7 +427,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             if sname == 'crop':
                 self.run_crop(sname)
 
-            elif sname == 'patch':
+            elif sname == 'create_patch':
                 self.run_create_patch(sname)
 
             elif sname == 'inversion':

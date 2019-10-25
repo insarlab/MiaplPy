@@ -92,7 +92,7 @@ class slcStackDict:
             dsDataType = dataTypeDict[metadata['DATA_TYPE'].lower()]
         return dsDataType
 
-    def write2hdf5(self, outputFile='slcStack.h5', access_mode='w', box=None, compression=None, extra_metadata=None):
+    def write2hdf5(self, outputFile='slcStack.h5', access_mode='a', box=None, compression=None, extra_metadata=None):
         '''Save/write an slcStackDict object into an HDF5 file with the structure below:
 
         /                  Root level
@@ -118,6 +118,7 @@ class slcStackDict:
         self.get_size(box)
 
         self.bperp = np.zeros(self.numSlc)
+
         ###############################
         # 3D datasets containing slc.
         for dsName in self.dsNames:
@@ -134,27 +135,33 @@ class slcStackDict:
                                                      t=str(dsDataType),
                                                      s=dsShape,
                                                      c=dsCompression))
-            ds = f.create_dataset(dsName,
-                                  shape=dsShape,
-                                  maxshape=(None, dsShape[1], dsShape[2]),
-                                  dtype=dsDataType,
-                                  chunks=True,
-                                  compression=dsCompression)
 
-            prog_bar = ptime.progressBar(maxValue=self.numSlc)
-            for i in range(self.numSlc):
-                slcObj = self.pairsDict[self.pairs[i]]
-                data = slcObj.read(dsName, box=box)[0]
-                ds[i, :, :] = data
-                self.bperp[i] = slcObj.get_perp_baseline()
-                prog_bar.update(i+1, suffix='{}_{}'.format(self.pairs[i][0],
-                                                           self.pairs[i][1]))
-            prog_bar.close()
+            if dsName in f.keys():
+                ds = f[dsName]
+            else:
+                ds = f.create_dataset(dsName,
+                                      shape=dsShape,
+                                      maxshape=(None, dsShape[1], dsShape[2]),
+                                      dtype=dsDataType,
+                                      chunks=True,
+                                      compression=dsCompression)
+
+                prog_bar = ptime.progressBar(maxValue=self.numSlc)
+
+                for i in range(self.numSlc):
+                    slcObj = self.pairsDict[self.pairs[i]]
+                    data = slcObj.read(dsName, box=box)[0]
+                    ds[i, :, :] = data
+                    self.bperp[i] = slcObj.get_perp_baseline()
+                    prog_bar.update(i+1, suffix='{}_{}'.format(self.pairs[i][0],
+                                                               self.pairs[i][1]))
+
+                prog_bar.close()
             ds.attrs['MODIFICATION_TIME'] = str(time.time())
 
         ###############################
         # 2D dataset containing master and slave dates of all pairs
-        dsName = 'date'
+        dsName = 'dates'
         dsDataType = np.string_
         dsShape = (self.numSlc, 2)
         print('create dataset /{d:<{w}} of {t:<25} in size of {s}'.format(d=dsName,
@@ -199,7 +206,7 @@ FILE_STRUCTURE_SLCs = """
 /                Root level
 Attributes       Dictionary for metadata
 /slc             3D array of float32 in size of (n, l, w) in meter.
-/date            1D array of string  in size of (n,     ) in YYYYMMDD format
+/dates            1D array of string  in size of (n,     ) in YYYYMMDD format
 /bperp           1D array of float32 in size of (n,     ) in meter. (optional)
 """
 
@@ -253,7 +260,7 @@ class slcStack:
     def get_metadata(self):
         with h5py.File(self.file, 'r') as f:
             self.metadata = dict(f.attrs)
-            dates = f['date'][:]
+            dates = f['dates'][:]
         for key, value in self.metadata.items():
             try:
                 self.metadata[key] = value.decode('utf8')
@@ -276,7 +283,7 @@ class slcStack:
 
     def get_date_list(self):
         with h5py.File(self.file, 'r') as f:
-            self.dateList = [i.decode('utf8') for i in f['date'][:]]
+            self.dateList = [i.decode('utf8') for i in f['dates'][:]]
         return self.dateList
 
     def read(self, datasetName=None, box=None, print_msg=True):
@@ -593,7 +600,7 @@ def read(fname, box=None, datasetName=None, print_msg=True):
         dsname4atr = datasetName[0].split('-')[0]
     elif isinstance(datasetName, str):
         dsname4atr = datasetName.split('-')[0]
-    atr = read_attribute(fname, datasetName=dsname4atr)
+    atr = readfile.read_attribute(fname, datasetName=dsname4atr)
 
     # box
     length, width = int(atr['LENGTH']), int(atr['WIDTH'])
@@ -802,7 +809,7 @@ def read_binary_file(fname, datasetName=None, box=None):
                 cpx_band = 'real'
 
         elif fext == '.slc':
-            data_type = 'complex32'
+            data_type = 'complex64'
             cpx_band = 'magnitude'
 
         elif fext in ['.mli']:
@@ -825,16 +832,6 @@ def read_binary_file(fname, datasetName=None, box=None):
 
     # reading
     data = read_image(fname, box=box)
-    '''
-    data = read_binary(fname, (length, width),
-                       box=box,
-                       data_type=data_type,
-                       byte_order=byte_order,
-                       num_band=num_band,
-                       band_interleave=band_interleave,
-                       band=band,
-                       cpx_band=cpx_band)
-    '''
 
     if 'DATA_TYPE' not in atr:
         atr['DATA_TYPE'] = data_type

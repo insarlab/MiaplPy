@@ -14,6 +14,7 @@ from minopy.objects.slcStack import(slcDatasetNames,
                                     slcStack,
                                     slcStackDict,
                                     slcDict)
+from minopy.objects.geometryStack import geometryDict
 from mintpy.utils import readfile, ptime, utils as ut
 from mintpy import subset
 import mintpy.load_data as mld
@@ -23,6 +24,11 @@ from minopy.objects.arg_parser import MinoPyParser
 
 #################################################################
 datasetName2templateKey = {'slc'             : 'mintpy.load.slcFile',
+                           'unwrapPhase'     : 'mintpy.load.unwFile',
+                           'coherence'       : 'mintpy.load.corFile',
+                           'connectComponent': 'mintpy.load.connCompFile',
+                           'wrapPhase'       : 'mintpy.load.intFile',
+                           'iono'            : 'mintpy.load.ionoFile',
                            'height'          : 'mintpy.load.demFile',
                            'latitude'        : 'mintpy.load.lookupYFile',
                            'longitude'       : 'mintpy.load.lookupXFile',
@@ -39,17 +45,19 @@ datasetName2templateKey = {'slc'             : 'mintpy.load.slcFile',
 
 
 def main(iargs=None):
-    Parser = MinoPyParser(iargs, screipt='crop_images')
+    Parser = MinoPyParser(iargs, script='crop_images')
     inps = Parser.parse()
     # read input options
+
     inpsDict = read_inps2dict(inps)
+
     prepare_metadata(inpsDict)
 
     inpsDict = read_subset_box(inpsDict)
     extraDict = mld.get_extra_metadata(inpsDict)
     # initiate objects
     stackObj = read_inps_dict2slc_stack_dict_object(inpsDict)
-    geomRadarObj, geomGeoObj = mld.read_inps_dict2geometry_dict_object(inpsDict)
+    geomRadarObj, geomGeoObj = read_inps_dict2geometry_dict_object(inpsDict)
 
     # prepare wirte
     updateMode, comp, box, boxGeo = mld.print_write_setting(inpsDict)
@@ -61,7 +69,7 @@ def main(iargs=None):
     if stackObj and update_object(inps.outfile[0], stackObj, box, updateMode=updateMode):
         print('-'*50)
         stackObj.write2hdf5(outputFile=inps.outfile[0],
-                            access_mode='w',
+                            access_mode='a',
                             box=box,
                             compression=comp,
                             extra_metadata=extraDict)
@@ -69,7 +77,7 @@ def main(iargs=None):
     if geomRadarObj and update_object(inps.outfile[1], geomRadarObj, box, updateMode=updateMode):
         print('-'*50)
         geomRadarObj.write2hdf5(outputFile=inps.outfile[1],
-                                access_mode='w',
+                                access_mode='a',
                                 box=box,
                                 compression='lzf',
                                 extra_metadata=extraDict)
@@ -77,7 +85,7 @@ def main(iargs=None):
     if geomGeoObj and update_object(inps.outfile[2], geomGeoObj, boxGeo, updateMode=updateMode):
         print('-'*50)
         geomGeoObj.write2hdf5(outputFile=inps.outfile[2],
-                              access_mode='w',
+                              access_mode='a',
                               box=boxGeo,
                               compression='lzf')
 
@@ -119,16 +127,18 @@ def read_inps2dict(inps):
     if not inpsDict['PROJECT_NAME']:
         cfile = [i for i in list(inps.template_file) if os.path.basename(i) != 'minopy_template.cfg']
         inpsDict['PROJECT_NAME'] = sensor.project_name2sensor_name(cfile)[1]
+
     inpsDict['PLATFORM'] = str(sensor.project_name2sensor_name(str(inpsDict['PROJECT_NAME']))[0])
     if inpsDict['PLATFORM']:
         print('SAR platform/sensor : {}'.format(inpsDict['PLATFORM']))
     print('processor: {}'.format(inpsDict['processor']))
 
     # Here to insert code to check default file path for miami user
+
     if (auto_path.autoPath
             and 'SCRATCHDIR' in os.environ
             and inpsDict['PROJECT_NAME'] is not None
-            and inpsDict['mintpy.load.slcFile']) == 'auto':
+            and inpsDict['mintpy.load.slcFile'] == 'auto'):
         print(('check auto path setting for Univ of Miami users'
                ' for processor: {}'.format(inpsDict['processor'])))
         inpsDict = auto_path.get_auto_path(processor=inpsDict['processor'],
@@ -153,6 +163,7 @@ def prepare_metadata(inpsDict):
                 os.system(cmd)
 
     elif processor == 'isce':
+
         slc_dir = os.path.dirname(os.path.dirname(inpsDict['mintpy.load.slcFile']))
         slc_file = os.path.basename(inpsDict['mintpy.load.slcFile'])
         meta_files = sorted(glob.glob(inpsDict['mintpy.load.metaFile']))
@@ -412,6 +423,91 @@ def update_object(outFile, inObj, box, updateMode=True):
                        ' no need to re-load.'.format(os.path.basename(outFile))))
                 write_flag = False
     return write_flag
+
+
+def read_inps_dict2geometry_dict_object(inpsDict):
+    # eliminate dsName by processor
+    if inpsDict['processor'] in ['isce', 'doris']:
+        datasetName2templateKey.pop('azimuthCoord')
+        datasetName2templateKey.pop('rangeCoord')
+    elif inpsDict['processor'] in ['roipac', 'gamma']:
+        datasetName2templateKey.pop('latitude')
+        datasetName2templateKey.pop('longitude')
+    elif inpsDict['processor'] in ['snap']:
+        # check again when there is a SNAP product in radar coordiantes
+        pass
+    else:
+        print('Un-recognized InSAR processor: {}'.format(inpsDict['processor']))
+
+    # inpsDict --> dsPathDict
+    print('-' * 50)
+    print('searching geometry files info')
+    print('input data files:')
+
+    maxDigit = max([len(i) for i in list(datasetName2templateKey.keys())])
+    dsPathDict = {}
+    for dsName in [i for i in geometryDatasetNames
+                   if i in datasetName2templateKey.keys()]:
+        key = datasetName2templateKey[dsName]
+        if key in inpsDict.keys():
+            files = sorted(glob.glob(str(inpsDict[key]) + '.xml'))
+            if len(files) > 0:
+                if dsName == 'bperp':
+                    bperpDict = {}
+                    for file in files:
+                        date = ptime.yyyymmdd(os.path.basename(os.path.dirname(file)))
+                        bperpDict[date] = file
+                    dsPathDict[dsName] = bperpDict
+                    print('{:<{width}}: {path}'.format(dsName,
+                                                       width=maxDigit,
+                                                       path=inpsDict[key]))
+                    print('number of bperp files: {}'.format(len(list(bperpDict.keys()))))
+                else:
+                    dsPathDict[dsName] = files[0]
+                    print('{:<{width}}: {path}'.format(dsName,
+                                                       width=maxDigit,
+                                                       path=files[0]))
+
+    # Check required dataset
+    dsName0 = geometryDatasetNames[0]
+    if dsName0 not in dsPathDict.keys():
+        print('WARNING: No reqired {} data files found!'.format(dsName0))
+
+    # metadata
+    ifgramRadarMetadata = None
+    ifgramKey = datasetName2templateKey['unwrapPhase']
+    if ifgramKey in inpsDict.keys():
+        ifgramFiles = glob.glob(str(inpsDict[ifgramKey]))
+        if len(ifgramFiles) > 0:
+            atr = readfile.read_attribute(ifgramFiles[0])
+            if 'Y_FIRST' not in atr.keys():
+                ifgramRadarMetadata = atr.copy()
+
+    # dsPathDict --> dsGeoPathDict + dsRadarPathDict
+    dsNameList = list(dsPathDict.keys())
+    dsGeoPathDict = {}
+    dsRadarPathDict = {}
+    for dsName in dsNameList:
+        if dsName == 'bperp':
+            atr = readfile.read_attribute(next(iter(dsPathDict[dsName].values())))
+        else:
+            atr = read_attribute(dsPathDict[dsName].split('.xml')[0], metafile_ext='.xml')
+        if 'Y_FIRST' in atr.keys():
+            dsGeoPathDict[dsName] = dsPathDict[dsName]
+        else:
+            dsRadarPathDict[dsName] = dsPathDict[dsName]
+
+    geomRadarObj = None
+    geomGeoObj = None
+    if len(dsRadarPathDict) > 0:
+        geomRadarObj = geometryDict(processor=inpsDict['processor'],
+                                    datasetDict=dsRadarPathDict,
+                                    extraMetadata=ifgramRadarMetadata)
+    if len(dsGeoPathDict) > 0:
+        geomGeoObj = geometryDict(processor=inpsDict['processor'],
+                                  datasetDict=dsGeoPathDict,
+                                  extraMetadata=None)
+    return geomRadarObj, geomGeoObj
 
 
 #################################################################

@@ -379,18 +379,18 @@ def prepare_geometry(geom_dir, metadata=dict(), update_mode=True):
     """Prepare and extract metadata from geometry files"""
     print('prepare .rsc file for geometry files')
     # grab all existed files
-    isce_files = [os.path.join(os.path.abspath(geom_dir), '{}.rdr.full'.format(i))
+    isce_files = [os.path.join(os.path.abspath(geom_dir), '{}.rdr.full.xml'.format(i))
                   for i in ['hgt','lat','lon','los','shadowMask','incLocal']]
     isce_files = [i for i in isce_files if os.path.isfile(i)]
 
     # write rsc file for each file
     for isce_file in isce_files:
         # prepare metadata for current file
-        geom_metadata = readfile.read_attribute(isce_file, metafile_ext='.xml')
+        geom_metadata = read_attribute(isce_file.split('.xml')[0], metafile_ext='.xml')
         geom_metadata.update(metadata)
 
         # write .rsc file
-        rsc_file = isce_file+'.rsc'
+        rsc_file = isce_file.split('.xml')[0]+'.rsc'
         writefile.write_roipac_rsc(geom_metadata, rsc_file,
                                    update_mode=update_mode,
                                    print_msg=True)

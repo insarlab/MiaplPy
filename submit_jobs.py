@@ -8,8 +8,10 @@ import sys
 import argparse
 from minopy_utilities import log_message
 from minopy.objects.utils import OutControl
+import subprocess
 import datetime
 
+supported_schedulers = ['LSF', 'PBS', 'SLURM']
 #################################
 EXAMPLE = """example:
          submit_jobs.py run_unwrap 
@@ -286,7 +288,7 @@ def submit_batch_jobs(batch_file, out_dir='./run_files', work_dir='.', memory='4
     :param queue: Name of the queue to which the job is to be submitted. Default is set based on the scheduler.
     """
 
-    log_message.log(work_dir, 'job_submission.py {a} --memory {b} --walltime {c} --queuename {d} --outdir {e}'
+    log_message(work_dir, 'job_submission.py {a} --memory {b} --walltime {c} --queuename {d} --outdir {e}'
                       .format(a=batch_file, b=memory, c=walltime, d=queue, e=out_dir))
 
     job_files = write_batch_job_files(batch_file, out_dir, memory=memory, walltime=walltime, queue=queue)

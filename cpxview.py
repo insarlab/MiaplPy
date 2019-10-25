@@ -1,4 +1,4 @@
-MinoPyParser#!/usr/bin/env python3
+#!/usr/bin/env python3
 ############################################################
 # Program is part of MintPy                                #
 # Copyright(c) 2013-2019, Zhang Yunjun, Heresh Fattahi     #
@@ -15,7 +15,6 @@ import datetime as dt
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-# suppress UserWarning from matplotlib
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
@@ -214,7 +213,7 @@ def read_data4figure(i_start, i_end, inps, metadata):
             if inps.dsetFamilyList[0] == 'unwrapPhase' and inps.file_ref_yx:
                 ref_y, ref_x = inps.file_ref_yx
                 ref_box = (ref_x, ref_y, ref_x + 1, ref_y + 1)
-                ref_data = readfile.read(inps.file, datasetName=dset_list, box=ref_box, print_msg=False)[0]
+                ref_data = read(inps.file, datasetName=dset_list, box=ref_box, print_msg=False)[0]
                 for i in range(data.shape[0]):
                     mask = data[i, :, :] != 0.
                     data[i, mask] -= ref_data[i]
@@ -224,7 +223,7 @@ def read_data4figure(i_start, i_end, inps, metadata):
         vprint('reading data ...')
         prog_bar = ptime.progressBar(maxValue=i_end - i_start, print_msg=inps.print_msg)
         for i in range(i_start, i_end):
-            d = readfile.read(inps.file,
+            d = read(inps.file,
                               datasetName=inps.dset[i],
                               box=inps.pix_box,
                               print_msg=False)[0]
@@ -235,7 +234,7 @@ def read_data4figure(i_start, i_end, inps, metadata):
     # ref_date for timeseries
     if inps.ref_date:
         vprint('consider input reference date: ' + inps.ref_date)
-        ref_data = readfile.read(inps.file,
+        ref_data = read(inps.file,
                                  datasetName=inps.ref_date,
                                  box=inps.pix_box,
                                  print_msg=False)[0]
@@ -402,7 +401,7 @@ def prepare4multi_subplots(inps, metadata):
         dem_metadata = read_attribute(inps.dem_file)
         if all(dem_metadata[i] == metadata[i] for i in ['LENGTH', 'WIDTH']):
             vprint('reading DEM: {} ... '.format(os.path.basename(inps.dem_file)))
-            dem = readfile.read(inps.dem_file,
+            dem = read(inps.dem_file,
                                 datasetName='height',
                                 box=inps.pix_box,
                                 print_msg=False)[0]
@@ -451,13 +450,13 @@ def prep_slice(cmd, auto_fig=False):
                                             print_msg=inps.print_msg)
 
     # read data
-    data, atr = readfile.read(inps.file,
+    data, atr = read(inps.file,
                               datasetName=inps.dset[0],
                               box=inps.pix_box,
                               print_msg=inps.print_msg)
     # reference in time
     if inps.ref_date:
-        data -= readfile.read(inps.file,
+        data -= read(inps.file,
                               datasetName=inps.ref_date,
                               box=inps.pix_box,
                               print_msg=False)[0]
@@ -466,7 +465,7 @@ def prep_slice(cmd, auto_fig=False):
             and inps.dset[0].split('-')[0] == 'unwrapPhase'
             and 'REF_Y' in atr.keys()):
         ref_y, ref_x = int(atr['REF_Y']), int(atr['REF_X'])
-        ref_data = readfile.read(inps.file,
+        ref_data = read(inps.file,
                                  datasetName=inps.dset[0],
                                  box=(ref_x, ref_y, ref_x + 1, ref_y + 1),
                                  print_msg=False)[0]
@@ -529,13 +528,13 @@ class viewer():
         if self.dsetNum == 1:
             vprint('reading data ...')
             # read data
-            data, self.atr = readfile.read(self.file,
+            data, self.atr = read(self.file,
                                            datasetName=self.dset[0],
                                            box=self.pix_box,
                                            print_msg=False)
             # reference in time
             if self.ref_date:
-                data -= readfile.read(self.file,
+                data -= read(self.file,
                                       datasetName=self.ref_date,
                                       box=self.pix_box,
                                       print_msg=False)[0]
@@ -544,7 +543,7 @@ class viewer():
                     and self.dset[0].split('-')[0] == 'unwrapPhase'
                     and 'REF_Y' in self.atr.keys()):
                 ref_y, ref_x = int(self.atr['REF_Y']), int(self.atr['REF_X'])
-                ref_data = readfile.read(self.file,
+                ref_data = read(self.file,
                                          datasetName=self.dset[0],
                                          box=(ref_x, ref_y, ref_x + 1, ref_y + 1),
                                          print_msg=False)[0]
@@ -831,6 +830,27 @@ def update_data_with_plot_inps(data, metadata, inps):
     vprint('display range: {} {}'.format(inps.vlim, inps.disp_unit))
 
     return data, inps
+
+
+def check_multilook_input(pixel_box, row_num, col_num):
+    # Estimate multilook_num
+    multilook_num=1
+    if row_num * col_num > 10:
+        box_size = (pixel_box[2] - pixel_box[0]) * (pixel_box[3] - pixel_box[1])
+        pixel_num_per_figure = box_size * row_num * col_num
+        if   pixel_num_per_figure > (8e6*160):   multilook_num=16;      ## 2k * 2k image with 120 subplots
+        elif pixel_num_per_figure > (4e6*80) :   multilook_num=8;       ## 2k * 2k image with 80  subplots
+        elif pixel_num_per_figure > (4e6*20) :   multilook_num=4;       ## 2k * 2k image with 40  subplots
+        elif pixel_num_per_figure > (1e6*20) :   multilook_num=2;       ## 2k * 2k image with 40  subplots
+
+    # Update multilook based on multilook_num
+    if multilook_num > 1:
+        multilook = True
+        vprint('number of data points per figures: {:.1E}'.format(pixel_num_per_figure))
+        vprint('multilook with a factor of {} for display'.format(multilook_num))
+    else:
+        multilook = False
+    return multilook, multilook_num
 
 #########################################  Main Function  ########################################
 def main(iargs=None):

@@ -5,9 +5,13 @@
 ###############################################################################
 import argparse
 from minopy.defaults import auto_path
+from minopy.defaults.auto_path import autoPath, PathFind
 import mintpy
 import os
 import datetime
+pathObj = PathFind()
+
+
 
 class MinoPyParser:
 
@@ -143,6 +147,21 @@ class MinoPyParser:
                 print('--dostep option enabled, disable the plotting at the end of the processing.')
                 inps.plot = False
 
+        inps.project_name = None
+        if inps.customTemplateFile and not os.path.basename(inps.customTemplateFile) == 'minopy_template.cfg':
+            inps.project_name = os.path.splitext(os.path.basename(inps.customTemplateFile))[0]
+            print('Project name:', inps.project_name)
+
+        if not inps.workDir:
+            if autoPath and 'SCRATCHDIR' in os.environ and inps.project_name:
+                inps.workDir = os.path.join(os.getenv('SCRATCHDIR'), inps.project_name, pathObj.minopydir)
+            else:
+                inps.workDir = os.getcwd()
+        inps.workDir = os.path.abspath(inps.workDir)
+
+        if not os.path.exists(inps.workDir):
+            os.mkdir((inps.workDir))
+
         print('-' * 50)
         return inps
 
@@ -215,7 +234,7 @@ class MinoPyParser:
 
     def create_patch_parser(self):
         parser = self.parser
-        patch = parser.add_argument_group('Crop options')
+        patch = parser.add_argument_group('Create Patch options')
         patch.add_argument('-w', '--workDir', type=str, dest='work_dir', help='minopy directory')
         patch.add_argument('-r', '--rangeWin', type=int, dest='range_window', default=15,
                            help='range window size for shp finding')
@@ -345,7 +364,7 @@ class MinoPyParser:
         step.add_argument('--dostep', dest='doStep', metavar='STEP',
                           help='run processing at the named step only')
 
-        self.STEP_LIST = STEP_HELP
+        self.STEP_LIST = STEP_LIST
 
         return parser
 
