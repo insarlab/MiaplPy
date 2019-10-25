@@ -227,12 +227,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_minopy_inversion = os.path.join(self.run_dir, 'run_minopy_inversion')
         with open(run_minopy_inversion, 'w') as f:
             for item in patch_list:
-                scp_srgs = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5}'.format(a0=self.workDir,
-                                                                                     a1=self.template['minopy.range_window'],
-                                                                                     a2=self.template['minopy.azimuth_window'],
-                                                                                     a3=self.template['minopy.plmethod'],
-                                                                                     a4=self.template['minopy.shp_test'],
-                                                                                     a5=item.split('/')[-1])
+                scp_srgs = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5}\n'.format(a0=self.workDir,
+                                                                                      a1=self.template['minopy.range_window'],
+                                                                                      a2=self.template['minopy.azimuth_window'],
+                                                                                      a3=self.template['minopy.plmethod'],
+                                                                                      a4=self.template['minopy.shp_test'],
+                                                                                      a5=item.split('/')[-1])
                 command = 'patch_inversion.py ' + scp_srgs
                 f.write(command)
 

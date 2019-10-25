@@ -10,6 +10,7 @@ from minopy_utilities import log_message
 from minopy.objects.utils import OutControl
 import subprocess
 import datetime
+import time
 
 supported_schedulers = ['LSF', 'PBS', 'SLURM']
 #################################
