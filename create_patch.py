@@ -73,7 +73,7 @@ def main(iargs=None):
             data = (patch_name, box, slcObj, dim)
             create_patch(data)
 
-    np.save(patch_dir + '/flag.npy', 'patchlist_created')
+    np.save(inps.patch_dir + '/flag.npy', 'patchlist_created')
     timep = time.time() - start_time
 
     print('All patches created in {} seconds'.format(timep))
