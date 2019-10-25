@@ -600,7 +600,7 @@ def read(fname, box=None, datasetName=None, print_msg=True):
         dsname4atr = datasetName[0].split('-')[0]
     elif isinstance(datasetName, str):
         dsname4atr = datasetName.split('-')[0]
-    atr = read_attribute(fname, datasetName=dsname4atr)
+    atr = read_attribute(fname, datasetName=dsname4atr, metafile_ext='.rsc')
 
     # box
     length, width = int(atr['LENGTH']), int(atr['WIDTH'])
