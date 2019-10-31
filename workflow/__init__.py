@@ -14,6 +14,7 @@ __all__ = [
     'crop_images',
     'generate_ifgram_sq',
     'patch_inversion',
+    'load_int',
     'version',
 ]
 

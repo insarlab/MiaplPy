@@ -10,6 +10,8 @@ import shutil
 import numpy as np
 import gdal
 import glob
+import h5py
+import mintpy
 from mintpy.utils import readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from mintpy.objects import ifgramStack
@@ -22,6 +24,8 @@ from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects.slcStack import slcStack
 from minopy.objects.stack_int import MinopyRun
 from minopy.defaults.auto_path import autoPath, PathFind
+from minopy.objects.utils import check_template_auto_value
+from minopy.defaults import auto_path
 
 pathObj = PathFind()
 ###########################################################################################
@@ -30,8 +34,8 @@ STEP_LIST = [
     'create_patch',
     'inversion',
     'ifgrams',
-    'unwrap'
-    'load_data',
+    'unwrap',
+    'load_int',
     'modify_network',
     'reference_point',
     'write_to_timeseries',
@@ -59,14 +63,14 @@ def main(iargs=None):
     job_name = job_file_name
 
     if inps.wall_time == 'None':
-        inps.wall_time = '12:00'
+        inps.wall_time = '24:00'
 
     #########################################
     # Submit job
     #########################################
 
     if inps.submit_flag:
-        js.submit_script(job_name, job_file_name, sys.argv[:], inps.workDir, inps.wall_time)
+        js.submit_script(job_name, job_file_name, sys.argv[:], inps.workDir, inps.wall_time, queue_name=inps.queue_name)
         sys.exit(0)
 
     if not iargs is None:
@@ -103,9 +107,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         # 1. Get project name
         self.project_name = None
-        if self.customTemplateFile:
+        if self.customTemplateFile and not os.path.basename(self.customTemplateFile) == 'minopy_template.cfg':
             self.project_name = os.path.splitext(os.path.basename(self.customTemplateFile))[0]
             print('Project name:', self.project_name)
+        else:
+            self.project_name = os.path.dirname(self.workDir)
 
         # 2. Go to the work directory
         # 2.1 Get workDir
@@ -150,9 +156,17 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 os.mkdir(directory)
 
         # 3.2 read (custom) template files into dicts
-        super()._read_template()
-        auto_template_file = os.path.join(os.path.dirname(__file__), 'defaults/minopy_template_defaults.cfg')
-        self.template = ut.check_template_auto_value(self.template, auto_file=auto_template_file)
+        self._read_template()
+
+        if (auto_path.autoPath
+                and 'SCRATCHDIR' in os.environ
+                and self.project_name is not None
+                and self.template['mintpy.load.slcFile'] == 'auto'):
+            print(('check auto path setting for Univ of Miami users'
+                   ' for processor: {}'.format(self.template['mintpy.load.processor'])))
+            self.template = auto_path.get_auto_path(processor=self.template['mintpy.load.processor'],
+                                                    project_name=self.project_name,
+                                                    template=self.template)
 
         # 4. Copy the plot shell file
         sh_file = os.path.join(os.getenv('MINTPY_HOME'), 'sh/plot_smallbaselineApp.sh')
@@ -181,6 +195,71 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         self.plot_sh_cmd = './' + os.path.basename(sh_file)
 
+        return
+
+    def _read_template(self):
+        # read custom template, to:
+        # 1) update default template
+        # 2) add metadata to ifgramStack file and HDF-EOS5 file
+        self.customTemplate = None
+        if self.customTemplateFile:
+            cfile = self.customTemplateFile
+            # Copy custom template file to inputs directory for backup
+            inputs_dir = os.path.join(self.workDir, 'inputs')
+            if not os.path.isdir(inputs_dir):
+                os.makedirs(inputs_dir)
+                print('create directory:', inputs_dir)
+            if ut.run_or_skip(out_file=os.path.join(inputs_dir, os.path.basename(cfile)),
+                              in_file=cfile,
+                              check_readable=False) == 'run':
+                shutil.copy2(cfile, inputs_dir)
+                print('copy {} to inputs directory for backup.'.format(os.path.basename(cfile)))
+
+            # Read custom template
+            print('read custom template file:', cfile)
+            cdict = readfile.read_template(cfile)
+
+            # correct some loose type errors
+            standardValues = {'def':'auto', 'default':'auto',
+                              'y':'yes', 'on':'yes', 'true':'yes',
+                              'n':'no', 'off':'no', 'false':'no'
+                             }
+            for key, value in cdict.items():
+                if value in standardValues.keys():
+                    cdict[key] = standardValues[value]
+
+            for key in ['mintpy.deramp', 'mintpy.troposphericDelay.method']:
+                if key in cdict.keys():
+                    cdict[key] = cdict[key].lower().replace('-', '_')
+
+            if 'processor' in cdict.keys():
+                cdict['mintpy.load.processor'] = cdict['processor']
+
+            # these metadata are used in load_data.py only, not needed afterwards
+            # (in order to manually add extra offset when the lookup table is shifted)
+            # (seen in ROI_PAC product sometimes)
+            for key in ['SUBSET_XMIN', 'SUBSET_YMIN']:
+                if key in cdict.keys():
+                    cdict.pop(key)
+
+            self.customTemplate = dict(cdict)
+
+            # Update default template file based on custom template
+            print('update default template based on input custom template')
+            self.templateFile = ut.update_template_file(self.templateFile, self.customTemplate)
+
+        print('read default template file:', self.templateFile)
+        self.template = readfile.read_template(self.templateFile)
+        auto_template_file = os.path.join(os.path.dirname(__file__), 'defaults/minopy_template_defaults.cfg')
+        self.template = check_template_auto_value(self.template, auto_file=auto_template_file)
+
+        # correct some loose setup conflicts
+        if self.template['mintpy.geocode'] is False:
+            for key in ['mintpy.save.hdfEos5', 'mintpy.save.kmz']:
+                if self.template[key] is True:
+                    self.template['mintpy.geocode'] = True
+                    print('Turn ON mintpy.geocode in order to run {}.'.format(key))
+                    break
         return
 
     def run_crop(self, sname):
@@ -237,9 +316,124 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 f.write(command)
 
         memorymax = '2000'
-        walltime = '2:00'
+        walltime = '6:00'
         js.scheduler_job_submit(run_minopy_inversion, self.workDir, memorymax, walltime)
 
+        return
+
+    def run_interferogram(self, sname):
+        """ Export single master interferograms
+        """
+        run_file_int = os.path.join(self.run_dir, 'run_interferograms')
+
+        slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
+        slcObj = slcStack(slc_file)
+        slcObj.open(print_msg=False)
+        date_list = slcObj.get_date_list()
+
+        pairs = []
+        for i in range(1, len(date_list)):
+            pairs.append((date_list[0], date_list[i]))
+
+        inps = self.inps
+        inps.run_dir = self.run_dir
+        inps.patch_dir = self.patch_dir
+        inps.ifgram_dir = self.ifgram_dir
+        inps.template = self.template
+
+        runObj = MinopyRun()
+        runObj.configure(inps, 'run_interferograms')
+        runObj.generateIfg(inps, pairs)
+        runObj.finalize()
+
+        memorymax = '4000'
+        walltime = '2:00'
+
+        js.scheduler_job_submit(run_file_int, self.workDir, memorymax, walltime)
+
+        return
+
+    def run_unwrap(self, sname):
+        """ Unwrapps single master interferograms
+        """
+        run_file_unwrap = os.path.join(self.run_dir, 'run_unwrap')
+
+        slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
+        slcObj = slcStack(slc_file)
+        slcObj.open(print_msg=False)
+        date_list = slcObj.get_date_list()
+
+        pairs = []
+        for i in range(1, len(date_list)):
+            pairs.append((date_list[0], date_list[i]))
+
+        inps = self.inps
+        inps.run_dir = self.run_dir
+        inps.patch_dir = self.patch_dir
+        inps.ifgram_dir = self.ifgram_dir
+        inps.template = self.template
+
+        runObj = MinopyRun()
+        runObj.configure(inps, 'run_unwrap')
+        runObj.unwrap(inps, pairs)
+        runObj.finalize()
+
+        memorymax = '5000'
+        walltime = '4:00'
+
+        js.scheduler_job_submit(run_file_unwrap, self.workDir, memorymax, walltime)
+
+        return
+
+    def run_load_int(self, step_name):
+        """Load InSAR stacks into HDF5 files in ./inputs folder.
+        It 1) copy auxiliary files into work directory (for Unvi of Miami only)
+           2) load all interferograms stack files into mintpy/inputs directory.
+           3) check loading result
+           4) add custom metadata (optional, for HDF-EOS5 format only)
+        """
+        # 1) copy aux files (optional)
+        self.projectName = self.project_name
+        super()._copy_aux_file()
+
+        # 2) loading data
+        scp_args = '--template {}'.format(self.templateFile)
+        if self.customTemplateFile:
+            scp_args += ' {}'.format(self.customTemplateFile)
+        if self.projectName:
+            scp_args += ' --project {}'.format(self.projectName)
+        scp_args += ' --output {}'.format('./inputs/ifgramStack.h5')
+        # run
+        print("load_int.py", scp_args)
+        minopy.load_int.main(scp_args.split())
+        os.chdir(self.workDir)
+
+        # 3) check loading result
+        load_complete, stack_file, geom_file = ut.check_loaded_dataset(self.workDir, print_msg=True)[0:3]
+
+        # 4) add custom metadata (optional)
+        if self.customTemplateFile:
+            print('updating {}, {} metadata based on custom template file: {}'.format(
+                os.path.basename(stack_file),
+                os.path.basename(geom_file),
+                os.path.basename(self.customTemplateFile)))
+            # use ut.add_attribute() instead of add_attribute.py because of
+            # better control of special metadata, such as SUBSET_X/YMIN
+            ut.add_attribute(stack_file, self.customTemplate)
+            ut.add_attribute(geom_file, self.customTemplate)
+
+        # 5) if not load_complete, plot and raise exception
+        if not load_complete:
+            # plot result if error occured
+            self.plot_result(print_aux=False, plot=plot)
+
+            # go back to original directory
+            print('Go back to directory:', self.cwd)
+            os.chdir(self.cwd)
+
+            # raise error
+            msg = 'step {}: NOT all required dataset found, exit.'.format(step_name)
+            raise RuntimeError(msg)
         return
 
     def get_phase_linking_coherence_mask(self):
@@ -248,9 +442,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         tcoh_file = os.path.join(self.workDir, 'temporalCoherence.h5')
         mask_file = os.path.join(self.workDir, 'maskTempCoh.h5')
 
-        tcoh_min = self.template['mintpy.networkInversion.minTempCoh']
+        tcoh_min = float(self.template['mintpy.networkInversion.minTempCoh'])
 
-        scp_args = '{} --nonzero -o {} --update'.format(tcoh_file, mask_file)
+        scp_args = '{} -m {} --nonzero -o {} --update'.format(tcoh_file, tcoh_min, mask_file)
         print('generate_mask.py', scp_args)
 
         # update mode: run only if:
@@ -315,8 +509,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         box = None
         ref_phase = stack_obj.get_reference_phase(dropIfgram=False)
         unwDatasetName = 'unwrapPhase'
-        mask_dataset_name = None
-        mask_threshold = self.template['mintpy.networkInversion.minTempCoh']
+        gfilename = os.path.join(self.workDir, 'inputs/geometryRadar.h5')
+        f = h5py.File(gfilename, 'r')
+        quality_map = f['quality'][:, :]
+
+        mask_threshold = float(self.template['mintpy.networkInversion.minTempCoh'])
 
         pha_data = read_unwrap_phase(stack_obj,
                                      box,
@@ -324,12 +521,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                      unwDatasetName=unwDatasetName,
                                      dropIfgram=True)
 
-        pha_data = mask_unwrap_phase(pha_data,
-                                     stack_obj,
-                                     box,
-                                     dropIfgram=True,
-                                     mask_ds_name=mask_dataset_name,
-                                     mask_threshold=mask_threshold)
+        mask_data = np.repeat(quality_map.reshape(1, -1), num_date - 1, axis=0)
+        pha_data = mask_unwrap_phase(pha_data, mask_data, mask_threshold=mask_threshold)
 
         ts = pha_data * phase2range
         ts0 = ts.reshape(num_date - 1, num_row, num_col)
@@ -337,79 +530,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         ts[1::, :, :] = ts0
         num_inv_ifg = np.zeros((num_row, num_col), np.int16) + num_date - 1
 
-        gfilename = os.path.join(self.workDir, '../merged/geom_master/Quality.rdr')
-        ds = gdal.Open(gfilename, gdal.GA_ReadOnly)
-        quality_map = ds.GetRasterBand(1).ReadAsArray()
-
-        if 'SUBSET_XMIN' in metadata:
-            first_row = int(metadata['SUBSET_YMIN'])
-            last_row = int(metadata['SUBSET_YMAX'])
-            first_col = int(metadata['SUBSET_XMIN'])
-            last_col = int(metadata['SUBSET_XMAX'])
-
-            quality_map = quality_map[first_row:last_row, first_col:last_col]
-
         os.chdir(self.workDir)
 
         write2hdf5_file(ifgram_file, metadata, ts, quality_map, num_inv_ifg, suffix='', inps=inps)
 
         self.get_phase_linking_coherence_mask()
-
-        return
-
-    def run_interferogram(self, sname):
-        """ Export single master interferograms
-        """
-        run_file_int = os.path.join(self.run_dir, 'run_interferograms')
-
-        if not os.path.exists(run_file_int):
-
-            slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
-            slcObj = slcStack(slc_file)
-            slcObj.open(print_msg=False)
-            date_list = slcObj.get_date_list()
-
-            pairs = []
-            for i in range(1, len(date_list)):
-                pairs.append((date_list[0], date_list[i]))
-
-            runObj = MinopyRun()
-            runObj.configure(self.inps, 'run_interferograms')
-            runObj.generateIfg(self.inps, pairs)
-            runObj.finalize()
-
-        memorymax = '4000'
-        walltime = '2:00'
-
-        js.scheduler_job_submit(run_file_int, self.workDir, memorymax, walltime)
-
-        return
-
-    def run_unwrap(self, sname):
-        """ Unwrapps single master interferograms
-        """
-        run_file_unwrap = os.path.join(self.run_dir, 'run_unwrap')
-
-        if not os.path.exists(run_file_unwrap):
-
-            slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
-            slcObj = slcStack(slc_file)
-            slcObj.open(print_msg=False)
-            date_list = slcObj.get_date_list(dropIfgram=True)
-
-            pairs = []
-            for i in range(1, len(date_list)):
-                pairs.append((date_list[0], date_list[i]))
-
-            runObj = MinopyRun()
-            runObj.configure(self.inps, 'run_unwrap')
-            runObj.generateIfg(self.inps, pairs)
-            runObj.finalize()
-
-        memorymax = '5000'
-        walltime = '4:00'
-
-        js.scheduler_job_submit(run_file_unwrap, self.workDir, memorymax, walltime)
 
         return
 
@@ -439,8 +564,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             elif sname == 'unwrap':
                 self.run_unwrap(sname)
 
-            elif sname == 'load_data':
-                super().run_load_data(sname)
+            elif sname == 'load_int':
+                self.run_load_int(sname)
 
             elif sname == 'modify_network':
                 super().run_network_modification(sname)
@@ -495,7 +620,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             elif sname == 'email':
                 self.run_email_results(sname)
 
-
         # plot result (show aux visualization message more multiple steps processing)
         print_aux = len(steps) > 1
         super().plot_result(print_aux=print_aux, plot=plot)
@@ -512,6 +636,15 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         return
 
 
+def mask_unwrap_phase(pha_data, msk_data, mask_threshold=0.3):
+    # Read/Generate Mask
+    msk_data[np.isnan(msk_data)] = 0
+    msk_data = msk_data >= float(mask_threshold)
+    pha_data[msk_data == 0.] = 0.
+    return pha_data
+
 ###########################################################################################
+
+
 if __name__ == '__main__':
     main()

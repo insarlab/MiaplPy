@@ -6,6 +6,7 @@
 import os
 import glob
 import warnings
+import shutil
 from minopy.defaults import auto_path
 from mintpy.objects import (geometryDatasetNames,
                             geometry,
@@ -18,8 +19,8 @@ from minopy.objects.geometryStack import geometryDict
 from mintpy.utils import readfile, ptime, utils as ut
 from mintpy import subset
 import mintpy.load_data as mld
-from minopy.prep_slc_isce import read_attribute
-from minopy.objects.utils import coord_rev
+from minopy.objects.utils import check_template_auto_value
+from minopy.objects.utils import read_attribute, coord_rev
 from minopy.objects.arg_parser import MinoPyParser
 
 #################################################################
@@ -64,7 +65,7 @@ def main(iargs=None):
     if any([stackObj, geomRadarObj, geomGeoObj]) and not os.path.isdir(inps.outdir):
         os.makedirs(inps.outdir)
         print('create directory: {}'.format(inps.outdir))
-
+    '''
     # write
     if stackObj and update_object(inps.outfile[0], stackObj, box, updateMode=updateMode):
         print('-'*50)
@@ -73,7 +74,7 @@ def main(iargs=None):
                             box=box,
                             compression=comp,
                             extra_metadata=extraDict)
-
+    '''
     if geomRadarObj and update_object(inps.outfile[1], geomRadarObj, box, updateMode=updateMode):
         print('-'*50)
         geomRadarObj.write2hdf5(outputFile=inps.outfile[1],
@@ -88,6 +89,11 @@ def main(iargs=None):
                               access_mode='a',
                               box=boxGeo,
                               compression='lzf')
+
+    master_dir = os.path.dirname(inpsDict['mintpy.load.metaFile'])
+    out_master = inps.outdir + '/master'
+    if not os.path.exists(out_master):
+        shutil.copytree(master_dir, out_master)
 
     return inps.outfile
 
@@ -104,7 +110,7 @@ def read_inps2dict(inps):
     template = {}
     for fname in inps.template_file:
         temp = readfile.read_template(fname)
-        temp = ut.check_template_auto_value(temp, auto_file=auto_template)
+        temp = check_template_auto_value(temp, auto_file=auto_template)
         template.update(temp)
     for key, value in template.items():
         inpsDict[key] = value
@@ -318,23 +324,20 @@ def read_inps_dict2slc_stack_dict_object(inpsDict):
         # One pair may have several types of dataset.
         # example slcPathDict = {'slc': /pathToFile/*.slc.full}
         # All path of data file must contain the master and slave date, either in file name or folder name.
-
         slcPathDict = {}
         for i in range(len(dsNameList)):
             dsName = dsNameList[i]
             dsPath1 = dsPathDict[dsName][0]
-            if all(d[2:8] in dsPath1 for d in dates):
+            if dates in dsPath1:
                 slcPathDict[dsName] = dsPath1
             else:
-                dsPath2 = [i for i in dsPathDict[dsName]
-                           if all(d[2:8] in i for d in dates)]
+                dsPath2 = [i for i in dsPathDict[dsName] if dates in i]
                 if len(dsPath2) > 0:
                     slcPathDict[dsName] = dsPath2[0]
                 else:
                     print('WARNING: {} file missing for pair {}'.format(dsName, dates))
 
-        slcObj = slcDict(dates=dates,
-                               datasetDict=slcPathDict)
+        slcObj = slcDict(dates=dates, datasetDict=slcPathDict)
         pairsDict[dates] = slcObj
 
     if len(pairsDict) > 0:
@@ -499,6 +502,7 @@ def read_inps_dict2geometry_dict_object(inpsDict):
 
     geomRadarObj = None
     geomGeoObj = None
+
     if len(dsRadarPathDict) > 0:
         geomRadarObj = geometryDict(processor=inpsDict['processor'],
                                     datasetDict=dsRadarPathDict,

@@ -10,7 +10,7 @@ import warnings
 import h5py
 import numpy as np
 from minopy.prep_slc_isce import read_attribute
-from minopy.objects.slcStack import read as read_geo
+from minopy.objects.utils import read as read_geo
 try:
     from skimage.transform import resize
 except ImportError:
@@ -77,11 +77,12 @@ class geometryDict:
         return data, metadata
 
     def get_slant_range_distance(self, box=None):
+
         if not self.extraMetadata or 'Y_FIRST' in self.extraMetadata.keys():
             return None
-        data = ut.range_distance(self.extraMetadata,
-                                 dimension=2,
-                                 print_msg=False)
+
+        data = ut.range_distance(self.extraMetadata, dimension=2, print_msg=False)
+
         if box is not None:
             data = data[box[1]:box[3], box[0]:box[2]]
         return data
@@ -248,9 +249,9 @@ class geometryDict:
             # Calculate data
             data = None
             if dsName == 'incidenceAngle':
-                data = self.get_incidence_angle(box=box)
+                data = self.get_incidence_angle(box=None)
             elif dsName == 'slantRangeDistance':
-                data = self.get_slant_range_distance(box=box)
+                data = self.get_slant_range_distance(box=None)
 
             # Write dataset
             if data is not None:

@@ -40,14 +40,14 @@ class MinopyConfig(object):
         self.f.write('###################################' + '\n')
         self.f.write(function + '\n')
         self.f.write('generate_ifgram_sq : ' + '\n')
-        self.f.write('work_dir : ' + self.work_dir + '\n')
-        self.f.write('ifg_dir : ' + self.ifgDir + '\n')
-        self.f.write('ifg_index : ' + self.ifgIndex + '\n')
-        self.f.write('range_window : ' + self.rangeWindow + '\n')
-        self.f.write('azimuth_window : ' + self.azimuthWindow + '\n')
-        self.f.write('acquisition_number : ' + self.acq_num + '\n')
-        self.f.write('range_looks : ' + self.rangeLooks + '\n')
-        self.f.write('azimuth_looks : ' + self.azimuthLooks + '\n')
+        self.f.write('workDir : ' + self.work_dir + '\n')
+        self.f.write('ifgDir : ' + self.ifgDir + '\n')
+        self.f.write('ifgIndex : ' + self.ifgIndex + '\n')
+        self.f.write('rangeWindow : ' + self.rangeWindow + '\n')
+        self.f.write('azimuthWindow : ' + self.azimuthWindow + '\n')
+        self.f.write('acquisitionNumber : ' + self.acq_num + '\n')
+        self.f.write('rangeLooks : ' + self.rangeLooks + '\n')
+        self.f.write('azimuthLooks : ' + self.azimuthLooks + '\n')
         if 'geom_master' in self.ifgDir:
             self.f.write('plmethod : ' + self.plmethod + '\n')
 
@@ -134,7 +134,7 @@ class MinopyRun(object):
         configObj = MinopyConfig(self.config_path, configName)
         configObj.configure(self)
         configObj.work_dir = self.work_dir
-        configObj.ifgDir = inps.template['minopy.load.geometry']
+        configObj.ifgDir = os.path.join(self.work_dir, 'inputs')
         configObj.ifgIndex = str(0)
         configObj.rangeWindow = inps.template['minopy.range_window']
         configObj.azimuthWindow = inps.template['minopy.azimuth_window']
@@ -161,7 +161,7 @@ class MinopyRun(object):
             configObj.cohName = os.path.join(mergedDir, 'filt_fine.cor')
             configObj.unwName = os.path.join(mergedDir, 'filt_fine.unw')
             configObj.noMCF = noMCF
-            configObj.master = os.path.dirname(inps.template['mintpy.load.metaFile'])
+            configObj.master = os.path.join(self.work_dir, 'inputs/master')
             configObj.defoMax = defoMax
             configObj.unwMethod = inps.template['topsStack.unwMethod']
             configObj.rangeLooks = inps.template['topsStack.rangeLooks']

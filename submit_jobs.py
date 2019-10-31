@@ -25,12 +25,12 @@ def create_argument_parser():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, epilog=EXAMPLE)
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-    parser.add_argument('file', dest='run_file', type=str, required=True, help='file containing run commands')
-    parser.add_argument('-n', 'nodeNum', dest='node_num', type=str, default=None, help='number of Cores')
-    parser.add_argument('-q', 'queue', dest='queue', type=str, default='general', help='job queue')
+    parser.add_argument('file', type=str, help='file containing run commands')
+    parser.add_argument('-n', '--nodeNum', dest='node_num', type=str, default=None, help='number of Cores')
+    parser.add_argument('-q', '--queue', dest='queue', type=str, default='general', help='job queue')
     parser.add_argument('-w', '--walltime', dest='walltime', type=str, default='1:00', help='wall time')
     parser.add_argument('-r', '--memory', dest='memory', type=int, default=3600, help='memory use')
-    group.add_argument('-o', '--outdir', dest="outdir", default='run_files', metavar="OUTDIR",
+    parser.add_argument('-o', '--outdir', dest="out_dir", default='run_files', metavar="OUTDIR",
                        help="output directory for run files")
 
     return parser
@@ -59,8 +59,8 @@ def parse_arguments(args):
     job_params.work_dir = os.path.join(os.getenv('SCRATCHDIR'),
                                job_params.file.rsplit(os.path.basename(os.getenv('SCRATCHDIR')))[1].split('/')[1])
 
-    if job_params.outdir == 'run_files':
-        job_params.outdir = os.path.join(job_params.work_dir, job_params.outdir)
+    if job_params.out_dir == 'run_files':
+        job_params.out_dir = os.path.join(job_params.work_dir, job_params.out_dir)
 
     return job_params
 
@@ -328,7 +328,7 @@ def submit_batch_jobs(batch_file, out_dir='./run_files', work_dir='.', memory='4
     return batch_file
 
 
-def submit_script(job_name, job_file_name, argv, work_dir, walltime, email_notif=True):
+def submit_script(job_name, job_file_name, argv, work_dir, walltime, email_notif=True, queue_name=None):
     """
     Submits a single script as a job.
     :param job_name: Name of job.
@@ -347,8 +347,11 @@ def submit_script(job_name, job_file_name, argv, work_dir, walltime, email_notif
     command_line = os.path.basename(argv[0]) + " "
     command_line += " ".join(flag for flag in argv[1:] if flag != "--submit")
 
+    if queue_name is None:
+        queue_name = os.getenv("QUEUENAME")
+
     write_single_job_file(job_name, job_file_name, command_line, work_dir, email_notif,
-                          walltime=walltime, queue=os.getenv("QUEUENAME"))
+                          walltime=walltime, queue=queue_name)
     return submit_single_job("{0}.job".format(job_file_name), work_dir)
 
 
@@ -471,6 +474,6 @@ def scheduler_job_submit(run_file, work_dir, memory, walltime):
 if __name__ == "__main__":
     PARAMS = parse_arguments(sys.argv[1::])
     submit_batch_jobs(PARAMS.file, PARAMS.out_dir, PARAMS.work_dir, memory=PARAMS.memory,
-                      walltime=PARAMS.wall, queue=PARAMS.queue)
+                      walltime=PARAMS.walltime, queue=PARAMS.queue)
 
 

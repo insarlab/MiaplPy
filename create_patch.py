@@ -9,7 +9,7 @@ import time
 from minopy.objects.arg_parser import MinoPyParser
 from minopy_utilities import read_image, patch_slice, log_message
 import minopy.submit_jobs as js
-from minopy.objects.slcStack import slcStack
+import h5py
 
 #######################
 
@@ -32,7 +32,7 @@ def main(iargs=None):
     #########################################
 
     if inps.submit_flag:
-        js.submit_script(job_name, job_file_name, sys.argv[:], inps.work_dir, new_wall_time)
+        js.submit_script(job_name, job_file_name, sys.argv[:], inps.work_dir, inps.wall_time)
         sys.exit(0)
 
     if not iargs is None:
@@ -41,16 +41,17 @@ def main(iargs=None):
         log_message(inps.work_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
 
     slc_file = os.path.join(inps.work_dir, 'inputs/slcStack.h5')
-    slcObj = slcStack(slc_file)
 
     inps.patch_dir = os.path.join(inps.work_dir, 'patches')
+
+    f = h5py.File(slc_file, 'r')
+    ds = f['slc']
+    numDate, length, width = ds.shape
 
     if not os.path.exists(inps.patch_dir):
         os.mkdir(inps.patch_dir)
 
-    dim = slcObj.get_size()
-
-    patch_rows, patch_cols, patch_list = patch_slice(dim[1], dim[2], inps.azimuth_window,
+    patch_rows, patch_cols, patch_list = patch_slice(length, width, inps.azimuth_window,
                                                          inps.range_window, inps.patch_size)
 
     np.save(inps.patch_dir + '/rowpatch.npy', patch_rows)
@@ -70,32 +71,27 @@ def main(iargs=None):
             box = [patch_cols[0][0][patch_col], patch_rows[0][0][patch_row],
                    patch_cols[1][0][patch_col], patch_rows[1][0][patch_row]]
 
-            data = (patch_name, box, slcObj, dim)
-            create_patch(data)
+            line = box[3] - box[1]
+            sample = box[2] - box[0]
+
+            if not os.path.isfile(patch_name + '/count.npy'):
+                if not os.path.isdir(patch_name):
+                    os.mkdir(patch_name)
+                rslc = np.memmap(patch_name + '/rslc', dtype=np.complex64, mode='w+', shape=(numDate, line, sample))
+                rslc[:, :, :] = ds[:, box[1]:box[3], box[0]:box[2]]
+
+                del rslc
+
+                np.save(patch_name + '/count.npy', [numDate, line, sample, box])
+                print(os.path.basename(patch_name) + " is created")
 
     np.save(inps.patch_dir + '/flag.npy', 'patchlist_created')
+    f.close()
     timep = time.time() - start_time
 
     print('All patches created in {} seconds'.format(timep))
 
     return
-
-
-def create_patch(data):
-    patch_name, box, slcObj, dim = data
-    line = box[3] - box[1]
-    sample = box[2] - box[0]
-
-    if not os.path.isfile(patch_name + '/count.npy'):
-        if not os.path.isdir(patch_name):
-            os.mkdir(patch_name)
-
-        rslc = np.memmap(patch_name + '/rslc', dtype=np.complex64, mode='w+', shape=(dim[0], line, sample))
-        rslc[:, :, :] = slcObj.read(datasetName='slc', box=box, print_msg=False)
-
-        np.save(patch_name + '/count.npy', [dim[0], line, sample])
-
-    return print(os.path.basename(patch_name) + " is created")
 
 
 if __name__ == '__main__':

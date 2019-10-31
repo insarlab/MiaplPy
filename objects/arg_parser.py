@@ -24,6 +24,7 @@ class MinoPyParser:
         commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
         commonp.add_argument('--walltime', dest='wall_time', default='None',
                              help='walltime for submitting the script as a job')
+        commonp.add_argument('--queue', dest='queue_name', default=None, help='Queue name')
 
     def parse(self):
 
@@ -268,16 +269,16 @@ class MinoPyParser:
                             help='minopy directory (inversion results)')
         parser.add_argument('-i', '--ifgDir', dest='ifg_dir', type=str, required=True,
                             help='interferogram directory')
-        parser.add_argument('-x', '--ifg_index', dest='ifg_index', type=str, required=True,
+        parser.add_argument('-x', '--ifgIndex', dest='ifg_index', type=str, required=True,
                             help='interferogram index in 3D array (inversion results)')
-        parser.add_argument('-r', '--range_window', dest='range_win', type=str, default='15'
+        parser.add_argument('-r', '--rangeWindow', dest='range_win', type=str, default='15'
                             , help='SHP searching window size in range direction. -- Default : 15')
-        parser.add_argument('-a', '--azimuth_window', dest='azimuth_win', type=str, default='15'
+        parser.add_argument('-a', '--azimuthWindow', dest='azimuth_win', type=str, default='15'
                             , help='SHP searching window size in azimuth direction. -- Default : 15')
-        parser.add_argument('-q', '--acquisition_number', dest='n_image', type=str, default='20',
+        parser.add_argument('-q', '--acquisitionNumber', dest='n_image', type=str, default='20',
                             help='number of images acquired')
-        parser.add_argument('-A', '--azimuth_looks', type=str, dest='azimuth_looks', default='3', help='azimuth looks')
-        parser.add_argument('-R', '--range_looks', type=str, dest='range_looks', default='9', help='range looks')
+        parser.add_argument('-A', '--azimuthLooks', type=str, dest='azimuth_looks', default='3', help='azimuth looks')
+        parser.add_argument('-R', '--rangeLooks', type=str, dest='range_looks', default='9', help='range looks')
 
         return parser
 
@@ -288,8 +289,8 @@ class MinoPyParser:
             'create_patch',
             'inversion',
             'ifgrams',
-            'unwrap'
-            'load_data',
+            'unwrap',
+            'load_int',
             'modify_network',
             'reference_point',
             'write_to_timeseries',
@@ -355,6 +356,7 @@ class MinoPyParser:
         parser.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
         parser.add_argument('--walltime', dest='wall_time', default='None',
                             help='walltime for submitting the script as a job')
+        parser.add_argument('--queue', dest='queue_name', default=None, help='Queue name')
 
         step = parser.add_argument_group('steps processing (start/end/dostep)', STEP_HELP)
         step.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],

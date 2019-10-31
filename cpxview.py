@@ -32,7 +32,7 @@ from mintpy.utils import ptime, readfile, utils as ut, plot as pp
 from mintpy.multilook import multilook_data
 from mintpy import subset, version
 from mintpy.view import *
-from minopy.prep_slc_isce import read_attribute
+from minopy.objects.utils import read_attribute, read, get_slice_list
 from minopy.objects.slcStack import *
 
 

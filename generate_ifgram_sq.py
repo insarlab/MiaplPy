@@ -5,12 +5,14 @@
 import numpy as np
 import os
 import glob
+import time
 import isce
 import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
 from FilterAndCoherence import estCoherence, runFilter
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects.slcStack import slcStack
+import h5py
 ########################################
 
 
@@ -22,31 +24,27 @@ def main(iargs=None):
     Parser = MinoPyParser(iargs, script='generate_ifgram')
     inps = Parser.parse()
 
-    slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
+    slc_file = os.path.join(inps.work_dir, 'inputs/slcStack.h5')
     slcObj = slcStack(slc_file)
     slcObj.open(print_msg=False)
-    date_list = slcObj.get_date_list(dropIfgram=True)
+    date_list = slcObj.get_date_list()
 
-    ifgram = os.path.basename(inps.ifg_dir).split('_')
-    master_ind = date_list.index[ifgram[0]]
-    slave_ind = date_list.index[ifgram[1]]
-
-    patch_list = glob.glob(inps.work_dir+'/PATCH*')
+    patch_list = glob.glob(inps.work_dir+'/patches/patch*')
     patch_list = list(map(lambda x: x.split('/')[-1], patch_list))
 
     range_win = int(inps.range_win)
     azimuth_win = int(inps.azimuth_win)
 
-    patch_rows = np.load(inps.work_dir + '/rowpatch.npy')
-    patch_cols = np.load(inps.work_dir + '/colpatch.npy')
+    patch_rows = np.load(inps.work_dir + '/patches/rowpatch.npy')
+    patch_cols = np.load(inps.work_dir + '/patches/colpatch.npy')
 
-    patch_rows_overlap = np.load(inps.work_dir + '/rowpatch.npy')
+    patch_rows_overlap = np.load(inps.work_dir + '/patches/rowpatch.npy')
     patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win + 1
     patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + azimuth_win + 1
     patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - azimuth_win + 1
     patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + azimuth_win - 1
 
-    patch_cols_overlap = np.load(inps.work_dir + '/colpatch.npy')
+    patch_cols_overlap = np.load(inps.work_dir + '/patches/colpatch.npy')
     patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - range_win + 1
     patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win + 1
     patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win + 1
@@ -62,19 +60,21 @@ def main(iargs=None):
     n_line = last_row - first_row
     width = last_col - first_col
 
-    if 'geom_master' in inps.ifg_dir:
+    if 'inputs' in inps.ifg_dir:
 
         if not os.path.isdir(inps.ifg_dir):
             os.mkdir(inps.ifg_dir)
 
-        output_quality = inps.ifg_dir + '/Quality.rdr'
-        output_shp = inps.ifg_dir + '/SHP.rdr'
-        Quality = IML.memmap(output_quality, mode='write', nchannels=1,
-                             nxx=width, nyy=n_line, scheme='BIL', dataType='f')
-        SHP = IML.memmap(output_shp, mode='write', nchannels=1,
-                             nxx=width, nyy=n_line, scheme='BIL', dataType='int')
+        output_geo = inps.ifg_dir + '/geometryRadar.h5'
+        Quality = np.zeros([n_line, width])
+        SHP = np.zeros([n_line, width])
+
         doq = True
     else:
+
+        ifgram = os.path.basename(inps.ifg_dir).split('_')
+        master_ind = date_list.index(ifgram[0])
+        slave_ind = date_list.index(ifgram[1])
 
         if not os.path.isdir(inps.ifg_dir):
             os.mkdir(inps.ifg_dir)
@@ -101,21 +101,23 @@ def main(iargs=None):
         l_col = col2 - patch_cols[0, 0, col]
 
         if doq:
-            qlty = np.memmap(inps.work_dir + '/' + patch + '/quality',
+            qlty = np.memmap(inps.work_dir + '/patches/' + patch + '/quality',
                              dtype=np.float32, mode='r', shape=(patch_lines, patch_samples))
-            Quality.bands[0][row1:row2 + 1, col1:col2 + 1] = qlty[f_row:l_row + 1, f_col:l_col + 1]
+            Quality[row1:row2 + 1, col1:col2 + 1] = qlty[f_row:l_row + 1, f_col:l_col + 1]
 
-            shp_p = np.memmap(inps.work_dir + '/' + patch + '/shp',
+            shp_p = np.memmap(inps.work_dir + '/patches/' + patch + '/shp',
                              dtype='byte', mode='r', shape=(range_win*azimuth_win, patch_lines, patch_samples))
 
-            SHP.bands[0][row1:row2 + 1, col1:col2 + 1] = np.sum(shp_p[:, f_row:l_row + 1, f_col:l_col + 1], axis=0)
+            SHP[row1:row2 + 1, col1:col2 + 1] = np.sum(shp_p[:, f_row:l_row + 1, f_col:l_col + 1], axis=0)
 
         else:
-            rslc_patch = np.memmap(inps.work_dir + '/' + patch + '/rslc_ref',
+
+            rslc_patch = np.memmap(inps.work_dir + '/patches/' + patch + '/rslc_ref',
                                dtype=np.complex64, mode='r', shape=(np.int(inps.n_image), patch_lines, patch_samples))
             ifg_patch = np.zeros([patch_lines, patch_samples])+0j
+
             master = rslc_patch[master_ind, :, :]
-            slave = rslc_patch[slave_ind + 1, :, :]
+            slave = rslc_patch[slave_ind, :, :]
 
             for kk in range(0, patch_lines):
                 ifg_patch[kk, f_col:l_col + 1] = master[kk, f_col:l_col + 1] * np.conj(slave[kk, f_col:l_col + 1])
@@ -124,38 +126,30 @@ def main(iargs=None):
 
     if doq:
 
-        Quality = None
+        f = h5py.File(output_geo, 'a')
+        if 'quality' in f.keys():
+            ds = f['quality']
+            ds[:,:] = Quality
+        else:
+            ds = f.create_dataset('quality',
+                                  data=Quality,
+                                  dtype=np.float32,
+                                  chunks=True,
+                                  compression='lzf')
+        ds.attrs['MODIFICATION_TIME'] = str(time.time())
 
-        IML.renderISCEXML(output_quality, 1, n_line, width, 'f', 'BIL')
+        if 'shp' in f.keys():
+            ds = f['shp']
+            ds[:, :] = SHP
+        else:
+            ds = f.create_dataset('shp',
+                                  data=SHP,
+                                  dtype=np.float32,
+                                  chunks=True,
+                                  compression='lzf')
+        ds.attrs['MODIFICATION_TIME'] = str(time.time())
 
-        out_img = isceobj.createImage()
-        out_img.load(output_quality + '.xml')
-        out_img.imageType = 'f'
-        out_img.renderHdr()
-        try:
-            out_img.bands[0].base.base.flush()
-        except:
-            pass
-
-        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + output_quality + '.vrt ' + output_quality
-        os.system(cmd)
-
-        ## SHP
-
-        SHP = None
-
-        IML.renderISCEXML(output_shp, 1, n_line, width, 'int', 'BIL')
-        out_img = isceobj.createImage()
-        out_img.load(output_shp + '.xml')
-        out_img.imageType = 'int'
-        out_img.renderHdr()
-        try:
-            out_img.bands[0].base.base.flush()
-        except:
-            pass
-
-        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + output_shp + '.vrt ' + output_shp
-        os.system(cmd)
+        f.close()
 
     else:
 

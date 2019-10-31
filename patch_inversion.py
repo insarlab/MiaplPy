@@ -40,8 +40,6 @@ def main(iargs=None):
 class PhaseLink:
     def __init__(self, inps):
         self.work_dir = inps.work_dir
-        self.patch_rows = np.load(os.path.join(self.work_dir, 'patches/rowpatch.npy'))
-        self.patch_cols = np.load(os.path.join(self.work_dir, 'patches/colpatch.npy'))
         self.phase_linking_method = inps.inversion_method
         self.range_window = inps.range_window
         self.azimuth_window = inps.azimuth_window
@@ -168,8 +166,14 @@ class PhaseLink:
 
             if not self.shp[:, coord[0], coord[1]].any():
                 shp = self.get_shp_row_col(coord)
+            else:
+                shp = self.shp[:, coord[0], coord[1]].reshape(self.azimuth_window, self.range_window)
+
+            if self.quality[coord[0], coord[1]] == -1:
+
                 num_shp = len(shp[np.nonzero(shp > 0)])
-                if num_shp > 0:
+                print(num_shp)
+                if num_shp > 1:
 
                     shp_rows, shp_cols = np.where(shp == 1)
                     shp_rows = np.array(shp_rows + coord[0] - (self.azimuth_window - 1) / 2).astype(int)
@@ -196,9 +200,15 @@ class PhaseLink:
 
                     self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat), vec_refined)
 
-                    if self.quality[coord[0], coord[1]] >= 0.5:
-                        self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
-                            vec_refined.reshape(self.n_image, 1, 1)
+                    amp_refined = np.array(np.mean(np.abs(CCG), axis=1)).reshape(self.n_image, 1, 1)
+
+                    if self.quality[coord[0], coord[1]] >= 0.3:
+                        phase_refined = np.angle(vec_refined).reshape(self.n_image, 1, 1)
+                    else:
+                        phase_refined = np.angle(self.rslc[:, coord[0], coord[1]]).reshape(self.n_image, 1, 1)
+
+                    self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
+                        np.multiply(amp_refined, np.exp(1j * phase_refined))
 
         timep = time.time() - time0
         print('time spent to do phase linking {}: min'.format(timep / 60))

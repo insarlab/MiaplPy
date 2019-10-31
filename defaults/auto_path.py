@@ -28,9 +28,9 @@ mintpy.load.metaFile       = ${PROJECT_DIR}/master/IW*.xml
 mintpy.load.baselineDir    = ${PROJECT_DIR}/baselines
 
 mintpy.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc.full
-mintpy.load.unwFile        = ${PROJECT_DIR}/minopy/merged/interferograms/*/filt*.unw
-mintpy.load.corFile        = ${PROJECT_DIR}/minopy/merged/interferograms/*/filt*.cor
-mintpy.load.connCompFile   = ${PROJECT_DIR}/minopy/merged/interferograms/*/filt*.unw.conncomp
+mintpy.load.unwFile        = ${PROJECT_DIR}/minopy/interferograms/*/filt*.unw
+mintpy.load.corFile        = ${PROJECT_DIR}/minopy/interferograms/*/filt*.cor
+mintpy.load.connCompFile   = ${PROJECT_DIR}/minopy/interferograms/*/filt*.unw.conncomp
 mintpy.load.ionoFile       = None
 mintpy.load.intFile        = None
 
@@ -97,6 +97,8 @@ class PathFind:
         self.mergeddir = 'subset'
         self.intdir = 'interferograms'
         self.auto_template = self.defaultdir + '/minopy_template.cfg'
+        self.wrappercommandtops = 'SentinelWrapper.py -c '
+        self.wrappercommandstripmap = 'stripmapWrapper.py -c '
         return
 
 ##----------------------------------------------------------------------------------------##
