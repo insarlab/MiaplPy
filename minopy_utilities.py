@@ -132,7 +132,7 @@ def corr2cov(corr_matrix = [],sigma = []):
 def cov2corr(cov_matrix):
     """ Converts covariance matrix to correlation/coherence matrix. """
 
-    D = LA.pinv(np.diagflat(np.sqrt(np.diag(cov_matrix))), hermitian=True)
+    D = LA.pinv(np.diagflat(np.sqrt(np.diag(cov_matrix))))
     y = np.matmul(D, cov_matrix)
     corr_matrix = np.matmul(y, np.transpose(D))
 
@@ -231,7 +231,7 @@ def PTA_L_BFGS(coh0):
     x0 = x0 - x0[0]
     abs_coh = regularize_matrix(np.abs(coh0))
     if np.size(abs_coh) == np.size(coh0):
-        inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh, hermitian=True), coh0))
+        inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh0))
         cons = ({'type':'eq', 'fun':lambda x: x[0]})
         res = minimize(optphase, x0, args=inverse_gam, method='L-BFGS-B',
                        tol=None, options={'gtol': 1e-6, 'disp': False}, constraints=cons)
@@ -261,7 +261,7 @@ def EMI_phase_estimation(coh0):
     """ Estimates the phase values based on EMI decomosition (Homa Ansari, 2018 paper) """
     abscoh = regularize_matrix(np.abs(coh0))
     if np.size(abscoh) == np.size(coh0):
-        M = np.multiply(LA.pinv(abscoh, hermitian=True), coh0)
+        M = np.multiply(LA.pinv(abscoh), coh0)
         eigen_value, eigen_vector = LA.eigh(M, UPLO='U')
         vec = eigen_vector[:, 0].reshape(len(eigen_value), 1)
         return vec
@@ -486,8 +486,8 @@ def CRLB_cov(gama, L):
 
     B_theta = np.zeros([len(gama), len(gama) - 1])
     B_theta[1::, :] = np.identity(len(gama) - 1)
-    X = 2 * L * (np.multiply(np.abs(gama), LA.pinv(np.abs(gama), hermitian=True)) - np.identity(len(gama)))
-    cov_out = LA.pinv(np.matmul(np.matmul(B_theta.T, (X + np.identity(len(X)))), B_theta), hermitian=True)
+    X = 2 * L * (np.multiply(np.abs(gama), LA.pinv(np.abs(gama))) - np.identity(len(gama)))
+    cov_out = LA.pinv(np.matmul(np.matmul(B_theta.T, (X + np.identity(len(X)))), B_theta))
 
     return cov_out
 
