@@ -10,11 +10,13 @@ import numpy as np
 import cmath
 import datetime
 from numpy import linalg as LA
+#from scipy import linalg as LA
 from scipy.optimize import minimize, Bounds
 from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 import gdal
 import isce
 import isceobj
+import matplotlib.pyplot as plt
 
 ################################################################################
 
@@ -130,7 +132,7 @@ def corr2cov(corr_matrix = [],sigma = []):
 def cov2corr(cov_matrix):
     """ Converts covariance matrix to correlation/coherence matrix. """
 
-    D = LA.pinv(np.diagflat(np.sqrt(np.diag(cov_matrix))))
+    D = LA.pinv(np.diagflat(np.sqrt(np.diag(cov_matrix))), hermitian=True)
     y = np.matmul(D, cov_matrix)
     corr_matrix = np.matmul(y, np.transpose(D))
 
@@ -199,6 +201,8 @@ def gam_pta(ph_filt, vec_refined):
     ifgram_diff = phi_mat - theta_mat
     temp_coh = np.real(np.sum(np.exp(1j * ifgram_diff))) * 2 / (n ** 2 - n)
 
+    print(temp_coh)
+
     return temp_coh
 
 ###############################################################################
@@ -223,14 +227,14 @@ def PTA_L_BFGS(coh0):
     """ Uses L-BFGS method to optimize PTA function and estimate phase values. """
 
     n = coh0.shape[0]
-    x0 = EMI_phase_estimation(coh0)
+    x0 = np.angle(EMI_phase_estimation(coh0))
+    x0 = x0 - x0[0]
     abs_coh = regularize_matrix(np.abs(coh0))
     if np.size(abs_coh) == np.size(coh0):
-        inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh0))
-        res = minimize(optphase, np.angle(x0), args=inverse_gam, method='L-BFGS-B',
-                       bounds=Bounds(-500, 500, keep_feasible=False),
-                       tol=None, options={'gtol': 1e-6, 'disp': False})
-
+        inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh, hermitian=True), coh0))
+        cons = ({'type':'eq', 'fun':lambda x: x[0]})
+        res = minimize(optphase, x0, args=inverse_gam, method='L-BFGS-B',
+                       tol=None, options={'gtol': 1e-6, 'disp': False}, constraints=cons)
         out = res.x.reshape(n, 1)
         vec = np.multiply(np.abs(x0), np.exp(1j * out)).reshape(n, 1)
 
@@ -246,10 +250,8 @@ def PTA_L_BFGS(coh0):
 
 def EVD_phase_estimation(coh0):
     """ Estimates the phase values based on eigen value decomosition """
-
-    eigen_value, eigen_vector = LA.eigh(coh0)
+    eigen_value, eigen_vector = LA.eigh(coh0, UPLO='U')
     vec = eigen_vector[:, -1].reshape(len(eigen_value), 1)
-
     return vec
 
 ###############################################################################
@@ -257,14 +259,11 @@ def EVD_phase_estimation(coh0):
 
 def EMI_phase_estimation(coh0):
     """ Estimates the phase values based on EMI decomosition (Homa Ansari, 2018 paper) """
-
     abscoh = regularize_matrix(np.abs(coh0))
-
     if np.size(abscoh) == np.size(coh0):
-        M = np.multiply(LA.pinv(abscoh), coh0)
-        eigen_value, eigen_vector = LA.eigh(M)
+        M = np.multiply(LA.pinv(abscoh, hermitian=True), coh0)
+        eigen_value, eigen_vector = LA.eigh(M, UPLO='U')
         vec = eigen_vector[:, 0].reshape(len(eigen_value), 1)
-
         return vec
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
@@ -455,8 +454,10 @@ def EST_rms(x):
 
 ###############################################################################
 
-def phase_linking_process(coh_mat, stepp, method, squeez=True):
+def phase_linking_process(ccg_sample, stepp, method, squeez=True):
     """Inversion of phase based on a selected method among PTA, EVD and EMI """
+
+    coh_mat = est_corr(ccg_sample)
 
     if 'PTA' in method:
         res = PTA_L_BFGS(coh_mat)
@@ -485,8 +486,8 @@ def CRLB_cov(gama, L):
 
     B_theta = np.zeros([len(gama), len(gama) - 1])
     B_theta[1::, :] = np.identity(len(gama) - 1)
-    X = 2 * L * (np.multiply(np.abs(gama), LA.pinv(np.abs(gama))) - np.identity(len(gama)))
-    cov_out = LA.pinv(np.matmul(np.matmul(B_theta.T, (X + np.identity(len(X)))), B_theta))
+    X = 2 * L * (np.multiply(np.abs(gama), LA.pinv(np.abs(gama), hermitian=True)) - np.identity(len(gama)))
+    cov_out = LA.pinv(np.matmul(np.matmul(B_theta.T, (X + np.identity(len(X)))), B_theta), hermitian=True)
 
     return cov_out
 
