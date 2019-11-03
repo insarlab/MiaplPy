@@ -434,13 +434,14 @@ def submit_parallel_with_thread(batch_file=None):
     return
 
 
-def scheduler_job_submit(run_file, work_dir, memory, walltime):
+def scheduler_job_submit(run_file, work_dir, memory, walltime, queuename=None):
 
     out_run = OutControl(run_file, work_dir)
 
     if os.getenv('JOBSCHEDULER') in supported_schedulers:
 
-        queuename = os.getenv('QUEUENAME')
+        if queuename is None:
+            queuename = os.getenv('QUEUENAME')
 
         log_message(work_dir, 'submit_jobs.py {} --memory {} --walltime {}'.format(run_file,
                                                                                     memory,

@@ -159,8 +159,8 @@ class PhaseLink:
 
         time0 = time.time()
 
-        if os.path.exists(self.patch_dir + '/inversion_flag'):
-            return print('Inversion is already done for {}'.format(self.patch_dir))
+        #if os.path.exists(self.patch_dir + '/inversion_flag'):
+        #    return print('Inversion is already done for {}'.format(self.patch_dir))
 
         for coord in self.coords:
 
@@ -172,46 +172,47 @@ class PhaseLink:
             if self.quality[coord[0], coord[1]] == -1:
 
                 num_shp = len(shp[np.nonzero(shp > 0)])
-                print(num_shp)
-                if num_shp > 1:
+                if num_shp == 0:
+                    shp = self.get_shp_row_col(coord)
+                    num_shp = len(shp[np.nonzero(shp > 0)])
 
-                    shp_rows, shp_cols = np.where(shp == 1)
-                    shp_rows = np.array(shp_rows + coord[0] - (self.azimuth_window - 1) / 2).astype(int)
-                    shp_cols = np.array(shp_cols + coord[1] - (self.range_window - 1) / 2).astype(int)
+                shp_rows, shp_cols = np.where(shp == 1)
+                shp_rows = np.array(shp_rows + coord[0] - (self.azimuth_window - 1) / 2).astype(int)
+                shp_cols = np.array(shp_cols + coord[1] - (self.range_window - 1) / 2).astype(int)
 
-                    CCG = np.matrix(1.0 * np.arange(self.n_image * len(shp_rows)).reshape(self.n_image, len(shp_rows)))
-                    CCG = np.exp(1j * CCG)
-                    CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
+                CCG = np.matrix(1.0 * np.arange(self.n_image * len(shp_rows)).reshape(self.n_image, len(shp_rows)))
+                CCG = np.exp(1j * CCG)
+                CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
 
-                    coh_mat = mnp.est_corr(CCG)
+                coh_mat = mnp.est_corr(CCG)
 
-                    if num_shp > 20:
+                if num_shp > 20:
 
-                        if 'sequential' in self.phase_linking_method:
-                            vec_refined = mnp.sequential_phase_linking(CCG, self.phase_linking_method, num_stack=100)
-                        else:
-                            vec_refined = mnp.phase_linking_process(coh_mat, 0, self.phase_linking_method, squeez=False)
+                    if 'sequential' in self.phase_linking_method:
+                        vec_refined = mnp.sequential_phase_linking(CCG, self.phase_linking_method, num_stack=100)
                     else:
-                        status = mnp.test_PS(coh_mat)
-                        if status:
-                            vec_refined = mnp.phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
+                        vec_refined = mnp.phase_linking_process(coh_mat, 0, self.phase_linking_method, squeez=False)
+                else:
+                    status = mnp.test_PS(coh_mat)
+                    if status:
+                        vec_refined = mnp.phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
 
-                    vec_refined = np.array(vec_refined)
+                vec_refined = np.array(vec_refined)
 
-                    self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat), vec_refined)
+                self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat), vec_refined)
 
-                    amp_refined = np.array(np.mean(np.abs(CCG), axis=1)).reshape(self.n_image, 1, 1)
+                amp_refined = np.array(np.mean(np.abs(CCG), axis=1)).reshape(self.n_image, 1, 1)
 
-                    if self.quality[coord[0], coord[1]] >= 0.3:
-                        phase_refined = np.angle(vec_refined).reshape(self.n_image, 1, 1)
-                    else:
-                        phase_refined = np.angle(self.rslc[:, coord[0], coord[1]]).reshape(self.n_image, 1, 1)
+                if self.quality[coord[0], coord[1]] >= 0.3:
+                    phase_refined = np.angle(vec_refined).reshape(self.n_image, 1, 1)
+                else:
+                    phase_refined = np.angle(self.rslc[:, coord[0], coord[1]]).reshape(self.n_image, 1, 1)
 
-                    self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
-                        np.multiply(amp_refined, np.exp(1j * phase_refined))
+                self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
+                    np.multiply(amp_refined, np.exp(1j * phase_refined))
 
         timep = time.time() - time0
-        print('time spent to do phase linking {}: min'.format(timep / 60))
+        print('time spent to do phase inversion {}: min'.format(timep / 60))
 
         with open(self.patch_dir + '/inversion_flag', 'w') as f:
             f.write('Inversion done')
