@@ -232,11 +232,13 @@ def PTA_L_BFGS(coh0):
     abs_coh = regularize_matrix(np.abs(coh0))
     if np.size(abs_coh) == np.size(coh0):
         inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh0))
-        # cons = ({'type':'eq', 'fun':lambda x: x[0]})
         res = minimize(optphase, x0, args=inverse_gam, method='L-BFGS-B',
-                       tol=None, options={'gtol': 1e-6, 'disp': False}) #, constraints=cons)
+                       tol=None, options={'gtol': 1e-6, 'disp': False})
         out = res.x.reshape(n, 1)
         vec = np.multiply(np.abs(x0), np.exp(1j * out)).reshape(n, 1)
+
+        x0 = np.exp(-1j * np.angle(vec[0]))
+        vec = np.multiply(vec, x0)
 
         return vec
 
@@ -252,6 +254,8 @@ def EVD_phase_estimation(coh0):
     """ Estimates the phase values based on eigen value decomosition """
     eigen_value, eigen_vector = LA.eigh(coh0, UPLO='U')
     vec = eigen_vector[:, -1].reshape(len(eigen_value), 1)
+    x0 = np.exp(-1j * np.angle(vec[0]))
+    vec = np.multiply(vec, x0)
     return vec
 
 ###############################################################################
@@ -264,6 +268,8 @@ def EMI_phase_estimation(coh0):
         M = np.multiply(LA.pinv(abscoh), coh0)
         eigen_value, eigen_vector = LA.eigh(M, UPLO='U')
         vec = eigen_vector[:, 0].reshape(len(eigen_value), 1)
+        x0 = np.exp(-1j * np.angle(vec[0]))
+        vec = np.multiply(vec, x0)
         return vec
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
