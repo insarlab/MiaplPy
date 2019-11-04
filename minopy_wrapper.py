@@ -296,7 +296,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         return
 
-    def run_phase_linking(self, sname):
+    def run_patch_inversion(self, sname):
         """ Non-Linear phase inversion.
         """
         if not os.path.exists(self.run_dir):
@@ -317,7 +317,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         memorymax = '2000'
         walltime = '6:00'
-        js.scheduler_job_submit(run_minopy_inversion, self.workDir, memorymax, walltime)
+        js.scheduler_job_submit(run_minopy_inversion, self.workDir, memorymax, walltime, queuename=self.inps.queue_name)
 
         return
 
@@ -541,8 +541,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
     def run_email_results(self, sname):
         """ email Time series results
         """
-        log_message(self.workDir, 'email_results.py {}'.format(self.customTemplateFiler))
-        email_results.main([self.customTemplateFiler])
+        log_message(self.workDir, 'email_results.py {}'.format(self.customTemplateFile))
+        email_results.main([self.customTemplateFile])
         return
 
     def run(self, steps=STEP_LIST, plot=True):
@@ -556,7 +556,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 self.run_create_patch(sname)
 
             elif sname == 'inversion':
-                self.run_phase_linking(sname)
+                self.run_patch_inversion(sname)
 
             elif sname == 'ifgrams':
                 self.run_interferogram(sname)
@@ -636,7 +636,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         return
 
 
-def mask_unwrap_phase(pha_data, msk_data, mask_threshold=0.3):
+def mask_unwrap_phase(pha_data, msk_data, mask_threshold=0.5):
     # Read/Generate Mask
     msk_data[np.isnan(msk_data)] = 0
     msk_data = msk_data >= float(mask_threshold)
