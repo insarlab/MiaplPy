@@ -35,16 +35,24 @@ def main(iargs=None):
     range_win = int(inps.range_win)
     azimuth_win = int(inps.azimuth_win)
 
-    patch_rows = np.load(inps.work_dir + '/patches/rowpatch.npy')
-    patch_cols = np.load(inps.work_dir + '/patches/colpatch.npy')
+    success = False
+    while success is False:
+        try:
+            patch_rows = np.load(inps.work_dir + '/patches/rowpatch.npy')
+            patch_cols = np.load(inps.work_dir + '/patches/colpatch.npy')
+            success = True
+        except:
+            success = False
 
-    patch_rows_overlap = np.load(inps.work_dir + '/patches/rowpatch.npy')
+    patch_rows_overlap = np.zeros(np.shape(patch_rows))
+    patch_rows_overlap[:, :, :] = patch_rows[:, :, :]
     patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win + 1
     patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + azimuth_win + 1
     patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - azimuth_win + 1
     patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + azimuth_win - 1
 
-    patch_cols_overlap = np.load(inps.work_dir + '/patches/colpatch.npy')
+    patch_cols_overlap = np.zeros(np.shape(patch_cols))
+    patch_cols_overlap[:, :, :] = patch_cols[:, :, :]
     patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - range_win + 1
     patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win + 1
     patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win + 1

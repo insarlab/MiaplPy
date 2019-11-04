@@ -82,7 +82,7 @@ def main(iargs=None):
 
                 del rslc
 
-                np.save(patch_name + '/count.npy', [numDate, line, sample, box])
+                np.save(patch_name + '/count.npy', [numDate, line, sample])
                 print(os.path.basename(patch_name) + " is created")
 
     np.save(inps.patch_dir + '/flag.npy', 'patchlist_created')

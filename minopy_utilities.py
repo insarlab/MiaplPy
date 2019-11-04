@@ -232,9 +232,9 @@ def PTA_L_BFGS(coh0):
     abs_coh = regularize_matrix(np.abs(coh0))
     if np.size(abs_coh) == np.size(coh0):
         inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh0))
-        cons = ({'type':'eq', 'fun':lambda x: x[0]})
+        # cons = ({'type':'eq', 'fun':lambda x: x[0]})
         res = minimize(optphase, x0, args=inverse_gam, method='L-BFGS-B',
-                       tol=None, options={'gtol': 1e-6, 'disp': False}, constraints=cons)
+                       tol=None, options={'gtol': 1e-6, 'disp': False}) #, constraints=cons)
         out = res.x.reshape(n, 1)
         vec = np.multiply(np.abs(x0), np.exp(1j * out)).reshape(n, 1)
 
@@ -454,6 +454,7 @@ def EST_rms(x):
 
 ###############################################################################
 
+
 def phase_linking_process(ccg_sample, stepp, method, squeez=True):
     """Inversion of phase based on a selected method among PTA, EVD and EMI """
 
@@ -471,7 +472,7 @@ def phase_linking_process(ccg_sample, stepp, method, squeez=True):
     if squeez:
 
         vm = np.exp(1j * np.angle(np.matrix(res[stepp::, :])))
-        vm = vm / LA.norm(vm)
+        vm = np.matrix(vm / LA.norm(vm))
         squeezed = np.matmul(vm.getH(), ccg_sample[stepp::, :])
 
         return res, squeezed

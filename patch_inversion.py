@@ -66,12 +66,46 @@ class PhaseLink:
 
         self.distance_thresh = mnp.ks_lut(self.num_slc, self.num_slc, alpha=0.05)
 
-        lin = np.ogrid[0:self.length]
-        sam = np.ogrid[0:self.width]
+        success = False
+        while success is False:
+            try:
+                patch_rows = np.load(inps.work_dir + '/patches/rowpatch.npy')
+                patch_cols = np.load(inps.work_dir + '/patches/colpatch.npy')
+                success = True
+            except:
+                success = False
+
+        row = int(self.patch_dir.split('patch')[-1].split('_')[0])
+        col = int(self.patch_dir.split('patch')[-1].split('_')[1])
+
+        patch_rows_overlap = np.zeros(np.shape(patch_rows))
+        patch_rows_overlap[:, :, :] = patch_rows[:, :, :]
+        patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - self.azimuth_window + 1
+        patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + self.azimuth_window + 1
+        patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - self.azimuth_window + 1
+        patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + self.azimuth_window - 1
+
+        patch_cols_overlap = np.zeros(np.shape(patch_cols))
+        patch_cols_overlap[:, :, :] = patch_cols[:, :, :]
+        patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - self.range_window + 1
+        patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + self.range_window + 1
+        patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - self.range_window + 1
+        patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + self.range_window - 1
+
+        row1 = patch_rows_overlap[0, 0, row] - patch_rows[0, 0, row]
+        row2 = patch_rows_overlap[1, 0, row] - patch_rows[0, 0, row]
+        col1 = patch_cols_overlap[0, 0, col] - patch_cols[0, 0, col]
+        col2 = patch_cols_overlap[1, 0, col] - patch_cols[0, 0, col]
+
+        lin = np.ogrid[row1:row2]
+        overlap_length = len(lin)
+        sam = np.ogrid[col1:col2]
+        overlap_width = len(sam)
         lin, sam = np.meshgrid(lin, sam)
+
         self.coords = list(map(lambda y, x: [int(y), int(x)],
-                          lin.T.reshape(self.length * self.width, 1),
-                          sam.T.reshape(self.length * self.width, 1)))
+                          lin.T.reshape(overlap_length * overlap_width, 1),
+                          sam.T.reshape(overlap_length * overlap_width, 1)))
 
         self.sample_rows = np.ogrid[-((self.azimuth_window - 1) / 2):((self.azimuth_window - 1) / 2) + 1]
         self.sample_rows = self.sample_rows.astype(int)
@@ -159,8 +193,8 @@ class PhaseLink:
 
         time0 = time.time()
 
-        #if os.path.exists(self.patch_dir + '/inversion_flag'):
-        #    return print('Inversion is already done for {}'.format(self.patch_dir))
+        if os.path.exists(self.patch_dir + '/inversion_flag'):
+            return print('Inversion is already done for {}'.format(self.patch_dir))
 
         for coord in self.coords:
 
