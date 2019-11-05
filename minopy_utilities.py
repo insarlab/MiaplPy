@@ -692,3 +692,41 @@ def apply_affine(rows, cols, ovs_x, ovs_y, transf):
             out_col[row, col] = col0
 
     return out_row, out_col
+
+#################################
+
+
+def email_minopy(work_dir):
+    """ email mintpy results """
+
+    import subprocess
+    import sys
+
+    email_address = os.getenv('NOTIFICATIONEMAIL')
+
+    textStr = 'email mintpy results'
+
+    cwd = os.getcwd()
+
+    pic_dir = os.path.join(work_dir, 'pic')
+    flist = ['avgPhaseVelocity.png', 'avgSpatialCoh.png', 'geo_maskTempCoh.png', 'geo_temporalCoherence.png',
+             'geo_velocity.png', 'maskConnComp.png', 'Network.pdf', 'BperpHistory.pdf', 'CoherenceMatrix.pdf',
+             'rms_timeseriesResidual_ramp.pdf', 'geo_velocity.kmz']
+
+    file_list = [os.path.join(pic_dir, i) for i in flist]
+    print(file_list)
+
+    attachmentStr = ''
+    i = 0
+    for fileList in file_list:
+        i = i + 1
+        attachmentStr = attachmentStr + ' -a ' + fileList
+
+    mailCmd = 'echo \"' + textStr + '\" | mail -s ' + cwd + ' ' + attachmentStr + ' ' + email_address
+    command = 'ssh pegasus.ccs.miami.edu \"cd ' + cwd + '; ' + mailCmd + '\"'
+    print(command)
+    status = subprocess.Popen(command, shell=True).wait()
+    if status is not 0:
+        sys.exit('Error in email_minopy')
+
+    return

@@ -306,6 +306,7 @@ class MinoPyParser:
             'geocode',
             'google_earth',
             'hdfeos5',
+            'plot',
             'email', ]
 
         STEP_HELP = """Command line options for steps processing with names are chosen from the following list:

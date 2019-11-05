@@ -12,14 +12,14 @@ import gdal
 import glob
 import h5py
 import mintpy
-from mintpy.utils import readfile, utils as ut
+from mintpy.utils import writefile, readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
-from mintpy.objects import ifgramStack
-from mintpy.ifgram_inversion import write2hdf5_file, read_unwrap_phase, mask_unwrap_phase
+from mintpy.objects import ifgramStack, timeseries
+from mintpy.ifgram_inversion import read_unwrap_phase, mask_unwrap_phase
 import minopy
 import minopy.workflow
 import minopy.submit_jobs as js
-from minopy_utilities import log_message
+from minopy_utilities import log_message, email_minopy
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects.slcStack import slcStack
 from minopy.objects.stack_int import MinopyRun
@@ -51,6 +51,7 @@ STEP_LIST = [
     'geocode',
     'google_earth',
     'hdfeos5',
+    'plot',
     'email',]
 
 ##########################################################################
@@ -331,9 +332,15 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         slcObj.open(print_msg=False)
         date_list = slcObj.get_date_list()
 
+        if self.template['minopy.interferograms.type'] == 'sequential':
+            master_ind = True
+
         pairs = []
         for i in range(1, len(date_list)):
-            pairs.append((date_list[0], date_list[i]))
+            if master_ind:
+                pairs.append((date_list[i - 1], date_list[i]))
+            else:
+                pairs.append((date_list[0], date_list[i]))
 
         inps = self.inps
         inps.run_dir = self.run_dir
@@ -349,7 +356,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         memorymax = '4000'
         walltime = '2:00'
 
-        js.scheduler_job_submit(run_file_int, self.workDir, memorymax, walltime)
+        js.scheduler_job_submit(run_file_int, self.workDir, memorymax, walltime, queuename=self.inps.queue_name)
 
         return
 
@@ -363,9 +370,15 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         slcObj.open(print_msg=False)
         date_list = slcObj.get_date_list()
 
+        if self.template['minopy.interferograms.type'] == 'sequential':
+            master_ind = True
+
         pairs = []
         for i in range(1, len(date_list)):
-            pairs.append((date_list[0], date_list[i]))
+            if master_ind:
+                pairs.append((date_list[i - 1], date_list[i]))
+            else:
+                pairs.append((date_list[0], date_list[i]))
 
         inps = self.inps
         inps.run_dir = self.run_dir
@@ -381,7 +394,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         memorymax = '5000'
         walltime = '4:00'
 
-        js.scheduler_job_submit(run_file_unwrap, self.workDir, memorymax, walltime)
+        js.scheduler_job_submit(run_file_unwrap, self.workDir, memorymax, walltime, queuename=self.inps.queue_name)
 
         return
 
@@ -493,9 +506,13 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         stack_obj = ifgramStack(ifgram_file)
         stack_obj.open(print_msg=False)
+        pbase = stack_obj.get_perp_baseline_timeseries(dropIfgram=True)
         date_list = stack_obj.get_date_list(dropIfgram=True)
         num_date = len(date_list)
 
+        # File 1 - timeseries.h5
+        suffix = ''
+        ts_file = '{}{}.h5'.format(suffix, os.path.splitext(inps.outfile[0])[0])
         metadata = dict(stack_obj.metadata)
         metadata['REF_DATE'] = date_list[0]
         metadata['FILE_TYPE'] = 'timeseries'
@@ -503,8 +520,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         num_row = stack_obj.length
         num_col = stack_obj.width
-
-        phase2range = -1 * float(stack_obj.metadata['WAVELENGTH']) / (4. * np.pi)
 
         box = None
         ref_phase = stack_obj.get_reference_phase(dropIfgram=False)
@@ -521,28 +536,44 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                      unwDatasetName=unwDatasetName,
                                      dropIfgram=True)
 
+        if self.template['minopy.interferograms.type'] == 'sequential':
+            Atransformation = np.tril(np.ones([num_date - 1, num_date - 1]))
+            pha_data = np.matmul(Atransformation, pha_data)
+
         mask_data = np.repeat(quality_map.reshape(1, -1), num_date - 1, axis=0)
         pha_data = mask_unwrap_phase(pha_data, mask_data, mask_threshold=mask_threshold)
 
-        ts = pha_data * phase2range
-        ts0 = ts.reshape(num_date - 1, num_row, num_col)
-        ts = np.zeros((num_date, num_row, num_col), np.float32)
-        ts[1::, :, :] = ts0
-        num_inv_ifg = np.zeros((num_row, num_col), np.int16) + num_date - 1
+        ph0 = pha_data.reshape(num_date - 1, num_row, num_col)
+        pha_data = np.zeros((num_date, num_row, num_col), np.float32)
+        pha_data[1::, :, :] = ph0[:, :, :]
 
         os.chdir(self.workDir)
 
-        write2hdf5_file(ifgram_file, metadata, ts, quality_map, num_inv_ifg, suffix='', inps=inps)
+        print('-' * 50)
+        print('converting phase to range')
+        phase2range = -1 * float(stack_obj.metadata['WAVELENGTH']) / (4. * np.pi)
+        ts = pha_data * phase2range
+
+        ts_obj = timeseries(ts_file)
+        ts_obj.write2hdf5(data=ts, dates=date_list, bperp=pbase, metadata=metadata)
+
+        # File 2 - temporalCoherence.h5
+        out_file = '{}{}.h5'.format(suffix, os.path.splitext(inps.outfile[1])[0])
+        metadata['FILE_TYPE'] = 'temporalCoherence'
+        metadata['UNIT'] = '1'
+        print('-' * 50)
+        writefile.write(quality_map, out_file=out_file, metadata=metadata)
+
+        # File 3 - numInvIfgram.h5
+        out_file = 'numInvIfgram{}.h5'.format(suffix)
+        metadata['FILE_TYPE'] = 'mask'
+        metadata['UNIT'] = '1'
+        print('-' * 50)
+        num_inv_ifg = np.zeros((num_row, num_col), np.int16) + num_date - 1
+        writefile.write(num_inv_ifg, out_file=out_file, metadata=metadata)
 
         self.get_phase_linking_coherence_mask()
 
-        return
-
-    def run_email_results(self, sname):
-        """ email Time series results
-        """
-        log_message(self.workDir, 'email_results.py {}'.format(self.customTemplateFile))
-        email_results.main([self.customTemplateFile])
         return
 
     def run(self, steps=STEP_LIST, plot=True):
@@ -617,12 +648,13 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             elif sname == 'hdfeos5':
                 super().run_save2hdfeos5(sname)
 
-            elif sname == 'email':
-                self.run_email_results(sname)
+            elif sname == 'plot':
+                # plot result (show aux visualization message more multiple steps processing)
+                print_aux = len(steps) > 1
+                super().plot_result(print_aux=print_aux, plot=plot)
 
-        # plot result (show aux visualization message more multiple steps processing)
-        print_aux = len(steps) > 1
-        super().plot_result(print_aux=print_aux, plot=plot)
+            elif sname == 'email':
+                email_minopy(self.workDir)
 
         # go back to original directory
         print('Go back to directory:', self.cwd)
