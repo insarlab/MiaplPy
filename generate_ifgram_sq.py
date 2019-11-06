@@ -2,13 +2,16 @@
 ############################################################
 # Copyright(c) 2017, Sara Mirzaee                          #
 ############################################################
+import importlib
+import logging
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
+
 import numpy as np
 import os
 import glob
 import time
-import isce
-import isceobj
-from isceobj.Util.ImageUtil import ImageLib as IML
+from isceobj.Image.IntImage import IntImage
 from FilterAndCoherence import estCoherence, runFilter
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects.slcStack import slcStack
@@ -57,8 +60,6 @@ def main(iargs=None):
     patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win + 1
     patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win + 1
     patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + range_win - 1
-
-    print(patch_rows_overlap, patch_cols_overlap)
 
     first_row = patch_rows_overlap[0, 0, 0]
     last_row = patch_rows_overlap[1, 0, -1]
@@ -137,7 +138,7 @@ def main(iargs=None):
         f = h5py.File(output_geo, 'a')
         if 'quality' in f.keys():
             ds = f['quality']
-            ds[:,:] = Quality
+            ds[:, :] = Quality
         else:
             ds = f.create_dataset('quality',
                                   data=Quality,
@@ -163,7 +164,7 @@ def main(iargs=None):
 
         ifg = None
 
-        obj_int = isceobj.createIntImage()
+        obj_int = IntImage()
         obj_int.setFilename(output_int)
         obj_int.setWidth(width)
         obj_int.setLength(n_line)
@@ -172,7 +173,7 @@ def main(iargs=None):
         obj_int.renderVRT()
 
         filt_file = inps.ifg_dir + '/filt_fine.int'
-        filter_strength = 0.5
+        filter_strength = 0.1
 
         runFilter(output_int, filt_file, filter_strength)
 

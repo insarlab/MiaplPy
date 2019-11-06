@@ -7,7 +7,7 @@ import os
 from minopy.defaults.auto_path import PathFind
 
 noMCF = 'False'
-defoMax = '4.0'
+defoMax = '2.0'
 maxNodes = 72
 
 pathObj = PathFind()

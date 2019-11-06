@@ -14,7 +14,6 @@ import h5py
 import mintpy
 from mintpy.utils import writefile, readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
-from mintpy.objects import ifgramStack, timeseries
 from mintpy.ifgram_inversion import read_unwrap_phase, mask_unwrap_phase
 import minopy
 import minopy.workflow
@@ -55,6 +54,8 @@ STEP_LIST = [
     'email',]
 
 ##########################################################################
+
+
 def main(iargs=None):
     start_time = time.time()
     Parser = MinoPyParser(iargs, script='minopy_wrapper')
@@ -334,6 +335,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.template['minopy.interferograms.type'] == 'sequential':
             master_ind = True
+        else:
+            master_ind = False
 
         pairs = []
         for i in range(1, len(date_list)):
@@ -352,6 +355,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         runObj.configure(inps, 'run_interferograms')
         runObj.generateIfg(inps, pairs)
         runObj.finalize()
+
+        del runObj, slcObj
 
         memorymax = '4000'
         walltime = '2:00'
@@ -372,6 +377,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.template['minopy.interferograms.type'] == 'sequential':
             master_ind = True
+        else:
+            master_ind = False
 
         pairs = []
         for i in range(1, len(date_list)):
@@ -405,6 +412,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
            3) check loading result
            4) add custom metadata (optional, for HDF-EOS5 format only)
         """
+        os.chdir(self.workDir)
+
         # 1) copy aux files (optional)
         self.projectName = self.project_name
         super()._copy_aux_file()
@@ -419,8 +428,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         # run
         print("load_int.py", scp_args)
         minopy.load_int.main(scp_args.split())
-        os.chdir(self.workDir)
-
+        
         # 3) check loading result
         load_complete, stack_file, geom_file = ut.check_loaded_dataset(self.workDir, print_msg=True)[0:3]
 
@@ -493,6 +501,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         return
 
     def write_to_timeseries(self, sname):
+
+        from mintpy.objects import timeseries, ifgramStack
 
         inps = self.inps
 
