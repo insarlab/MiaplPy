@@ -14,6 +14,7 @@ import h5py
 import mintpy
 from mintpy.utils import writefile, readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
+from mintpy.objects import timeseries, ifgramStack
 from mintpy.ifgram_inversion import read_unwrap_phase, mask_unwrap_phase
 import minopy
 import minopy.workflow
@@ -37,8 +38,8 @@ STEP_LIST = [
     'load_int',
     'modify_network',
     'reference_point',
-    'write_to_timeseries',
     'correct_unwrap_error',
+    'write_to_timeseries',
     'stack_interferograms',
     'correct_LOD',
     'correct_troposphere',
@@ -502,8 +503,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
     def write_to_timeseries(self, sname):
 
-        from mintpy.objects import timeseries, ifgramStack
-
         inps = self.inps
 
         inps.timeseriesFile = os.path.join(self.workDir, 'timeseries.h5')
@@ -533,7 +532,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         box = None
         ref_phase = stack_obj.get_reference_phase(dropIfgram=False)
-        unwDatasetName = 'unwrapPhase'
+
+        unwDatasetName = [i for i in ['unwrapPhase_bridging', 'unwrapPhase'] if i in stack_obj.datasetNames][0]
         gfilename = os.path.join(self.workDir, 'inputs/geometryRadar.h5')
         f = h5py.File(gfilename, 'r')
         quality_map = f['quality'][:, :]
@@ -612,15 +612,29 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 super().run_network_modification(sname)
 
             elif sname == 'reference_point':
+
+                ifgram_file = os.path.join(self.workDir, 'inputs/ifgramStack.h5')
+                with h5py.File(ifgram_file, 'a') as f:
+                    f.attrs['mintpy.reference.yx'] = self.template['mintpy.reference.yx']
+                    f.attrs['mintpy.reference.lalo'] = self.template['mintpy.reference.lalo']
+                f.close()
+
                 super().run_reference_point(sname)
+
+            elif sname == 'correct_unwrap_error':
+
+                if self.template['mintpy.unwrapError.method']:
+                    self.template['mintpy.unwrapError.method'] = 'bridging'
+                ifgram_file = os.path.join(self.workDir, 'inputs/ifgramStack.h5')
+                f = h5py.File(ifgram_file, 'a')
+                if 'unwrapPhase_bridging' in f.keys():
+                    del f['unwrapPhase_bridging']
+                f.close()
+
+                super().run_unwrap_error_correction(sname)
 
             elif sname == 'write_to_timeseries':
                 self.write_to_timeseries(sname)
-
-            elif sname == 'correct_unwrap_error':
-                if self.template['mintpy.unwrapError.method']:
-                    self.template['mintpy.unwrapError.method'] = 'bridging'
-                super().run_unwrap_error_correction(sname)
 
             elif sname == 'stack_interferograms':
                 super().run_ifgram_stacking(sname)
@@ -663,8 +677,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 print_aux = len(steps) > 1
                 super().plot_result(print_aux=print_aux, plot=plot)
 
-            elif sname == 'email':
-                email_minopy(self.workDir)
+            #elif sname == 'email':
+            #    email_minopy(self.workDir)
 
         # go back to original directory
         print('Go back to directory:', self.cwd)
