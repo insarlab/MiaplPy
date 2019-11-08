@@ -189,17 +189,16 @@ def gam_pta(ph_filt, vec_refined):
     :param ph_filt: np.angle(coh) before inversion
     :param vec_refined: refined complex vector after inversion
     """
-
-    n = np.shape(ph_filt)[0]
-    indx = np.triu_indices(n, 1)
-    phi_mat = ph_filt[indx]
+    nm = np.shape(ph_filt)[0]
+    diagones = np.diag(np.diag(np.ones([nm, nm])))
+    phi_mat = np.exp(1j * ph_filt)
     ph_refined = np.angle(vec_refined)
-    g1 = np.exp(1j * ph_refined).reshape(n, 1)
-    g2 = np.exp(-1j * ph_refined).reshape(1, n)
-    theta_mat = np.angle(np.matmul(g1, g2))
-    theta_mat = theta_mat[indx]
-    ifgram_diff = phi_mat - theta_mat
-    temp_coh = np.real(np.sum(np.exp(1j * ifgram_diff))) * 2 / (n ** 2 - n)
+    g1 = np.exp(-1j * ph_refined).reshape(nm, 1)
+    g2 = np.exp(1j * ph_refined).reshape(1, nm)
+    theta_mat = np.matmul(g1, g2)
+    ifgram_diff = np.multiply(phi_mat, theta_mat)
+    ifgram_diff = ifgram_diff - np.multiply(ifgram_diff, diagones)
+    temp_coh = np.abs(np.sum(ifgram_diff) / (nm ** 2 - nm))
 
     print(temp_coh)
 
@@ -371,7 +370,7 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
     for ii in range(length):
         for jj in range(ii + 1, length):
             if seasonal:
-                factor = (A + B * np.cos(2 * np.pi * t[ii] / 90)) * (A + B * np.cos(2 * np.pi * t[jj] / 90))
+                factor = (A + B * np.cos(2 * np.pi * t[ii] / 180)) * (A + B * np.cos(2 * np.pi * t[jj] / 180))
             gamma = factor * (np.exp((t[ii] - t[jj]) / Tau0) + gammaf)
             C[ii, jj] = gamma * np.exp(1j * (ph[ii] - ph[jj]))
             C[jj, ii] = np.conj(C[ii, jj])
