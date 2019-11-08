@@ -50,14 +50,14 @@ def main(iargs=None):
     patch_rows_overlap = np.zeros(np.shape(patch_rows), dtype=int)
     patch_rows_overlap[:, :, :] = patch_rows[:, :, :]
     patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win + 1
-    patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + azimuth_win + 1
+    patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + azimuth_win - 1
     patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - azimuth_win + 1
     patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + azimuth_win - 1
 
     patch_cols_overlap = np.zeros(np.shape(patch_cols), dtype=int)
     patch_cols_overlap[:, :, :] = patch_cols[:, :, :]
     patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - range_win + 1
-    patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win + 1
+    patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win - 1
     patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win + 1
     patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + range_win - 1
 

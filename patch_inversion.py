@@ -81,14 +81,14 @@ class PhaseLink:
         patch_rows_overlap = np.zeros(np.shape(patch_rows), dtype=int)
         patch_rows_overlap[:, :, :] = patch_rows[:, :, :]
         patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - self.azimuth_window + 1
-        patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + self.azimuth_window + 1
+        patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + self.azimuth_window - 1
         patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - self.azimuth_window + 1
         patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + self.azimuth_window - 1
 
         patch_cols_overlap = np.zeros(np.shape(patch_cols), dtype=int)
         patch_cols_overlap[:, :, :] = patch_cols[:, :, :]
         patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - self.range_window + 1
-        patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + self.range_window + 1
+        patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + self.range_window - 1
         patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - self.range_window + 1
         patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + self.range_window - 1
 
@@ -164,11 +164,11 @@ class PhaseLink:
 
         x, y = np.meshgrid(sample_cols.astype(int), sample_rows.astype(int), sparse=False)
 
-        win = np.abs(self.rslc[0:self.num_slc, y, x])
+        win = np.abs(self.rslc[self.n_image - self.num_slc::, y, x])
         testvec = np.sort(win.reshape(self.num_slc, self.azimuth_window * self.range_window), axis=0)
         ksres = np.zeros(self.azimuth_window * self.range_window).astype(int)
 
-        S1 = np.abs(self.rslc[0:self.num_slc, row_0, col_0]).reshape(self.num_slc, 1)
+        S1 = np.abs(self.rslc[self.n_image - self.num_slc::, row_0, col_0]).reshape(self.num_slc, 1)
         S1 = np.sort(S1.flatten())
 
         x = x.flatten()
@@ -229,18 +229,21 @@ class PhaseLink:
                 else:
                     status = mnp.test_PS(coh_mat)
                     if status:
-                        vec_refined = mnp.phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
+                        vec_refined = mnp.phase_linking_process(coh_mat, 0, 'PTA', squeez=False)
 
                 vec_refined = np.array(vec_refined)
 
                 self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat), vec_refined)
 
                 amp_refined = np.array(np.mean(np.abs(CCG), axis=1)).reshape(self.n_image, 1, 1)
+                phase_refined = np.angle(vec_refined).reshape(self.n_image, 1, 1)
 
+                '''
                 if self.quality[coord[0], coord[1]] >= 0.3:
                     phase_refined = np.angle(vec_refined).reshape(self.n_image, 1, 1)
                 else:
                     phase_refined = np.angle(self.rslc[:, coord[0], coord[1]]).reshape(self.n_image, 1, 1)
+                '''
 
                 self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
                     np.multiply(amp_refined, np.exp(1j * phase_refined))
