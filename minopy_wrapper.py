@@ -357,6 +357,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         runObj.generateIfg(inps, pairs)
         runObj.finalize()
 
+        os.system('chmod +x {}'.format(self.workDir+'/configs/*'))
+
         del runObj, slcObj
 
         memorymax = '4000'
@@ -399,6 +401,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         runObj.unwrap(inps, pairs)
         runObj.finalize()
 
+        os.system('chmod +x {}'.format(self.workDir + '/configs/*'))
+        
         memorymax = '5000'
         walltime = '4:00'
 
