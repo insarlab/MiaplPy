@@ -429,11 +429,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             scp_args += ' {}'.format(self.customTemplateFile)
         if self.projectName:
             scp_args += ' --project {}'.format(self.projectName)
-        scp_args += ' --output {}'.format('./inputs/ifgramStack.h5')
+        scp_args += ' --output {}'.format(self.workDir + '/inputs/ifgramStack.h5')
         # run
         print("load_int.py", scp_args)
         minopy.load_int.main(scp_args.split())
-        
+
         # 3) check loading result
         load_complete, stack_file, geom_file = ut.check_loaded_dataset(self.workDir, print_msg=True)[0:3]
 

@@ -24,7 +24,7 @@ autoPath = True
 # Default path of data files from different InSAR processors to be loaded into MintPy
 isceAutoPath = '''##----------Default file path of ISCE-topsStack products
 mintpy.load.processor      = isce
-mintpy.load.metaFile       = ${PROJECT_DIR}/master/IW*.xml
+mintpy.load.metaFile       = ${PROJECT_DIR}//master/IW*.xml
 mintpy.load.baselineDir    = ${PROJECT_DIR}/baselines
 
 mintpy.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc.full
