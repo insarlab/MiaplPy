@@ -129,7 +129,7 @@ def main(iargs=None):
             slave = rslc_patch[slave_ind, :, :]
 
             for kk in range(0, patch_lines):
-                ifg_patch[kk, f_col:l_col + 1] = slave[kk, f_col:l_col + 1] * np.conj(master[kk, f_col:l_col + 1])
+                ifg_patch[kk, f_col:l_col + 1] = master[kk, f_col:l_col + 1] * np.conj(slave[kk, f_col:l_col + 1])
 
             ifg[row1:row2 + 1, col1:col2 + 1] = ifg_patch[f_row:l_row + 1, f_col:l_col + 1]
 

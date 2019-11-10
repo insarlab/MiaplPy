@@ -7,7 +7,7 @@ import os
 from minopy.defaults.auto_path import PathFind
 
 noMCF = 'False'
-defoMax = '2.0'
+defoMax = '2'
 maxNodes = 72
 
 pathObj = PathFind()
@@ -75,8 +75,8 @@ class MinopyConfig(object):
         self.f.write('nomcf : ' + self.noMCF + '\n')
         self.f.write('master : ' + self.master + '\n')
         self.f.write('defomax : ' + self.defoMax + '\n')
-        self.f.write('alks : ' + self.rangeLooks + '\n')
-        self.f.write('rlks : ' + self.azimuthLooks + '\n')
+        self.f.write('alks : ' + self.azimuthLooks + '\n')
+        self.f.write('rlks : ' + self.rangeLooks + '\n')
 
     def finalize(self):
         self.f.close()
