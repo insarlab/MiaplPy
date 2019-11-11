@@ -12,8 +12,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import minopy_utilities as mnp
 from skimage.measure import label
-from mintpy.tsview import *   
-
+#from mintpy.tsview import *
+import mintpy.tsview as tsview
 
 ###########################################################################################
 EXAMPLE = """example:
@@ -31,7 +31,7 @@ EXAMPLE = """example:
 """
 
 def tcoh_create_parser():
-    parser = create_parser()
+    parser = tsview.create_parser()
     parser.add_argument('--slc', dest='slc_file', nargs='+',
                         help='slc stack file to get pixel shp\n'
                              'i.e.: slcStack.h5 (MintPy)\n')
@@ -64,6 +64,7 @@ def cmd_line_parse(iargs=None):
     # verbose print using --noverbose option
     global vprint
     vprint = print if inps.print_msg else lambda *args, **kwargs: None
+    tsview.vprint = print if inps.print_msg else lambda *args, **kwargs: None
 
     if not inps.disp_fig:
         plt.switch_backend('Agg')
@@ -82,7 +83,7 @@ def save_ts_plot(yx, fig_img, fig_pts, d_ts, fig_coh, inps):
         inps.outfile_base = 'y{}_x{}'.format(yx[0], yx[1])
 
     # get aux info
-    vel, std = estimate_slope(d_ts[0], inps.yearList,
+    vel, std = tsview.estimate_slope(d_ts[0], inps.yearList,
                               ex_flag=inps.ex_flag,
                               disp_unit=inps.disp_unit)
 
@@ -125,7 +126,7 @@ def save_ts_plot(yx, fig_img, fig_pts, d_ts, fig_coh, inps):
     return
 
 
-class CoherenceViewer(timeseriesViewer):
+class CoherenceViewer(tsview.timeseriesViewer):
     """Class for tsview.py
 
     Example:
@@ -143,23 +144,31 @@ class CoherenceViewer(timeseriesViewer):
 
     def configure(self):
         inps = cmd_line_parse(self.iargs)
-        inps, self.atr = read_init_info(inps)
+        inps, self.atr = tsview.read_init_info(inps)
         # copy inps to self object
         for key, value in inps.__dict__.items():
             setattr(self, key, value)
         # input figsize for the point time-series plot
         self.figsize_pts = self.fig_size
         self.pts_marker = 'r^'
-
-        self.slcStack = inps.slc_file
+        self.slcStack = inps.slc_file[0]
         self.range_window = int(inps.range_win)
         self.azimuth_window = int(inps.azimuth_win)
+
+        slc_file = h5py.File(self.slcStack, 'r')
+        self.rslc = slc_file['slc'][:, :, :]
+        slc_file.close()
+        self.length = self.rslc.shape[1]
+        self.width = self.rslc.shape[2]
+        self.n_image = self.rslc.shape[0]
+        self.num_slc = 20
+
         return
 
 
     def plot(self):
         # read 3D time-series
-        self.ts_data, self.mask = read_timeseries_data(self)[0:2]
+        self.ts_data, self.mask = tsview.read_timeseries_data(self)[0:2]
 
         # Figure 1 - Cumulative Displacement Map
         self.fig_img = plt.figure(self.figname_img, figsize=self.figsize_img)
@@ -170,6 +179,9 @@ class CoherenceViewer(timeseriesViewer):
         img_data[self.mask == 0] = np.nan
         self.plot_init_image(img_data)
 
+        del self.ts_data
+
+        '''
         # Figure 1 - Axes 2 - Time Slider
         self.ax_tslider = self.fig_img.add_axes([0.2, 0.1, 0.6, 0.07])
         self.plot_init_time_slider(init_idx=self.idx, ref_idx=self.ref_idx)
@@ -179,20 +191,40 @@ class CoherenceViewer(timeseriesViewer):
         self.fig_pts, self.ax_pts = plt.subplots(num=self.figname_pts, figsize=self.figsize_pts)
         if self.yx:
             d_ts = self.plot_point_timeseries(self.yx)
-
+            
+        '''
+        d_coh = None
         # Figure 3 - Temporal Coherence - Point
-        self.fig_coh, self.ax_coh = plt.subplots(nrows=1, ncols=2)
+        self.fig_coh = plt.figure('Coherence matrix abs', figsize=self.figsize_img)
+        self.ax_coh = self.fig_coh.add_axes([0.125, 0.25, 0.75, 0.65])
+        #self.fig_coh, self.ax_coh = plt.subplots(nrows=1, ncols=2)
         if self.yx:
             d_coh = self.plot_point_coh_matrix(self.yx)
 
+        # Figure 3 - Temporal Coherence - Point
+        self.fig_ph = plt.figure('Coherence matrix phase', figsize=self.figsize_img)
+        self.ax_ph = self.fig_ph.add_axes([0.125, 0.25, 0.75, 0.65])
+        if d_coh:
+            self.plot_coh_phase(d_coh)
+
+        '''
         # Output
         if self.save_fig:
             save_ts_plot(self.yx, self.fig_img, self.fig_pts, d_ts, self.fig_coh, self)
+        '''
 
         # Final linking of the canvas to the plots.
-        self.fig_img.canvas.mpl_connect('button_press_event', self.update_plot_timeseries)
+        #self.fig_img.canvas.mpl_connect('button_press_event', self.update_plot_timeseries)
+        self.fig_img.canvas.mpl_connect('button_press_event', self.update_plot_coh)
+        #self.fig_img.canvas.mpl_connect('key_press_event', self.on_key_event)
         if self.disp_fig:
             vprint('showing ...')
+            msg = '\n------------------------------------------------------------------------'
+            msg += '\nTo scroll through the image sequence:'
+            msg += '\n1) Move the slider, OR'
+            msg += '\n2) Press left or right arrow key (if not responding, click the image and try again).'
+            msg += '\n------------------------------------------------------------------------'
+            vprint(msg)
             plt.show()
         return
 
@@ -201,15 +233,7 @@ class CoherenceViewer(timeseriesViewer):
         Parameters: yx : list of 2 int
         Returns:    d_ts : 2D np.array in size of (num_date, num_date)
         """
-        self.ax_pts.cla()
-
-        slc_file = h5py.File(self.slcStack, 'r')
-
-        length = slc_file['slc'][:, :].shape[1]
-        width = slc_file['slc'][:, :].shape[2]
-        n_image = slc_file['slc'][:, :].shape[0]
-        num_slc = 20
-
+        vprint('showing Coherence matrix for ({})'.format(yx))
         row = yx[0] - self.pix_box[1]
         col = yx[1] - self.pix_box[0]
 
@@ -225,29 +249,29 @@ class CoherenceViewer(timeseriesViewer):
 
         sample_rows = row + sample_rows
         sample_rows[sample_rows < 0] = -1
-        sample_rows[sample_rows >= length] = -1
+        sample_rows[sample_rows >= self.length] = -1
 
         sample_cols = col + sample_cols
         sample_cols[sample_cols < 0] = -1
-        sample_cols[sample_cols >= width] = -1
+        sample_cols[sample_cols >= self.width] = -1
 
-        x, y = np.meshgrid(sample_cols.astype(int), sample_rows.astype(int), sparse=False)
+        xm, ym = np.meshgrid(sample_cols.astype(int), sample_rows.astype(int), sparse=False)
 
-        win = np.abs(slc_file['slc'][n_image - num_slc::, y, x])
+        win = np.abs(self.rslc[self.n_image - self.num_slc::, ym, xm])
 
-        testvec = np.sort(win.reshape(num_slc, self.azimuth_window * self.range_window), axis=0)
+        testvec = np.sort(win.reshape(self.num_slc, self.azimuth_window * self.range_window), axis=0)
         ksres = np.zeros(self.azimuth_window * self.range_window).astype(int)
 
-        S1 = np.abs(slc_file['slc'][n_image - num_slc::, row, col]).reshape(num_slc, 1)
+        S1 = np.abs(self.rslc[self.n_image - self.num_slc::, row, col]).reshape(self.num_slc, 1)
         S1 = np.sort(S1.flatten())
 
-        x = x.flatten()
-        y = y.flatten()
+        xm = xm.flatten()
+        ym = ym.flatten()
 
-        distance_thresh = mnp.ks_lut(num_slc, num_slc, alpha=0.05)
+        distance_thresh = mnp.ks_lut(self.num_slc, self.num_slc, alpha=0.05)
 
         for m in range(testvec.shape[1]):
-            if x[m] >= 0 and y[m] >= 0:
+            if xm[m] >= 0 and ym[m] >= 0:
                 S2 = testvec[:, m]
                 S2 = np.sort(S2.flatten())
                 ksres[m] = mnp.ks2smapletest(S1, S2, threshold=distance_thresh)
@@ -259,24 +283,39 @@ class CoherenceViewer(timeseriesViewer):
         shp_rows = np.array(shp_rows + row - (self.azimuth_window - 1) / 2).astype(int)
         shp_cols = np.array(shp_cols + col - (self.range_window - 1) / 2).astype(int)
 
-        CCG = np.matrix(1.0 * np.arange(n_image * len(shp_rows)).reshape(n_image, len(shp_rows)))
+        CCG = np.matrix(1.0 * np.arange(self.n_image * len(shp_rows)).reshape(self.n_image, len(shp_rows)))
         CCG = np.exp(1j * CCG)
-        CCG[:, :] = np.matrix(slc_file['slc'][:, shp_rows, shp_cols])
+        CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
 
         coh_mat = mnp.est_corr(CCG)
 
-        slc_file.close()
-
         cmap, norm = mnp.custom_cmap()
-        im1 = self.ax_pts.imshow(np.abs(coh_mat), cmap='jet', norm=norm)
+        im1 = self.ax_coh.imshow(np.abs(coh_mat), cmap='jet', norm=norm)
         cbar = plt.colorbar(im1, ticks=[0, 1], orientation='vertical')
 
-        im2 = self.ax_pts.imshow(np.angle(coh_mat), cmap='jet', norm=norm)
-        cbar = plt.colorbar(im2, ticks=[-np.pi, np.pi], orientation='vertical')
-
-        #plt.show()
-
         return coh_mat
+
+    def plot_coh_phase(self, coh_mat):
+        vprint('showing Phase matrix')
+        cmap, norm = mnp.custom_cmap()
+        im1 = self.ax_ph.imshow(np.angle(coh_mat), cmap='jet', norm=norm)
+        cbar = plt.colorbar(im1, ticks=[-np.pi, np.pi], orientation='vertical')
+        return
+
+    def update_plot_coh(self, event):
+        """Event function to get y/x from button press"""
+        if event.inaxes == self.ax_coh:
+            # get row/col number
+            if self.fig_coord == 'geo':
+                y, x = self.coord.geo2radar(event.ydata, event.xdata, print_msg=False)[0:2]
+            else:
+                y, x = int(event.ydata+0.5), int(event.xdata+0.5)
+
+            vprint(y, x)
+            # plot time-series displacement
+            d_coh = self.plot_point_coh_matrix((y, x))
+            self.plot_coh_phase(d_coh)
+        return
 
 
 ###########################################################################################
