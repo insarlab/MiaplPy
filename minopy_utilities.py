@@ -381,18 +381,16 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
 
 
 def simulate_noise(corr_matrix):
-    N = corr_matrix.shape[0]
-
     nsar = corr_matrix.shape[0]
-    w, v = np.linalg.eigh(corr_matrix)
-    msk = (w < 1e-3)
-    w[msk] = 0.
-    # corr_matrix =  np.dot(v, np.dot(np.diag(w), np.matrix.getH(v)))
+    eigen_value, eigen_vector = np.linalg.eigh(corr_matrix)
+    msk = (eigen_value < 1e-3)
+    eigen_value[msk] = 0.
+    # corr_matrix =  np.dot(eigen_vector, np.dot(np.diag(eigen_value), np.matrix.getH(eigen_vector)))
 
     # C = np.linalg.cholesky(corr_matrix)
-    C = np.dot(v, np.dot(np.diag(np.sqrt(w)), np.matrix.getH(v)))
-    Z = (np.random.randn(N) + 1j*np.random.randn(N)) / np.sqrt(2)
-    noise = np.dot(C, Z)
+    CM = np.dot(eigen_vector, np.dot(np.diag(np.sqrt(eigen_value)), np.matrix.getH(eigen_vector)))
+    Zr = (np.random.randn(nsar) + 1j*np.random.randn(nsar)) / np.sqrt(2)
+    noise = np.dot(CM, Zr)
 
     return noise
 
@@ -427,11 +425,11 @@ def est_corr(CCGsam):
 
     CCGS = np.matrix(CCGsam)
 
-    corr_mat = np.matmul(CCGS, CCGS.getH()) / CCGS.shape[1]
+    cov_mat = np.matmul(CCGS, CCGS.getH()) / CCGS.shape[1]
 
-    coh = np.multiply(cov2corr(np.abs(corr_mat)), np.exp(1j * np.angle(corr_mat)))
+    corr_matrix = np.multiply(cov2corr(np.abs(cov_mat)), np.exp(1j * np.angle(cov_mat)))
 
-    return coh
+    return corr_matrix
 
 ###############################################################################
 
@@ -585,6 +583,17 @@ def ks2smapletest(S1, S2, threshold=0.4):
     try:
         distance = ecdf_distance(S1, S2)
         if distance <= threshold:
+             return 1
+        else:
+            return 0
+    except:
+        return 0
+
+
+def ks2smapletestp(S1, S2, alpha=0.05):
+    try:
+        distance = ks_2samp(S1, S2)
+        if distance[1] >= alpha:
              return 1
         else:
             return 0
