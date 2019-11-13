@@ -7,11 +7,13 @@
 import h5py
 import os
 import sys
+import time
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import minopy_utilities as mnp
 from skimage.measure import label
+from mintpy import subset, view
 #from mintpy.tsview import *
 import mintpy.tsview as tsview
 
@@ -35,10 +37,10 @@ def tcoh_create_parser():
     parser.add_argument('--slc', dest='slc_file', nargs='+',
                         help='slc stack file to get pixel shp\n'
                              'i.e.: slcStack.h5 (MintPy)\n')
-    parser.add_argument('-rw', '--rangeWindow', dest='range_win', type=str, default='11'
-                        , help='SHP searching window size in range direction. -- Default : 11')
-    parser.add_argument('-aw', '--azimuthWindow', dest='azimuth_win', type=str, default='15'
-                        , help='SHP searching window size in azimuth direction. -- Default : 15')
+    parser.add_argument('-rw', '--rangeWindow', dest='range_win', type=str, default='19'
+                        , help='SHP searching window size in range direction. -- Default : 19')
+    parser.add_argument('-aw', '--azimuthWindow', dest='azimuth_win', type=str, default='21'
+                        , help='SHP searching window size in azimuth direction. -- Default : 21')
 
     return parser
 
@@ -161,7 +163,7 @@ class CoherenceViewer(tsview.timeseriesViewer):
         self.length = self.rslc.shape[1]
         self.width = self.rslc.shape[2]
         self.n_image = self.rslc.shape[0]
-        self.num_slc = 20
+        self.num_slc = 20 #self.n_image
 
         return
 
@@ -179,9 +181,6 @@ class CoherenceViewer(tsview.timeseriesViewer):
         img_data[self.mask == 0] = np.nan
         self.plot_init_image(img_data)
 
-        del self.ts_data
-
-        '''
         # Figure 1 - Axes 2 - Time Slider
         self.ax_tslider = self.fig_img.add_axes([0.2, 0.1, 0.6, 0.07])
         self.plot_init_time_slider(init_idx=self.idx, ref_idx=self.ref_idx)
@@ -191,32 +190,20 @@ class CoherenceViewer(tsview.timeseriesViewer):
         self.fig_pts, self.ax_pts = plt.subplots(num=self.figname_pts, figsize=self.figsize_pts)
         if self.yx:
             d_ts = self.plot_point_timeseries(self.yx)
-            
-        '''
-        d_coh = None
+
         # Figure 3 - Temporal Coherence - Point
-        self.fig_coh = plt.figure('Coherence matrix abs', figsize=self.figsize_img)
-        self.ax_coh = self.fig_coh.add_axes([0.125, 0.25, 0.75, 0.65])
-        #self.fig_coh, self.ax_coh = plt.subplots(nrows=1, ncols=2)
+        self.fig_coh, self.ax_coh = plt.subplots(nrows=2, ncols=2)
         if self.yx:
             d_coh = self.plot_point_coh_matrix(self.yx)
 
-        # Figure 3 - Temporal Coherence - Point
-        self.fig_ph = plt.figure('Coherence matrix phase', figsize=self.figsize_img)
-        self.ax_ph = self.fig_ph.add_axes([0.125, 0.25, 0.75, 0.65])
-        if d_coh:
-            self.plot_coh_phase(d_coh)
-
-        '''
         # Output
         if self.save_fig:
             save_ts_plot(self.yx, self.fig_img, self.fig_pts, d_ts, self.fig_coh, self)
-        '''
 
         # Final linking of the canvas to the plots.
-        #self.fig_img.canvas.mpl_connect('button_press_event', self.update_plot_timeseries)
+        self.fig_img.canvas.mpl_connect('button_press_event', self.update_plot_timeseries)
         self.fig_img.canvas.mpl_connect('button_press_event', self.update_plot_coh)
-        #self.fig_img.canvas.mpl_connect('key_press_event', self.on_key_event)
+        self.fig_img.canvas.mpl_connect('key_press_event', self.on_key_event)
         if self.disp_fig:
             vprint('showing ...')
             msg = '\n------------------------------------------------------------------------'
@@ -233,9 +220,15 @@ class CoherenceViewer(tsview.timeseriesViewer):
         Parameters: yx : list of 2 int
         Returns:    d_ts : 2D np.array in size of (num_date, num_date)
         """
-        vprint('showing Coherence matrix for ({})'.format(yx))
+        self.ax_coh[0, 0].cla()
+        self.ax_coh[0, 1].cla()
+        self.ax_coh[1, 0].cla()
+        self.ax_coh[1, 1].cla()
+
         row = yx[0] - self.pix_box[1]
         col = yx[1] - self.pix_box[0]
+
+        time0 = time.time()
 
         sample_rows = np.ogrid[-((self.azimuth_window - 1) / 2):((self.azimuth_window - 1) / 2) + 1]
         sample_rows = sample_rows.astype(int)
@@ -268,15 +261,18 @@ class CoherenceViewer(tsview.timeseriesViewer):
         xm = xm.flatten()
         ym = ym.flatten()
 
-        distance_thresh = mnp.ks_lut(self.num_slc, self.num_slc, alpha=0.05)
+        distance_thresh = mnp.ks_lut(self.num_slc, self.num_slc, alpha=0.1)
 
         for m in range(testvec.shape[1]):
             if xm[m] >= 0 and ym[m] >= 0:
                 S2 = testvec[:, m]
                 S2 = np.sort(S2.flatten())
+                # ksres[m] = mnp.ADtest(S1, S2)
                 ksres[m] = mnp.ks2smapletest(S1, S2, threshold=distance_thresh)
 
-        ks_label = label(ksres.reshape(self.azimuth_window, self.range_window), background=False, connectivity=2)
+        vprint('time: {} s'.format(time.time() - time0))
+
+        ks_label = label(ksres.reshape(self.azimuth_window, self.range_window), background=0, connectivity=2)
         shp = 1 * (ks_label == ks_label[reference_row, reference_col])
 
         shp_rows, shp_cols = np.where(shp == 1)
@@ -289,32 +285,48 @@ class CoherenceViewer(tsview.timeseriesViewer):
 
         coh_mat = mnp.est_corr(CCG)
 
+        vec_refined = mnp.phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
+        tcoh = mnp.gam_pta(np.angle(coh_mat), vec_refined)
+
         cmap, norm = mnp.custom_cmap()
-        im1 = self.ax_coh.imshow(np.abs(coh_mat), cmap='jet', norm=norm)
-        cbar = plt.colorbar(im1, ticks=[0, 1], orientation='vertical')
+        im1 = self.ax_coh[0, 0].imshow(np.abs(coh_mat), cmap='jet', norm=norm)
+        #plt.colorbar(im1, ticks=[0, 1], orientation='vertical')
+
+        cmap, norm = mnp.custom_cmap(-np.pi, np.pi)
+        im2 = self.ax_coh[0, 1].imshow(np.angle(coh_mat), cmap='jet', norm=norm)
+        #plt.colorbar(im2, ticks=[-np.pi, np.pi], orientation='vertical')
+
+        im3 = self.ax_coh[1, 0].imshow(np.mean(win[:, :, :], axis=0), cmap='jet')
+
+        im4 = self.ax_coh[1, 1].imshow(ks_label, cmap='jet')
+
+        self.fig_coh.canvas.draw()
+
+        vprint('minimum coherence: {}\n'
+               'mean coherence: {}\n'
+               'num shp: {}\n'
+               'temporal coherence: {}'
+               .format(np.nanmin(np.abs(coh_mat)),
+                       np.mean(np.abs(coh_mat)),
+                       len(shp_cols),
+                       tcoh))
+
+        vprint('showing Coherence matrix for ({})'.format(yx))
 
         return coh_mat
 
-    def plot_coh_phase(self, coh_mat):
-        vprint('showing Phase matrix')
-        cmap, norm = mnp.custom_cmap()
-        im1 = self.ax_ph.imshow(np.angle(coh_mat), cmap='jet', norm=norm)
-        cbar = plt.colorbar(im1, ticks=[-np.pi, np.pi], orientation='vertical')
-        return
-
     def update_plot_coh(self, event):
         """Event function to get y/x from button press"""
-        if event.inaxes == self.ax_coh:
+        if event.inaxes == self.ax_img:
+
             # get row/col number
             if self.fig_coord == 'geo':
                 y, x = self.coord.geo2radar(event.ydata, event.xdata, print_msg=False)[0:2]
             else:
                 y, x = int(event.ydata+0.5), int(event.xdata+0.5)
 
-            vprint(y, x)
             # plot time-series displacement
-            d_coh = self.plot_point_coh_matrix((y, x))
-            self.plot_coh_phase(d_coh)
+            self.plot_point_coh_matrix((y, x))
         return
 
 

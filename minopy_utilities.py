@@ -14,6 +14,7 @@ from numpy import linalg as LA
 from scipy.optimize import minimize, Bounds
 from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 import gdal
+import pandas as pd
 import isce
 import isceobj
 import matplotlib.pyplot as plt
@@ -199,8 +200,6 @@ def gam_pta(ph_filt, vec_refined):
     ifgram_diff = np.multiply(phi_mat, theta_mat)
     ifgram_diff = ifgram_diff - np.multiply(ifgram_diff, diagones)
     temp_coh = np.abs(np.sum(ifgram_diff) / (nm ** 2 - nm))
-
-    print(temp_coh)
 
     return temp_coh
 
@@ -427,7 +426,9 @@ def est_corr(CCGsam):
 
     cov_mat = np.matmul(CCGS, CCGS.getH()) / CCGS.shape[1]
 
-    corr_matrix = np.multiply(cov2corr(np.abs(cov_mat)), np.exp(1j * np.angle(cov_mat)))
+    corr_matrix = cov2corr(cov_mat)
+
+    #corr_matrix = np.multiply(cov2corr(np.abs(cov_mat)), np.exp(1j * np.angle(cov_mat)))
 
     return corr_matrix
 
@@ -604,7 +605,7 @@ def ks2smapletestp(S1, S2, alpha=0.05):
 def ttest_indtest(S1, S2):
     try:
         test = ttest_ind(S1, S2, equal_var=False)
-        if test[1] <= 0.05:
+        if test[1] >= 0.05:
              return 1
         else:
             return 0
@@ -615,7 +616,7 @@ def ttest_indtest(S1, S2):
 def ADtest(S1, S2):
     try:
         test = anderson_ksamp([S1, S2])
-        if test.significance_level <= 0.05:
+        if test.significance_level >= 0.05:
              return 1
         else:
             return 0
@@ -639,7 +640,7 @@ def ks_lut(N1, N2, alpha=0.05):
     return np.min(critical_distance)
 
 
-def ecdf_distance(S1, S2):
+def ecdf_distance_old(S1, S2):
     data1 = np.sort(S1.flatten())
     data2 = np.sort(S2.flatten())
     n1 = len(data1)
@@ -647,6 +648,17 @@ def ecdf_distance(S1, S2):
     data_all = np.concatenate([data1, data2])
     cdf1 = np.searchsorted(data1, data_all, side='right') / (1.0 * n1)
     cdf2 = np.searchsorted(data2, data_all, side='right') / (1.0 * n2)
+    d = np.max(np.absolute(cdf1 - cdf2))
+    return d
+
+
+def ecdf_distance(data):
+    data_all = data.flatten()
+    n1 = int(len(data_all)/2)
+    data1 = data_all[0:n1]
+    data2 = data_all[n1::]
+    cdf1 = np.searchsorted(data1, data_all, side='right') / (1.0 * n1)
+    cdf2 = np.searchsorted(data2, data_all, side='right') / (1.0 * n1)
     d = np.max(np.absolute(cdf1 - cdf2))
     return d
 
