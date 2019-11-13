@@ -185,48 +185,50 @@ class PhaseLink:
 
         print(coord)
 
-        if self.quality[coord[0], coord[1]] == -1 or not self.shp[:, coord[0], coord[1]].any():
+        if not self.shp[:, coord[0], coord[1]].any():
             shp = self.get_shp_row_col(coord)
         else:
             shp = self.shp[:, coord[0], coord[1]].reshape(self.azimuth_window, self.range_window)
 
-        num_shp = len(shp[shp > 0])
+        if self.quality[coord[0], coord[1]] == -1:
 
-        shp_rows, shp_cols = np.where(shp == 1)
-        shp_rows = np.array(shp_rows + coord[0] - (self.azimuth_window - 1) / 2).astype(int)
-        shp_cols = np.array(shp_cols + coord[1] - (self.range_window - 1) / 2).astype(int)
+            num_shp = len(shp[shp > 0])
 
-        CCG = np.matrix(1.0 * np.arange(self.n_image * len(shp_rows)).reshape(self.n_image, len(shp_rows)))
-        CCG = np.exp(1j * CCG)
-        CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
+            shp_rows, shp_cols = np.where(shp == 1)
+            shp_rows = np.array(shp_rows + coord[0] - (self.azimuth_window - 1) / 2).astype(int)
+            shp_cols = np.array(shp_cols + coord[1] - (self.range_window - 1) / 2).astype(int)
 
-        coh_mat = mnp.est_corr(CCG)
+            CCG = np.matrix(1.0 * np.arange(self.n_image * len(shp_rows)).reshape(self.n_image, len(shp_rows)))
+            CCG = np.exp(1j * CCG)
+            CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
 
-        if num_shp > 20:
+            coh_mat = mnp.est_corr(CCG)
 
-            if 'sequential' in self.phase_linking_method:
-                vec_refined = mnp.sequential_phase_linking(CCG, self.phase_linking_method, num_stack=100)
+            if num_shp > 20:
+
+                if 'sequential' in self.phase_linking_method:
+                    vec_refined = mnp.sequential_phase_linking(CCG, self.phase_linking_method, num_stack=100)
+                else:
+                    vec_refined = mnp.phase_linking_process(coh_mat, 0, self.phase_linking_method, squeez=False)
+
+                self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat), vec_refined)
+
             else:
-                vec_refined = mnp.phase_linking_process(coh_mat, 0, self.phase_linking_method, squeez=False)
+                status = mnp.test_PS(coh_mat)
+                if status:
+                    # vec_refined = self.rslc[:, coord[0], coord[1]]
+                    vec_refined = mnp.phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
+                    self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat),
+                                                                                             vec_refined)
+                else:
+                    vec_refined = self.rslc[:, coord[0], coord[1]]
+                    self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = 0
 
-            self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat), vec_refined)
+            phase_refined = np.angle(np.array(vec_refined)).reshape(self.n_image, 1, 1)
+            amp_refined = np.array(np.mean(np.abs(CCG), axis=1)).reshape(self.n_image, 1, 1)
 
-        else:
-            status = mnp.test_PS(coh_mat)
-            if status:
-                # vec_refined = self.rslc[:, coord[0], coord[1]]
-                vec_refined = mnp.phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
-                self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat),
-                                                                                         vec_refined)
-            else:
-                vec_refined = self.rslc[:, coord[0], coord[1]]
-                self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = 0
-
-        phase_refined = np.angle(np.array(vec_refined)).reshape(self.n_image, 1, 1)
-        amp_refined = np.array(np.mean(np.abs(CCG), axis=1)).reshape(self.n_image, 1, 1)
-
-        self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
-            np.multiply(amp_refined, np.exp(1j * phase_refined))
+            self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
+                np.multiply(amp_refined, np.exp(1j * phase_refined))
 
         return
 
