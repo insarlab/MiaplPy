@@ -137,25 +137,22 @@ def main(iargs=None):
 
         f = h5py.File(output_geo, 'a')
         if 'quality' in f.keys():
-            ds = f['quality']
-            ds[:, :] = Quality
-        else:
-            ds = f.create_dataset('quality',
-                                  data=Quality,
-                                  dtype=np.float32,
-                                  chunks=True,
-                                  compression='lzf')
+            del f['quality']
+
+        ds = f.create_dataset('quality',
+                              data=Quality,
+                              dtype=np.float32,
+                              chunks=True,
+                              compression='lzf')
         ds.attrs['MODIFICATION_TIME'] = str(time.time())
 
         if 'shp' in f.keys():
-            ds = f['shp']
-            ds[:, :] = SHP
-        else:
-            ds = f.create_dataset('shp',
-                                  data=SHP,
-                                  dtype=np.float32,
-                                  chunks=True,
-                                  compression='lzf')
+            del f['shp']
+        ds = f.create_dataset('shp',
+                              data=SHP,
+                              dtype=np.float32,
+                              chunks=True,
+                              compression='lzf')
         ds.attrs['MODIFICATION_TIME'] = str(time.time())
 
         f.close()

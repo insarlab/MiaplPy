@@ -214,10 +214,12 @@ class PhaseLink:
         else:
             status = mnp.test_PS(coh_mat)
             if status:
-                self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = 1
-                vec_refined = self.rslc[:, coord[0], coord[1]]
-                # vec_refined = mnp.phase_linking_process(coh_mat, 0, 'PTA', squeez=False)
+                # vec_refined = self.rslc[:, coord[0], coord[1]]
+                vec_refined = mnp.phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
+                self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat),
+                                                                                         vec_refined)
             else:
+                vec_refined = self.rslc[:, coord[0], coord[1]]
                 self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = 0
 
         phase_refined = np.angle(np.array(vec_refined)).reshape(self.n_image, 1, 1)

@@ -552,7 +552,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.template['minopy.interferograms.type'] == 'sequential':
             Atransformation = np.tril(np.ones([num_date - 1, num_date - 1]))
-            pha_data = np.matmul(Atransformation, pha_data)
+            for kk in range(pha_data.shape[0]):
+                pha_data[:, kk] = np.matmul(Atransformation, pha_data[:, kk])
 
         mask_data = np.repeat(quality_map.reshape(1, -1), num_date - 1, axis=0)
         pha_data = mask_unwrap_phase(pha_data, mask_data, mask_threshold=mask_threshold)
