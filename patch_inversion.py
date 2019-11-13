@@ -7,10 +7,9 @@ import os
 import time
 import numpy as np
 import minopy_utilities as mnp
-import dask
-import pandas as pd
 from skimage.measure import label
 from minopy.objects.arg_parser import MinoPyParser
+import multiprocessing
 
 #################################
 
@@ -37,6 +36,44 @@ def main(iargs=None):
 
     return None
 
+
+def parallel_apply_along_axis(func1d, axis, arr, *args, **kwargs):
+    """
+    Like numpy.apply_along_axis(), but takes advantage of multiple
+    cores.
+    """
+    # Effective axis where apply_along_axis() will be applied by each
+    # worker (any non-zero axis number would work, so as to allow the use
+    # of `np.array_split()`, which is only done on axis 0):
+    effective_axis = 1 if axis == 0 else axis
+    if effective_axis != axis:
+        arr = arr.swapaxes(axis, effective_axis)
+
+    # Chunks for the mapping (only a few chunks):
+    chunks = [(func1d, effective_axis, sub_arr, args, kwargs)
+              for sub_arr in np.array_split(arr, multiprocessing.cpu_count())]
+
+    pool = multiprocessing.Pool()
+    individual_results = pool.map(unpacking_apply_along_axis, chunks)
+    # Freeing the workers:
+    pool.close()
+    pool.join()
+
+    return np.concatenate(individual_results)
+
+def unpacking_apply_along_axis(all_args):
+
+    """
+    Like numpy.apply_along_axis(), but with arguments in a tuple
+    instead.
+
+    This function is useful with multiprocessing.Pool().map(): (1)
+    map() only handles functions that take a single argument, and (2)
+    this function can generally be imported from a module, as required
+    by map().
+    """
+    (func1d, axis, arr, args, kwargs) = all_args
+    return np.apply_along_axis(func1d, axis, arr, *args, **kwargs)
 
 class PhaseLink:
     def __init__(self, inps):
@@ -241,7 +278,8 @@ class PhaseLink:
         if os.path.exists(self.patch_dir + '/inversion_flag'):
             return print('Inversion is already done for {}'.format(self.patch_dir))
 
-        np.apply_along_axis(self.phase_inversion, 0, self.coords)
+        parallel_apply_along_axis(self.phase_inversion, 0, self.coords)
+        # np.apply_along_axis(self.phase_inversion, 0, self.coords)
 
         timep = time.time() - time0
         print('time spent to do phase inversion {}: min'.format(timep / 60))
@@ -250,7 +288,6 @@ class PhaseLink:
             f.write('Inversion done')
 
         return
-
 
     def patch_phase_linking(self):
 
