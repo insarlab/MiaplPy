@@ -217,6 +217,8 @@ class PhaseLink:
                                                                                              vec_refined)
                 else:
                     vec_refined = self.rslc[:, coord[0], coord[1]]
+                    x0 = np.exp(1j * np.angle(vec_refined[0]))
+                    vec_refined = np.multiply(vec_refined, np.conj(x0))
                     self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = 0
 
             phase_refined = np.angle(np.array(vec_refined)).reshape(self.n_image, 1, 1)
