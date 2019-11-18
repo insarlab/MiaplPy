@@ -551,16 +551,15 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                      dropIfgram=True)
 
         if self.template['minopy.interferograms.type'] == 'sequential':
-            Atransformation = np.tril(np.ones([num_date - 1, num_date - 1]))
-            for kk in range(pha_data.shape[0]):
-                pha_data[:, kk] = np.matmul(Atransformation, pha_data[:, kk])
+            Atransformation = np.tril(np.ones([num_date, num_date - 1]), -1)
+        else:
+            Atransformation = np.tril(np.ones([num_date, num_date - 1]), -1) - \
+                              np.tril(np.ones([num_date, num_date - 1]), -2)
 
-        mask_data = np.repeat(quality_map.reshape(1, -1), num_date - 1, axis=0)
+        pha_data = np.matmul(Atransformation, pha_data)
+
+        mask_data = quality_map.reshape(1, -1)
         pha_data = mask_unwrap_phase(pha_data, mask_data, mask_threshold=mask_threshold)
-
-        ph0 = pha_data.reshape(num_date - 1, num_row, num_col)
-        pha_data = np.zeros((num_date, num_row, num_col), np.float32)
-        pha_data[1::, :, :] = ph0[:, :, :]
 
         os.chdir(self.workDir)
 
@@ -568,6 +567,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         print('converting phase to range')
         phase2range = -1 * float(stack_obj.metadata['WAVELENGTH']) / (4. * np.pi)
         ts = pha_data * phase2range
+        ts = ts.reshape(num_date, num_row, num_col)
 
         ts_obj = timeseries(ts_file)
         ts_obj.write2hdf5(data=ts, dates=date_list, bperp=pbase, metadata=metadata)
@@ -700,8 +700,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 def mask_unwrap_phase(pha_data, msk_data, mask_threshold=0.5):
     # Read/Generate Mask
     msk_data[np.isnan(msk_data)] = 0
-    msk_data = msk_data >= float(mask_threshold)
-    pha_data[msk_data == 0.] = 0.
+    msk_data = 1 * (msk_data >= float(mask_threshold))
+    for ind in range(pha_data.shape[0]):
+        pha_data[ind, :] = msk_data * pha_data[ind, :]
     return pha_data
 
 ###########################################################################################

@@ -468,17 +468,18 @@ def plot_slice(ax, data, metadata, inps=None):
                 data -= data[y, x]
                 vprint(('referencing InSAR data to the pixel nearest to '
                         'GPS station: {} at {}').format(inps.ref_gps_site, ref_site_lalo))
-            # im = m.imshow(data, cmap=inps.colormap, origin='upper',
-            #              vmin=inps.vlim[0], vmax=inps.vlim[1],
-            #              alpha=inps.transparency, interpolation='nearest',
-            #              animated=inps.animation, zorder=1)
-            import pdb;
-            pdb.set_trace()
-
-            xx = x.reshape(-1, 1)
-            yy = y.reshape(-1, 1)
-            color = data[yy, xx].reshape(-1, 1)
-            im = m.scatter(xx, yy, c=color, cmap=inps.colormap, vmin=inps.vlim[0], vmax=inps.vlim[1], alpha=0.3, edgecolors='none')
+            latt = []
+            lonn = []
+            rr, cc = np.where(data.mask == False)
+            color = data.data[rr, cc]
+            for tind in range(len(rr)):
+                lonc, latc = coord.radar2geo(int(rr[tind]), int(cc[tind]))[0:2]
+                latt.append(latc)
+                lonn.append(lonc)
+            latt = np.array(latt)
+            lonn = np.array(lonn)
+            im = m.scatter(latt, lonn, c=color, cmap=inps.colormap, vmin=inps.vlim[0], vmax=inps.vlim[1], s=1,
+                           alpha=0.9, edgecolors='none')
 
 
             # Scale Bar
@@ -613,12 +614,14 @@ def plot_slice(ax, data, metadata, inps=None):
         vprint('plotting Data ...')
         extent = (inps.pix_box[0] - 0.5, inps.pix_box[2] - 0.5,
                   inps.pix_box[3] - 0.5, inps.pix_box[1] - 0.5)  # (left, right, bottom, top) in data coordinates
-        # im = ax.imshow(data, cmap=inps.colormap, vmin=inps.vlim[0], vmax=inps.vlim[1],
+        #im = ax.imshow(data, cmap=inps.colormap, vmin=inps.vlim[0], vmax=inps.vlim[1],
         #               extent=extent, alpha=inps.transparency, interpolation='nearest', zorder=1)
-        import pdb; pdb.set_trace()
 
-        im = ax.scatter(data, cmap=inps.colormap, vmin=inps.vlim[0], vmax=inps.vlim[1], extent=extent,
-                       alpha=0.3, edgecolors='none')
+        rr, cc = np.where(data.mask == False)
+        color = data.data[rr, cc]
+        import pdb; pdb.set_trace()
+        im = ax.scatter(cc, rr, c=color, cmap=inps.colormap, vmin=inps.vlim[0], vmax=inps.vlim[1],
+                       alpha=0.9, s=1, edgecolors='none')
 
         ax.tick_params(labelsize=inps.font_size)
 
