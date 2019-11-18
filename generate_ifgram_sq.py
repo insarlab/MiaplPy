@@ -170,7 +170,7 @@ def main(iargs=None):
         obj_int.renderVRT()
 
         filt_file = inps.ifg_dir + '/filt_fine.int'
-        filter_strength = 0.5
+        filter_strength = 0.1
 
         runFilter(output_int, filt_file, filter_strength)
 
