@@ -9,7 +9,7 @@ import os
 import numpy as np
 import cmath
 import datetime
-from numpy import linalg as LA
+from scipy import linalg as LA
 #from scipy import linalg as LA
 from scipy.optimize import minimize, Bounds
 from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
@@ -191,7 +191,7 @@ def gam_pta(ph_filt, vec_refined):
     :param vec_refined: refined complex vector after inversion
     """
     nm = np.shape(ph_filt)[0]
-    diagones = np.diag(np.diag(np.ones([nm, nm])))
+    diagones = np.diag(np.diag(np.ones([nm, nm])+1j))
     phi_mat = np.exp(1j * ph_filt)
     ph_refined = np.angle(vec_refined)
     g1 = np.exp(-1j * ph_refined).reshape(nm, 1)
@@ -200,6 +200,8 @@ def gam_pta(ph_filt, vec_refined):
     ifgram_diff = np.multiply(phi_mat, theta_mat)
     ifgram_diff = ifgram_diff - np.multiply(ifgram_diff, diagones)
     temp_coh = np.abs(np.sum(ifgram_diff) / (nm ** 2 - nm))
+
+    print(temp_coh)
 
     return temp_coh
 
@@ -250,7 +252,7 @@ def PTA_L_BFGS(coh0):
 
 def EVD_phase_estimation(coh0):
     """ Estimates the phase values based on eigen value decomosition """
-    eigen_value, eigen_vector = LA.eigh(coh0, UPLO='L')
+    eigen_value, eigen_vector = LA.eigh(coh0)
     vec = eigen_vector[:, -1].reshape(len(eigen_value), 1)
     x0 = np.exp(1j * np.angle(vec[0]))
     vec = np.multiply(vec, np.conj(x0))
@@ -264,7 +266,7 @@ def EMI_phase_estimation(coh0):
     abscoh = regularize_matrix(np.abs(coh0))
     if np.size(abscoh) == np.size(coh0):
         M = np.multiply(LA.pinv(abscoh), coh0)
-        eigen_value, eigen_vector = LA.eigh(M, UPLO='L')
+        eigen_value, eigen_vector = LA.eigh(M)
         vec = eigen_vector[:, 0].reshape(len(eigen_value), 1)
         x0 = np.exp(1j * np.angle(vec[0]))
         vec = np.multiply(vec, np.conj(x0))

@@ -57,7 +57,7 @@ class PhaseLink:
         self.length = count_dim[1]
         self.width = count_dim[2]
 
-        self.distance_thresh = mnp.ks_lut(self.n_image, self.n_image, alpha=0.05)
+        self.distance_thresh = mnp.ks_lut(self.n_image, self.n_image, alpha=0.1)
 
         success = False
         while success is False:

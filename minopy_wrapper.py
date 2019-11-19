@@ -8,14 +8,15 @@ import time
 import datetime
 import shutil
 import numpy as np
-import gdal
+import warnings
 import glob
 import h5py
+from scipy import linalg
 import mintpy
 from mintpy.utils import writefile, readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from mintpy.objects import timeseries, ifgramStack
-from mintpy.ifgram_inversion import read_unwrap_phase, mask_unwrap_phase
+from mintpy.ifgram_inversion import read_unwrap_phase, mask_unwrap_phase, split2boxes, write2hdf5_auxFiles
 import minopy
 import minopy.workflow
 import minopy.submit_jobs as js
@@ -39,8 +40,8 @@ STEP_LIST = [
     'modify_network',
     'reference_point',
     'correct_unwrap_error',
-    'write_to_timeseries',
     'stack_interferograms',
+    'write_to_timeseries',
     'correct_LOD',
     'correct_troposphere',
     'deramp',
@@ -291,9 +292,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         scp_args = '--workDir {} --rangeWin {} --azimuthWin {} --patchSize {}'.\
             format(self.workDir,
-                   int(self.template['minopy.range_window']),
-                   int(self.template['minopy.azimuth_window']),
-                   int(self.template['minopy.patch_size']))
+                   int(self.template['mintpy.inversion.range_window']),
+                   int(self.template['mintpy.inversion.azimuth_window']),
+                   int(self.template['mintpy.inversion.patch_size']))
         print('create_patch.py ', scp_args)
         minopy.create_patch.main(scp_args.split())
 
@@ -309,12 +310,13 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_minopy_inversion = os.path.join(self.run_dir, 'run_minopy_inversion')
         with open(run_minopy_inversion, 'w') as f:
             for item in patch_list:
-                scp_srgs = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5}\n'.format(a0=self.workDir,
-                                                                                      a1=self.template['minopy.range_window'],
-                                                                                      a2=self.template['minopy.azimuth_window'],
-                                                                                      a3=self.template['minopy.plmethod'],
-                                                                                      a4=self.template['minopy.shp_test'],
-                                                                                      a5=item.split('/')[-1])
+                scp_srgs = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5}\n'.format(
+                    a0=self.workDir,
+                    a1=self.template['mintpy.inversion.range_window '],
+                    a2=self.template['mintpy.inversion.azimuth_window'],
+                    a3=self.template['mintpy.inversion.plmethod'],
+                    a4=self.template['mintpy.inversion.shp_test'],
+                    a5=item.split('/')[-1])
                 command = 'patch_inversion.py ' + scp_srgs
                 f.write(command)
 
@@ -334,7 +336,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         slcObj.open(print_msg=False)
         date_list = slcObj.get_date_list()
 
-        if self.template['minopy.interferograms.type'] == 'sequential':
+        if self.template['mintpy.interferograms.type'] == 'sequential':
             master_ind = True
         else:
             master_ind = False
@@ -378,7 +380,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         slcObj.open(print_msg=False)
         date_list = slcObj.get_date_list()
 
-        if self.template['minopy.interferograms.type'] == 'sequential':
+        if self.template['mintpy.interferograms.type'] == 'sequential':
             master_ind = True
         else:
             master_ind = False
@@ -519,75 +521,142 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         stack_obj = ifgramStack(ifgram_file)
         stack_obj.open(print_msg=False)
-        pbase = stack_obj.get_perp_baseline_timeseries(dropIfgram=True)
-        date_list = stack_obj.get_date_list(dropIfgram=True)
+
+        date12_list = stack_obj.get_date12_list(dropIfgram=True)
+        A = stack_obj.get_design_matrix4timeseries(date12_list=date12_list)[0]
+
+        pbase = stack_obj.get_perp_baseline_timeseries(dropIfgram=False)
+        date_list = stack_obj.get_date_list(dropIfgram=False)
+        length, width = stack_obj.length, stack_obj.width
         num_date = len(date_list)
+        num_ifgram = num_date - 1
+
+        '''
+        if self.template['mintpy.interferograms.type'] == 'sequential':
+            Atransformation = np.tril(np.ones([num_date, num_ifgram]), -1)
+        else:
+            Atransformation = np.tril(np.ones([num_date, num_ifgram]), -1) - \
+                              np.tril(np.ones([num_date, num_ifgram]), -2)
+        '''
+
+        box_list = split2boxes(dataset_shape=stack_obj.get_size(), chunk_size=100e6)
+        num_box = len(box_list)
+
+        unwDatasetName = [i for i in ['unwrapPhase_bridging', 'unwrapPhase'] if i in stack_obj.datasetNames][0]
+        mask_dataset_name = self.template['mintpy.networkInversion.maskDataset']
+        mask_threshold = float(self.template['mintpy.networkInversion.maskThreshold'])
+
+        ref_phase = stack_obj.get_reference_phase(unwDatasetName=unwDatasetName,
+                                                  skip_reference=True,
+                                                  dropIfgram=False)
 
         # File 1 - timeseries.h5
-        suffix = ''
-        ts_file = '{}{}.h5'.format(suffix, os.path.splitext(inps.outfile[0])[0])
+
         metadata = dict(stack_obj.metadata)
         metadata['REF_DATE'] = date_list[0]
         metadata['FILE_TYPE'] = 'timeseries'
         metadata['UNIT'] = 'm'
 
-        num_row = stack_obj.length
-        num_col = stack_obj.width
+        suffix = ''
+        ts_file = '{}{}.h5'.format(suffix, os.path.splitext(inps.outfile[0])[0])
+        ts_obj = timeseries(ts_file)
 
-        box = None
-        ref_phase = stack_obj.get_reference_phase(dropIfgram=False)
+        # A dictionary of the datasets which we like to have in the timeseries
+        dsNameDict = {
+            "date": (np.dtype('S8'), (num_date,)),
+            "bperp": (np.float32, (num_date,)),
+            "timeseries": (np.float32, (num_date, length, width)),
+        }
 
-        unwDatasetName = [i for i in ['unwrapPhase_bridging', 'unwrapPhase'] if i in stack_obj.datasetNames][0]
+        # layout the HDF5 file for the datasets and the metadata
+        ts_obj.layout_hdf5(dsNameDict, metadata)
+
+        phase2range = -1 * float(metadata['WAVELENGTH']) / (4. * np.pi)
+
+        gfilename = os.path.join(self.workDir, 'avgSpatialCoh.h5')
+        f = h5py.File(gfilename, 'r')
+        spatial_coh = f['coherence'][:, :]
+        f.close()
+
+        for i in range(num_box):
+            box = box_list[i]
+            num_row = box[3] - box[1]
+            num_col = box[2] - box[0]
+            num_pixel = num_row * num_col
+
+            mask_spCoh = (spatial_coh[box[1]:box[3], box[0]:box[2]] >= mask_threshold).reshape(num_pixel,)
+
+            if num_box > 1:
+                print('\n------- Processing Patch {} out of {} --------------'.format(i + 1, num_box))
+
+                # Read/Mask unwrapPhase
+                pha_data = read_unwrap_phase(stack_obj,
+                                             box,
+                                             ref_phase,
+                                             unwDatasetName=unwDatasetName,
+                                             dropIfgram=True)
+
+                pha_data = mask_unwrap_phase(pha_data,
+                                             stack_obj,
+                                             box,
+                                             dropIfgram=True,
+                                             mask_ds_name=mask_dataset_name,
+                                             mask_threshold=mask_threshold)
+
+                # Mask for pixels to invert
+                mask = np.ones(num_pixel, np.bool_)
+
+                # Mask for Zero Phase in ALL ifgrams
+                print('skip pixels with zero/nan value in all interferograms')
+                with warnings.catch_warnings():
+                    # ignore warning message for all-NaN slices
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    phase_stack = np.nanmean(pha_data, axis=0)
+                mask *= np.multiply(~np.isnan(phase_stack), phase_stack != 0.)
+                del phase_stack
+
+                ts = np.zeros((num_date, num_pixel), np.float32)
+                num_pixel2inv = int(np.sum(mask))
+                idx_pixel2inv = np.where(mask)[0]
+
+                if num_pixel2inv < 1:
+                    ts = ts.reshape(num_date, num_row, num_col)
+                else:
+
+                    # Mask for Non-Zero Phase in ALL ifgrams (share one B in sbas inversion)
+                    mask_all_net = np.all(pha_data, axis=0)
+                    mask_all_net *= mask
+                    mask_all_net *= mask_spCoh
+                    idx_pixel2inv = np.where(mask_all_net)[0]
+
+                    if np.sum(mask_all_net) > 0:
+                        tsi = linalg.lstsq(A, pha_data[:, mask_all_net], cond=1e-5)[0]
+
+            ts[1:, idx_pixel2inv] = tsi
+            ts = ts.reshape(num_date, num_row, num_col)
+
+            print('converting phase to range')
+            ts *= phase2range
+            block = [0, num_date, box[1], box[3], box[0], box[2]]
+            ts_obj.write2hdf5_block(ts, datasetName='timeseries', block=block)
+
+        print('-' * 50)
+        date_list_utf8 = [dt.encode('utf-8') for dt in date_list]
+        ts_obj.write2hdf5_block(date_list_utf8, datasetName='date')
+        ts_obj.write2hdf5_block(pbase, datasetName='bperp')
+
         gfilename = os.path.join(self.workDir, 'inputs/geometryRadar.h5')
         f = h5py.File(gfilename, 'r')
-        quality_map = f['quality'][:, :]
+        temp_coh = f['quality'][:, :]
+        f.close()
 
-        mask_threshold = float(self.template['mintpy.networkInversion.minTempCoh'])
+        # reference pixel
+        ref_y = int(stack_obj.metadata['REF_Y'])
+        ref_x = int(stack_obj.metadata['REF_X'])
+        temp_coh[ref_y, ref_x] = 1.
 
-        pha_data = read_unwrap_phase(stack_obj,
-                                     box,
-                                     ref_phase,
-                                     unwDatasetName=unwDatasetName,
-                                     dropIfgram=True)
-
-        if self.template['minopy.interferograms.type'] == 'sequential':
-            Atransformation = np.tril(np.ones([num_date, num_date - 1]), -1)
-        else:
-            Atransformation = np.tril(np.ones([num_date, num_date - 1]), -1) - \
-                              np.tril(np.ones([num_date, num_date - 1]), -2)
-
-        pha_data = np.matmul(Atransformation, pha_data)
-
-        mask_data = quality_map.reshape(1, -1)
-        pha_data = mask_unwrap_phase(pha_data, mask_data, mask_threshold=mask_threshold)
-
-        os.chdir(self.workDir)
-
-        print('-' * 50)
-        print('converting phase to range')
-        phase2range = -1 * float(stack_obj.metadata['WAVELENGTH']) / (4. * np.pi)
-        ts = pha_data * phase2range
-        ts = ts.reshape(num_date, num_row, num_col)
-
-        ts_obj = timeseries(ts_file)
-        ts_obj.write2hdf5(data=ts, dates=date_list, bperp=pbase, metadata=metadata)
-
-        # File 2 - temporalCoherence.h5
-        out_file = '{}{}.h5'.format(suffix, os.path.splitext(inps.outfile[1])[0])
-        metadata['FILE_TYPE'] = 'temporalCoherence'
-        metadata['UNIT'] = '1'
-        print('-' * 50)
-        writefile.write(quality_map, out_file=out_file, metadata=metadata)
-
-        # File 3 - numInvIfgram.h5
-        out_file = 'numInvIfgram{}.h5'.format(suffix)
-        metadata['FILE_TYPE'] = 'mask'
-        metadata['UNIT'] = '1'
-        print('-' * 50)
-        num_inv_ifg = np.zeros((num_row, num_col), np.int16) + num_date - 1
-        writefile.write(num_inv_ifg, out_file=out_file, metadata=metadata)
-
-        self.get_phase_linking_coherence_mask()
+        num_inv_ifg = np.zeros((length, width), np.int16) + num_ifgram
+        write2hdf5_auxFiles(metadata, temp_coh, num_inv_ifg, suffix='', inps=inps)
 
         return
 
@@ -638,14 +707,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
                 super().run_unwrap_error_correction(sname)
 
-            elif sname == 'write_to_timeseries':
-                self.write_to_timeseries(sname)
-
             elif sname == 'stack_interferograms':
                 super().run_ifgram_stacking(sname)
 
-            elif sname == 'invert_network':
-                super().run_network_inversion(sname)
+            elif sname == 'write_to_timeseries':
+                self.write_to_timeseries(sname)
 
             elif sname == 'correct_LOD':
                 super().run_local_oscillator_drift_correction(sname)
@@ -696,7 +762,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         print(msg)
         return
 
-
+'''
 def mask_unwrap_phase(pha_data, msk_data, mask_threshold=0.5):
     # Read/Generate Mask
     msk_data[np.isnan(msk_data)] = 0
@@ -704,7 +770,7 @@ def mask_unwrap_phase(pha_data, msk_data, mask_threshold=0.5):
     for ind in range(pha_data.shape[0]):
         pha_data[ind, :] = msk_data * pha_data[ind, :]
     return pha_data
-
+'''
 ###########################################################################################
 
 
