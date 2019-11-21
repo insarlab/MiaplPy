@@ -119,8 +119,8 @@ class MinopyRun(object):
             configObj.work_dir = self.work_dir
             configObj.ifgDir = os.path.join(self.ifgram_dir, '{}_{}'.format(ifg[0], ifg[1]))
             configObj.ifgIndex = str(pairs.index(ifg))
-            configObj.rangeWindow = inps.template['minopy.range_window']
-            configObj.azimuthWindow = inps.template['minopy.azimuth_window']
+            configObj.rangeWindow = inps.template['mintpy.inversion.range_window']
+            configObj.azimuthWindow = inps.template['mintpy.inversion.azimuth_window']
             configObj.acq_num = str(len(pairs) + 1)
             configObj.rangeLooks = inps.template['topsStack.rangeLooks']
             configObj.azimuthLooks = inps.template['topsStack.azimuthLooks']
@@ -136,12 +136,12 @@ class MinopyRun(object):
         configObj.work_dir = self.work_dir
         configObj.ifgDir = os.path.join(self.work_dir, 'inputs')
         configObj.ifgIndex = str(0)
-        configObj.rangeWindow = inps.template['minopy.range_window']
-        configObj.azimuthWindow = inps.template['minopy.azimuth_window']
+        configObj.rangeWindow = inps.template['mintpy.inversion.range_window']
+        configObj.azimuthWindow = inps.template['mintpy.inversion.azimuth_window']
         configObj.acq_num = str(len(pairs) + 1)
         configObj.rangeLooks = inps.template['topsStack.rangeLooks']
         configObj.azimuthLooks = inps.template['topsStack.azimuthLooks']
-        configObj.plmethod = inps.template['minopy.plmethod']
+        configObj.plmethod = inps.template['mintpy.inversion.plmethod']
         configObj.generate_igram('[Function-1]')
         configObj.finalize()
         if inps.template['topsStack.textCmd'] is None or inps.template['topsStack.textCmd'] == 'None':

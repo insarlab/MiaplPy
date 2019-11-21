@@ -305,14 +305,14 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """
         if not os.path.exists(self.run_dir):
             os.mkdir(self.run_dir)
-
         patch_list = glob.glob(self.patch_dir + '/patch*')
         run_minopy_inversion = os.path.join(self.run_dir, 'run_minopy_inversion')
+
         with open(run_minopy_inversion, 'w') as f:
             for item in patch_list:
                 scp_srgs = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5}\n'.format(
                     a0=self.workDir,
-                    a1=self.template['mintpy.inversion.range_window '],
+                    a1=self.template['mintpy.inversion.range_window'],
                     a2=self.template['mintpy.inversion.azimuth_window'],
                     a3=self.template['mintpy.inversion.plmethod'],
                     a4=self.template['mintpy.inversion.shp_test'],
