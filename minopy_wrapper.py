@@ -531,14 +531,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         num_date = len(date_list)
         num_ifgram = num_date - 1
 
-        '''
-        if self.template['mintpy.interferograms.type'] == 'sequential':
-            Atransformation = np.tril(np.ones([num_date, num_ifgram]), -1)
-        else:
-            Atransformation = np.tril(np.ones([num_date, num_ifgram]), -1) - \
-                              np.tril(np.ones([num_date, num_ifgram]), -2)
-        '''
-
         box_list = split2boxes(dataset_shape=stack_obj.get_size(), chunk_size=100e6)
         num_box = len(box_list)
 
@@ -578,13 +570,22 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         spatial_coh = f['coherence'][:, :]
         f.close()
 
+        gfilename = os.path.join(self.workDir, 'inputs/geometryRadar.h5')
+        f = h5py.File(gfilename, 'r')
+        temp_coh = f['quality'][:, :]
+        f.close()
+        mask_spCoh = (spatial_coh >= mask_threshold)
+        temp_coh *= mask_spCoh
+
+        threshold_tempCoh = float(self.template['mintpy.networkInversion.minTempCoh'])
+
         for i in range(num_box):
             box = box_list[i]
             num_row = box[3] - box[1]
             num_col = box[2] - box[0]
             num_pixel = num_row * num_col
 
-            mask_spCoh = (spatial_coh[box[1]:box[3], box[0]:box[2]] >= mask_threshold).reshape(num_pixel,)
+            mask_Coh = (temp_coh[box[1]:box[3], box[0]:box[2]] >= threshold_tempCoh).reshape(num_pixel,)
 
             if num_box > 1:
                 print('\n------- Processing Patch {} out of {} --------------'.format(i + 1, num_box))
@@ -626,7 +627,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                     # Mask for Non-Zero Phase in ALL ifgrams (share one B in sbas inversion)
                     mask_all_net = np.all(pha_data, axis=0)
                     mask_all_net *= mask
-                    mask_all_net *= mask_spCoh
+                    mask_all_net *= mask_Coh
                     idx_pixel2inv = np.where(mask_all_net)[0]
 
                     if np.sum(mask_all_net) > 0:
@@ -645,11 +646,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         ts_obj.write2hdf5_block(date_list_utf8, datasetName='date')
         ts_obj.write2hdf5_block(pbase, datasetName='bperp')
 
-        gfilename = os.path.join(self.workDir, 'inputs/geometryRadar.h5')
-        f = h5py.File(gfilename, 'r')
-        temp_coh = f['quality'][:, :]
-        f.close()
-
         # reference pixel
         ref_y = int(stack_obj.metadata['REF_Y'])
         ref_x = int(stack_obj.metadata['REF_X'])
@@ -657,6 +653,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         num_inv_ifg = np.zeros((length, width), np.int16) + num_ifgram
         write2hdf5_auxFiles(metadata, temp_coh, num_inv_ifg, suffix='', inps=inps)
+
+        self.get_phase_linking_coherence_mask()
 
         return
 

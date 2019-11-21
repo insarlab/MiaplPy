@@ -57,7 +57,7 @@ class PhaseLink:
         self.length = count_dim[1]
         self.width = count_dim[2]
 
-        self.distance_thresh = mnp.ks_lut(self.n_image, self.n_image, alpha=0.1)
+        self.distance_thresh = mnp.ks_lut(self.n_image, self.n_image, alpha=0.05)
 
         success = False
         while success is False:
@@ -205,22 +205,10 @@ class PhaseLink:
                     vec_refined = mnp.sequential_phase_linking(CCG, self.phase_linking_method, num_stack=100)
                 else:
                     vec_refined = mnp.phase_linking_process(coh_mat, 0, self.phase_linking_method, squeez=False)
-
-                self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat), vec_refined)
-
             else:
-                status = mnp.test_PS(coh_mat)
-                if status:
-                    # vec_refined = self.rslc[:, coord[0], coord[1]]
-                    vec_refined = mnp.phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
-                    self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat),
-                                                                                             vec_refined)
-                else:
-                    vec_refined = self.rslc[:, coord[0], coord[1]]
-                    x0 = np.exp(1j * np.angle(vec_refined[0]))
-                    vec_refined = np.multiply(vec_refined, np.conj(x0))
-                    self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = 0
+                vec_refined = mnp.test_PS(coh_mat)
 
+            self.quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mnp.gam_pta(np.angle(coh_mat), vec_refined)
             phase_refined = np.angle(np.array(vec_refined)).reshape(self.n_image, 1, 1)
             amp_refined = np.array(np.mean(np.abs(CCG), axis=1)).reshape(self.n_image, 1, 1)
 

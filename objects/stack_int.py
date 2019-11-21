@@ -164,8 +164,8 @@ class MinopyRun(object):
             configObj.master = os.path.join(self.work_dir, 'inputs/master')
             configObj.defoMax = defoMax
             configObj.unwMethod = inps.template['topsStack.unwMethod']
-            configObj.rangeLooks = inps.template['topsStack.rangeLooks']
-            configObj.azimuthLooks = inps.template['topsStack.azimuthLooks']
+            configObj.rangeLooks = '1'      # inps.template['topsStack.rangeLooks']
+            configObj.azimuthLooks = '1'    # inps.template['topsStack.azimuthLooks']
             configObj.unwrap('[Function-1]')
             configObj.finalize()
             if inps.template['topsStack.textCmd'] is None or inps.template['topsStack.textCmd'] == 'None':

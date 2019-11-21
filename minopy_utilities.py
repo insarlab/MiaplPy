@@ -10,11 +10,9 @@ import numpy as np
 import cmath
 import datetime
 from scipy import linalg as LA
-#from scipy import linalg as LA
 from scipy.optimize import minimize, Bounds
-from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
+from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind, median_absolute_deviation
 import gdal
-import pandas as pd
 import isce
 import isceobj
 import matplotlib.pyplot as plt
@@ -282,18 +280,21 @@ def test_PS(coh_mat):
     """ checks if the pixel is PS """
 
     Eigen_value, Eigen_vector = LA.eigh(coh_mat)
-    med_w = np.median(Eigen_value)
-    MAD = np.median(np.absolute(Eigen_value - med_w))
+    norm_eigenvalues = Eigen_value*100/np.sum(Eigen_value)
+    indx = np.where(norm_eigenvalues > 25)[0]
 
-    thold1 = np.abs(med_w + 3.5*MAD)
-    thold2 = np.abs(med_w - 3.5*MAD)
-    treshhold = np.max([thold1, thold2])
-    status = len(np.where(np.abs(Eigen_value) > treshhold))
-
-    if status > 0:
-        return True
+    if len(indx) >= 1:
+        msk = (norm_eigenvalues <= 25)
+        Eigen_value[msk] = 0.
+        CM = np.dot(Eigen_vector, np.dot(np.diag(np.sqrt(Eigen_value)), np.matrix.getH(Eigen_vector)))
+        vec = EMI_phase_estimation(CM)
     else:
-        return False
+        vec = EMI_phase_estimation(coh_mat)
+
+    x0 = np.exp(1j * np.angle(vec[0]))
+    vec = np.multiply(vec, np.conj(x0))
+
+    return vec
 
 ###############################################################################
 
