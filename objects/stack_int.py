@@ -111,7 +111,7 @@ class MinopyRun(object):
 
         self.runf = open(self.run_outname, 'w')
 
-    def generateIfg(self, inps, pairs):
+    def generateIfg(self, inps, pairs, n_image):
         for ifg in pairs:
             configName = os.path.join(self.config_path, 'config_generate_ifgram_{}_{}'.format(ifg[0], ifg[1]))
             configObj = MinopyConfig(self.config_path, configName)
@@ -121,7 +121,7 @@ class MinopyRun(object):
             configObj.ifgIndex = str(pairs.index(ifg))
             configObj.rangeWindow = inps.template['mintpy.inversion.range_window']
             configObj.azimuthWindow = inps.template['mintpy.inversion.azimuth_window']
-            configObj.acq_num = str(len(pairs) + 1)
+            configObj.acq_num = str(n_image)
             configObj.rangeLooks = inps.template['topsStack.rangeLooks']
             configObj.azimuthLooks = inps.template['topsStack.azimuthLooks']
             configObj.generate_igram('[Function-1]')
@@ -138,7 +138,7 @@ class MinopyRun(object):
         configObj.ifgIndex = str(0)
         configObj.rangeWindow = inps.template['mintpy.inversion.range_window']
         configObj.azimuthWindow = inps.template['mintpy.inversion.azimuth_window']
-        configObj.acq_num = str(len(pairs) + 1)
+        configObj.acq_num = str(n_image)
         configObj.rangeLooks = inps.template['topsStack.rangeLooks']
         configObj.azimuthLooks = inps.template['topsStack.azimuthLooks']
         configObj.plmethod = inps.template['mintpy.inversion.plmethod']
@@ -164,8 +164,8 @@ class MinopyRun(object):
             configObj.master = os.path.join(self.work_dir, 'inputs/master')
             configObj.defoMax = defoMax
             configObj.unwMethod = inps.template['topsStack.unwMethod']
-            configObj.rangeLooks = '1'      # inps.template['topsStack.rangeLooks']
-            configObj.azimuthLooks = '1'    # inps.template['topsStack.azimuthLooks']
+            configObj.rangeLooks = inps.template['mintpy.inversion.range_window']
+            configObj.azimuthLooks = inps.template['mintpy.inversion.azimuth_window']
             configObj.unwrap('[Function-1]')
             configObj.finalize()
             if inps.template['topsStack.textCmd'] is None or inps.template['topsStack.textCmd'] == 'None':

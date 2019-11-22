@@ -336,17 +336,27 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         slcObj.open(print_msg=False)
         date_list = slcObj.get_date_list()
 
-        if self.template['mintpy.interferograms.type'] == 'sequential':
-            master_ind = True
+        if self.template['mintpy.interferograms.masterDate']:
+            master_date = self.template['mintpy.interferograms.masterDate']
         else:
+            master_date = date_list[0]
+
+        if self.template['mintpy.interferograms.type'] == 'sequential':
             master_ind = False
+        else:
+            master_ind = date_list.index(master_date)
 
         pairs = []
-        for i in range(1, len(date_list)):
+        for i in range(0, len(date_list)):
             if master_ind:
-                pairs.append((date_list[i - 1], date_list[i]))
+                if not master_ind == i:
+                    pairs.append((date_list[master_ind], date_list[i]))
             else:
-                pairs.append((date_list[0], date_list[i]))
+                if not i == 0:
+                    pairs.append((date_list[i - 1], date_list[i]))
+
+        # if master_ind is False:
+        #    pairs.append((date_list[0], date_list[-1]))
 
         inps = self.inps
         inps.run_dir = self.run_dir
@@ -356,7 +366,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         runObj = MinopyRun()
         runObj.configure(inps, 'run_interferograms')
-        runObj.generateIfg(inps, pairs)
+        runObj.generateIfg(inps, pairs, len(date_list))
         runObj.finalize()
 
         os.system('chmod +x {}'.format(self.workDir+'/configs/*'))
@@ -380,17 +390,27 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         slcObj.open(print_msg=False)
         date_list = slcObj.get_date_list()
 
-        if self.template['mintpy.interferograms.type'] == 'sequential':
-            master_ind = True
+        if self.template['mintpy.interferograms.masterDate']:
+            master_date = self.template['mintpy.interferograms.masterDate']
         else:
+            master_date = date_list[0]
+
+        if self.template['mintpy.interferograms.type'] == 'sequential':
             master_ind = False
+        else:
+            master_ind = date_list.index(master_date)
 
         pairs = []
-        for i in range(1, len(date_list)):
+        for i in range(0, len(date_list)):
             if master_ind:
-                pairs.append((date_list[i - 1], date_list[i]))
+                if not master_ind == i:
+                    pairs.append((date_list[master_ind], date_list[i]))
             else:
-                pairs.append((date_list[0], date_list[i]))
+                if not i == 0:
+                    pairs.append((date_list[i - 1], date_list[i]))
+
+        # if master_ind is False:
+        #    pairs.append((date_list[0], date_list[-1]))
 
         inps = self.inps
         inps.run_dir = self.run_dir
@@ -523,13 +543,24 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         stack_obj.open(print_msg=False)
 
         date12_list = stack_obj.get_date12_list(dropIfgram=True)
-        A = stack_obj.get_design_matrix4timeseries(date12_list=date12_list)[0]
 
         pbase = stack_obj.get_perp_baseline_timeseries(dropIfgram=False)
         date_list = stack_obj.get_date_list(dropIfgram=False)
         length, width = stack_obj.length, stack_obj.width
         num_date = len(date_list)
         num_ifgram = num_date - 1
+
+        if self.template['mintpy.interferograms.masterDate']:
+            master_date = self.template['mintpy.interferograms.masterDate']
+        else:
+            master_date = date_list[0]
+
+        if self.template['mintpy.interferograms.type'] == 'sequential':
+            master_ind = False
+        else:
+            master_ind = date_list.index(master_date)
+
+        A = stack_obj.get_design_matrix4timeseries(date12_list=date12_list, refDate=master_date)[0]
 
         box_list = split2boxes(dataset_shape=stack_obj.get_size(), chunk_size=100e6)
         num_box = len(box_list)
@@ -633,7 +664,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                     if np.sum(mask_all_net) > 0:
                         tsi = linalg.lstsq(A, pha_data[:, mask_all_net], cond=1e-5)[0]
 
-            ts[1:, idx_pixel2inv] = tsi
+            ts[0:master_ind, idx_pixel2inv] = tsi[0:master_ind, :]
+            ts[master_ind + 1::, idx_pixel2inv] = tsi[master_ind::, :]
             ts = ts.reshape(num_date, num_row, num_col)
 
             print('converting phase to range')
