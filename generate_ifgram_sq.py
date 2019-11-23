@@ -31,6 +31,7 @@ def main(iargs=None):
     slcObj = slcStack(slc_file)
     slcObj.open(print_msg=False)
     date_list = slcObj.get_date_list()
+    n_image = len(date_list)
 
     patch_list = glob.glob(inps.work_dir+'/patches/patch*')
     patch_list = list(map(lambda x: x.split('/')[-1], patch_list))
@@ -69,13 +70,14 @@ def main(iargs=None):
     n_line = last_row - first_row
     width = last_col - first_col
 
+    Quality = np.zeros([n_line, width])
+
     if 'inputs' in inps.ifg_dir:
 
         if not os.path.isdir(inps.ifg_dir):
             os.mkdir(inps.ifg_dir)
 
         output_geo = inps.ifg_dir + '/geometryRadar.h5'
-        Quality = np.zeros([n_line, width])
         SHP = np.zeros([n_line, width])
 
         doq = True
@@ -109,10 +111,11 @@ def main(iargs=None):
         f_col = col1 - patch_cols[0, 0, col]
         l_col = col2 - patch_cols[0, 0, col]
 
+        qlty = np.memmap(inps.work_dir + '/patches/' + patch + '/quality',
+                         dtype=np.float32, mode='r', shape=(patch_lines, patch_samples))
+        Quality[row1:row2 + 1, col1:col2 + 1] = qlty[f_row:l_row + 1, f_col:l_col + 1]
+
         if doq:
-            qlty = np.memmap(inps.work_dir + '/patches/' + patch + '/quality',
-                             dtype=np.float32, mode='r', shape=(patch_lines, patch_samples))
-            Quality[row1:row2 + 1, col1:col2 + 1] = qlty[f_row:l_row + 1, f_col:l_col + 1]
 
             shp_p = np.memmap(inps.work_dir + '/patches/' + patch + '/shp',
                              dtype='byte', mode='r', shape=(range_win*azimuth_win, patch_lines, patch_samples))
@@ -122,7 +125,7 @@ def main(iargs=None):
         else:
 
             rslc_patch = np.memmap(inps.work_dir + '/patches/' + patch + '/rslc_ref',
-                               dtype=np.complex64, mode='r', shape=(np.int(inps.n_image), patch_lines, patch_samples))
+                               dtype=np.complex64, mode='r', shape=(np.int(n_image), patch_lines, patch_samples))
             ifg_patch = np.zeros([patch_lines, patch_samples])+0j
 
             master = rslc_patch[master_ind, :, :]
@@ -158,6 +161,9 @@ def main(iargs=None):
         f.close()
 
     else:
+
+        mask = 1 * (Quality >= 0.3)
+        ifg[:, :] = np.ma.masked_array(ifg, mask=mask)
 
         ifg = None
 

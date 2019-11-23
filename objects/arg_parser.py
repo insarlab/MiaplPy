@@ -269,17 +269,10 @@ class MinoPyParser:
                             help='minopy directory (inversion results)')
         parser.add_argument('-i', '--ifgDir', dest='ifg_dir', type=str, required=True,
                             help='interferogram directory')
-        parser.add_argument('-x', '--ifgIndex', dest='ifg_index', type=str, required=True,
-                            help='interferogram index in 3D array (inversion results)')
         parser.add_argument('-r', '--rangeWindow', dest='range_win', type=str, default='15'
                             , help='SHP searching window size in range direction. -- Default : 15')
         parser.add_argument('-a', '--azimuthWindow', dest='azimuth_win', type=str, default='15'
                             , help='SHP searching window size in azimuth direction. -- Default : 15')
-        parser.add_argument('-q', '--acquisitionNumber', dest='n_image', type=str, default='20',
-                            help='number of images acquired')
-        parser.add_argument('-A', '--azimuthLooks', type=str, dest='azimuth_looks', default='3', help='azimuth looks')
-        parser.add_argument('-R', '--rangeLooks', type=str, dest='range_looks', default='9', help='range looks')
-
         return parser
 
     def minopy_wrapper_parser(self):

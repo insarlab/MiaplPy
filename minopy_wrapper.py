@@ -484,6 +484,22 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             raise RuntimeError(msg)
         return
 
+
+    def run_reference_point(self, step_name):
+        """Select reference point.
+        It 1) generate mask file from common conn comp
+           2) generate average spatial coherence and its mask
+           3) add REF_X/Y and/or REF_LAT/LON attribute to stack file
+        """
+        stack_file = ut.check_loaded_dataset(self.workDir, print_msg=False)[1]
+        coh_file = 'avgSpatialCoh.h5'
+
+        scp_args = '{} -t {} -c {} --method maxCoherence'.format(stack_file, self.templateFile, coh_file)
+        print('reference_point.py', scp_args)
+        mintpy.reference_point.main(scp_args.split())
+        return
+
+
     def get_phase_linking_coherence_mask(self):
         """Generate reliable pixel mask from temporal coherence"""
 
@@ -596,17 +612,17 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         phase2range = -1 * float(metadata['WAVELENGTH']) / (4. * np.pi)
 
-        gfilename = os.path.join(self.workDir, 'avgSpatialCoh.h5')
-        f = h5py.File(gfilename, 'r')
-        spatial_coh = f['coherence'][:, :]
-        f.close()
+        #gfilename = os.path.join(self.workDir, 'avgSpatialCoh.h5')
+        #f = h5py.File(gfilename, 'r')
+        #spatial_coh = f['coherence'][:, :]
+        #f.close()
 
         gfilename = os.path.join(self.workDir, 'inputs/geometryRadar.h5')
         f = h5py.File(gfilename, 'r')
         temp_coh = f['quality'][:, :]
         f.close()
-        mask_spCoh = (spatial_coh >= mask_threshold)
-        temp_coh *= mask_spCoh
+        #mask_spCoh = (spatial_coh >= mask_threshold)
+        #temp_coh *= mask_spCoh
 
         threshold_tempCoh = float(self.template['mintpy.networkInversion.minTempCoh'])
 
@@ -616,7 +632,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             num_col = box[2] - box[0]
             num_pixel = num_row * num_col
 
-            mask_Coh = (temp_coh[box[1]:box[3], box[0]:box[2]] >= threshold_tempCoh).reshape(num_pixel,)
+            #mask_Coh = (temp_coh[box[1]:box[3], box[0]:box[2]] >= threshold_tempCoh).reshape(num_pixel,)
 
             if num_box > 1:
                 print('\n------- Processing Patch {} out of {} --------------'.format(i + 1, num_box))
@@ -658,7 +674,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                     # Mask for Non-Zero Phase in ALL ifgrams (share one B in sbas inversion)
                     mask_all_net = np.all(pha_data, axis=0)
                     mask_all_net *= mask
-                    mask_all_net *= mask_Coh
+                    #mask_all_net *= mask_Coh
                     idx_pixel2inv = np.where(mask_all_net)[0]
 
                     if np.sum(mask_all_net) > 0:
@@ -723,7 +739,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                     f.attrs['mintpy.reference.lalo'] = self.template['mintpy.reference.lalo']
                 f.close()
 
-                super().run_reference_point(sname)
+                self.run_reference_point(sname)
 
             elif sname == 'correct_unwrap_error':
 
@@ -792,15 +808,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         print(msg)
         return
 
-'''
-def mask_unwrap_phase(pha_data, msk_data, mask_threshold=0.5):
-    # Read/Generate Mask
-    msk_data[np.isnan(msk_data)] = 0
-    msk_data = 1 * (msk_data >= float(mask_threshold))
-    for ind in range(pha_data.shape[0]):
-        pha_data[ind, :] = msk_data * pha_data[ind, :]
-    return pha_data
-'''
+
 ###########################################################################################
 
 

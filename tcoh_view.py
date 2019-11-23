@@ -163,7 +163,7 @@ class CoherenceViewer(tsview.timeseriesViewer):
         self.length = self.rslc.shape[1]
         self.width = self.rslc.shape[2]
         self.n_image = self.rslc.shape[0]
-        self.num_slc = 20 #self.n_image
+        self.num_slc = self.n_image
 
         return
 
@@ -230,6 +230,8 @@ class CoherenceViewer(tsview.timeseriesViewer):
 
         time0 = time.time()
 
+        distance_thresh = mnp.ks_lut(self.num_slc, self.num_slc, alpha=0.05)
+
         sample_rows = np.ogrid[-((self.azimuth_window - 1) / 2):((self.azimuth_window - 1) / 2) + 1]
         sample_rows = sample_rows.astype(int)
         reference_row = np.array([(self.azimuth_window - 1) / 2]).astype(int)
@@ -248,32 +250,26 @@ class CoherenceViewer(tsview.timeseriesViewer):
         sample_cols[sample_cols < 0] = -1
         sample_cols[sample_cols >= self.width] = -1
 
-        xm, ym = np.meshgrid(sample_cols.astype(int), sample_rows.astype(int), sparse=False)
+        x, y = np.meshgrid(sample_cols.astype(int), sample_rows.astype(int), sparse=False)
 
-        win = np.abs(self.rslc[self.n_image - self.num_slc::, ym, xm])
+        win = np.abs(self.rslc[0:self.n_image, y, x])
 
-        testvec = np.sort(win.reshape(self.num_slc, self.azimuth_window * self.range_window), axis=0)
-        ksres = np.zeros(self.azimuth_window * self.range_window).astype(int)
+        mask = 1 * (x >= 0) * (y >= 0)
+        indx = np.where(mask == 1)
+        x = x[indx[0], indx[1]]
+        y = y[indx[0], indx[1]]
 
-        S1 = np.abs(self.rslc[self.n_image - self.num_slc::, row, col]).reshape(self.num_slc, 1)
-        S1 = np.sort(S1.flatten())
+        testvec = np.sort(np.abs(self.rslc[:, y, x]), axis=0)
+        S1 = np.sort(np.abs(self.rslc[:, row, col])).reshape(self.n_image, 1)
 
-        xm = xm.flatten()
-        ym = ym.flatten()
+        data1 = np.repeat(S1, testvec.shape[1], axis=1)
+        data_all = np.concatenate((data1, testvec), axis=0)
 
-        distance_thresh = mnp.ks_lut(self.num_slc, self.num_slc, alpha=0.1)
+        res = np.zeros([self.azimuth_window, self.range_window])
+        res[indx[0], indx[1]] = 1 * (np.apply_along_axis(mnp.ecdf_distance, 0, data_all) <= distance_thresh)
 
-        for m in range(testvec.shape[1]):
-            if xm[m] >= 0 and ym[m] >= 0:
-                S2 = testvec[:, m]
-                S2 = np.sort(S2.flatten())
-                # ksres[m] = mnp.ADtest(S1, S2)
-                ksres[m] = mnp.ks2smapletest(S1, S2, threshold=distance_thresh)
-
-        vprint('time: {} s'.format(time.time() - time0))
-
-        ks_label = label(ksres.reshape(self.azimuth_window, self.range_window), background=0, connectivity=2)
-        shp = 1 * (ks_label == ks_label[reference_row, reference_col])
+        ks_label = label(res, background=0, connectivity=2)
+        shp = 1 * (ks_label == ks_label[reference_row, reference_col]) * mask
 
         shp_rows, shp_cols = np.where(shp == 1)
         shp_rows = np.array(shp_rows + row - (self.azimuth_window - 1) / 2).astype(int)
@@ -290,15 +286,13 @@ class CoherenceViewer(tsview.timeseriesViewer):
 
         cmap, norm = mnp.custom_cmap()
         im1 = self.ax_coh[0, 0].imshow(np.abs(coh_mat), cmap='jet', norm=norm)
-        #plt.colorbar(im1, ticks=[0, 1], orientation='vertical')
 
         cmap, norm = mnp.custom_cmap(-np.pi, np.pi)
         im2 = self.ax_coh[0, 1].imshow(np.angle(coh_mat), cmap='jet', norm=norm)
-        #plt.colorbar(im2, ticks=[-np.pi, np.pi], orientation='vertical')
 
         im3 = self.ax_coh[1, 0].imshow(np.mean(win[:, :, :], axis=0), cmap='jet')
 
-        im4 = self.ax_coh[1, 1].imshow(ks_label, cmap='jet')
+        im4 = self.ax_coh[1, 1].imshow(shp, cmap='jet')
 
         self.fig_coh.canvas.draw()
 

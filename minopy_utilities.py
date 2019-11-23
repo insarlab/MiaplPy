@@ -656,14 +656,15 @@ def ecdf_distance_old(S1, S2):
 
 
 def ecdf_distance(data):
-    data_all = data.flatten()
+    data_all = np.array(data).flatten()
     n1 = int(len(data_all)/2)
     data1 = data_all[0:n1]
     data2 = data_all[n1::]
+    data_all = np.sort(data_all)
     cdf1 = np.searchsorted(data1, data_all, side='right') / (1.0 * n1)
     cdf2 = np.searchsorted(data2, data_all, side='right') / (1.0 * n1)
-    d = np.max(np.absolute(cdf1 - cdf2))
-    return d
+    di = np.max(np.absolute(cdf1 - cdf2))
+    return di
 
 
 def affine_transform(rows, cols, ovs_x, ovs_y):

@@ -57,7 +57,7 @@ class PhaseLink:
         self.length = count_dim[1]
         self.width = count_dim[2]
 
-        self.distance_thresh = mnp.ks_lut(self.n_image, self.n_image, alpha=0.05)
+        self.distance_thresh = mnp.ks_lut(self.n_image, self.n_image, alpha=0.01)
 
         success = False
         while success is False:
@@ -170,7 +170,6 @@ class PhaseLink:
 
         res = np.zeros([self.azimuth_window, self.range_window])
         res[indx[0], indx[1]] = 1 * (np.apply_along_axis(mnp.ecdf_distance, 0, data_all) <= self.distance_thresh)
-
         ks_label = label(res, background=0, connectivity=2)
         ksres = 1 * (ks_label == ks_label[self.reference_row, self.reference_col]) * mask
 
