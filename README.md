@@ -14,6 +14,7 @@ examples:
 
 
 Use 'minopy_wrapper.py -H' for a complete list of required options.
+
 Use 'minopy_wrapper.py -h' for a help on the steps you need to run 
 
 -- Note:
