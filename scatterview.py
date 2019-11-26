@@ -619,7 +619,7 @@ def plot_slice(ax, data, metadata, inps=None):
 
         rr, cc = np.where(data.mask == False)
         color = data.data[rr, cc]
-        import pdb; pdb.set_trace()
+
         im = ax.scatter(cc, rr, c=color, cmap=inps.colormap, vmin=inps.vlim[0], vmax=inps.vlim[1],
                        alpha=0.9, s=1, edgecolors='none')
 

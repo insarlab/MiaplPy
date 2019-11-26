@@ -612,19 +612,19 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         phase2range = -1 * float(metadata['WAVELENGTH']) / (4. * np.pi)
 
-        #gfilename = os.path.join(self.workDir, 'avgSpatialCoh.h5')
-        #f = h5py.File(gfilename, 'r')
-        #spatial_coh = f['coherence'][:, :]
-        #f.close()
+        gfilename = os.path.join(self.workDir, 'avgSpatialCoh.h5')
+        f = h5py.File(gfilename, 'r')
+        spatial_coh = f['coherence'][:, :]
+        f.close()
 
         gfilename = os.path.join(self.workDir, 'inputs/geometryRadar.h5')
         f = h5py.File(gfilename, 'r')
         temp_coh = f['quality'][:, :]
         f.close()
-        #mask_spCoh = (spatial_coh >= mask_threshold)
-        #temp_coh *= mask_spCoh
+        # mask_spCoh = (spatial_coh >= mask_threshold)
+        # temp_coh *= mask_spCoh
 
-        threshold_tempCoh = float(self.template['mintpy.networkInversion.minTempCoh'])
+        # threshold_tempCoh = float(self.template['mintpy.networkInversion.minTempCoh'])
 
         for i in range(num_box):
             box = box_list[i]
@@ -632,7 +632,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             num_col = box[2] - box[0]
             num_pixel = num_row * num_col
 
-            #mask_Coh = (temp_coh[box[1]:box[3], box[0]:box[2]] >= threshold_tempCoh).reshape(num_pixel,)
+            # mask_Coh = (temp_coh[box[1]:box[3], box[0]:box[2]] >= threshold_tempCoh).reshape(num_pixel,)
 
             if num_box > 1:
                 print('\n------- Processing Patch {} out of {} --------------'.format(i + 1, num_box))
@@ -674,7 +674,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                     # Mask for Non-Zero Phase in ALL ifgrams (share one B in sbas inversion)
                     mask_all_net = np.all(pha_data, axis=0)
                     mask_all_net *= mask
-                    #mask_all_net *= mask_Coh
+                    # mask_all_net *= mask_Coh
                     idx_pixel2inv = np.where(mask_all_net)[0]
 
                     if np.sum(mask_all_net) > 0:

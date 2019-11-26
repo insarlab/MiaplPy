@@ -199,7 +199,7 @@ def gam_pta(ph_filt, vec_refined):
     ifgram_diff = ifgram_diff - np.multiply(ifgram_diff, diagones)
     temp_coh = np.abs(np.sum(ifgram_diff) / (nm ** 2 - nm))
 
-    print(temp_coh)
+    #print(temp_coh)
 
     return temp_coh
 
