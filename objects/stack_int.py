@@ -42,7 +42,6 @@ class MinopyConfig(object):
         self.f.write('generate_ifgram_sq : ' + '\n')
         self.f.write('workDir : ' + self.work_dir + '\n')
         self.f.write('ifgDir : ' + self.ifgDir + '\n')
-        self.f.write('ifgIndex : ' + self.ifgIndex + '\n')
         self.f.write('rangeWindow : ' + self.rangeWindow + '\n')
         self.f.write('azimuthWindow : ' + self.azimuthWindow + '\n')
 

@@ -366,7 +366,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         runObj = MinopyRun()
         runObj.configure(inps, 'run_interferograms')
-        runObj.generateIfg(inps, pairs, len(date_list))
+        runObj.generateIfg(inps, pairs)
         runObj.finalize()
 
         os.system('chmod +x {}'.format(self.workDir+'/configs/*'))
