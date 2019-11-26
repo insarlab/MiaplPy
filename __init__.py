@@ -4,9 +4,21 @@
 # Author:  Sara Mirzaee, 2019 Jan                                       #
 #########################################################################
 
-
+from __future__ import print_function
 import sys
 import os
 
-sqsar_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(1, sqsar_path)
+
+minopy_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(1, minopy_path)
+sys.path.insert(1, os.path.join(minopy_path, 'defaults'))
+sys.path.insert(1, os.path.join(minopy_path, 'objects'))
+
+from minopy.version import *
+__version__ = release_version
+
+try:
+    os.environ['MINOPY_HOME']
+except KeyError:
+    print('Using default MintPy Path: %s' % (minopy_path))
+    os.environ['MINOPY_HOME'] = minopy_path

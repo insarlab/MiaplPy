@@ -4,113 +4,30 @@
 # Author: Sara Mirzaee
 # Created: 10/2018
 ###############################################################################
-from mintpy.prep_isce import extract_tops_metadata, extract_geometry_metadata
-import sys
+
 import os
 import numpy as np
 import cmath
-import argparse
-import glob
-from numpy import linalg as LA
+import datetime
+from scipy import linalg as LA
 from scipy.optimize import minimize, Bounds
-from scipy import stats
-from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
+from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind, median_absolute_deviation
 import gdal
 import isce
 import isceobj
-from mintpy.utils import readfile
-from minsar.objects.auto_defaults import PathFind
-import minsar.utils.process_utilities as putils
+import matplotlib.pyplot as plt
 
-
-pathObj = PathFind()
 ################################################################################
 
 
-def cmd_line_parse(iargs=None, script=None):
-    """Command line parser."""
-
-    parser = argparse.ArgumentParser(description='MiNoPy scripts parser')
-    parser = add_common_parser(parser)
-
-    if script == 'patch_inversion':
-        parser = add_patch_inversion(parser)
-    if script == 'timeseries_corrections':
-        parser = add_mintpy_corrections(parser)
-    if script == 'oversample_minopy':
-        parser = add_oversample(parser)
-
-    inps = parser.parse_args(args=iargs)
-    inps = putils.create_or_update_template(inps)
-
-    return inps
-
-
-def add_common_parser(parser):
-
-    commonp = parser.add_argument_group('General options:')
-    commonp.add_argument('custom_template_file', nargs='?', help='custom template with option settings.\n')
-    commonp.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-    commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
-    commonp.add_argument('--walltime', dest='wall_time', default='None',
-                        help='walltime for submitting the script as a job')
-    commonp.add_argument('--wait', dest='wait_time', default='00:00', metavar="Wait time (hh:mm)",
-                         help="wait time to submit a job")
-    return parser
-
-
-def add_oversample(parser):
-    crp = parser.add_argument_group('Crop options:')
-    crp.add_argument('--ox', dest='over_sample_x', default=3, help='Oversampling in azimuth direction')
-    crp.add_argument('--oy', dest='over_sample_y', default=1, help='Oversampling in range direction')
-    return parser
-
-
-def add_minopy_wrapper(parser):
-
-    STEP_LIST, STEP_HELP = pathObj.minopy_help()
-
-    minp = parser.add_argument_group('MiNoPy Routine InSAR Time Series Analysis. steps processing '
-                                    '(start/end/step)', STEP_HELP)
-    minp.add_argument('--remove_minopy_dir', dest='remove_minopy_dir', action='store_true',
-                     help='remove directory before download starts')
-    minp.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
-                      help='start processing at the named step, default: {}'.format(STEP_LIST[0]))
-    minp.add_argument('--stop', dest='endStep', metavar='STEP', default=STEP_LIST[-1],
-                      help='end processing at the named step, default: {}'.format(STEP_LIST[-1]))
-    minp.add_argument('--step', dest='step', metavar='STEP',
-                      help='run processing at the named step only')
-    minp.add_argument('--email', action='store_true', dest='email', default=False,
-                    help='opt to email results')
-
-    return parser
-
-
-def add_patch_inversion(parser):
-
-    pi = parser.add_argument_group('Patch inversion option')
-    pi.add_argument('-p', '--patch', type=str, dest='patch', help='patch directory')
-
-    return parser
-
-
-def add_mintpy_corrections(parser):
-
-    corrections = parser.add_argument_group('Mintpy options')
-
-    corrections.add_argument('--dir', dest='work_dir',
-                        help='MintPy working directory, default is:\n' +
-                             'a) current directory, or\n' +
-                             'b) $SCRATCHDIR/projectName/mintpy, if meets the following 3 requirements:\n' +
-                             '    1) autoPath = True in mintpy/defaults/auto_path.py\n' +
-                             '    2) environmental variable $SCRATCHDIR exists\n' +
-                             '    3) input custom template with basename same as projectName\n')
-    corrections.add_argument('-g', dest='generate_template', action='store_true',
-                        help='Generate default template (and merge with custom template), then exit.')
-    corrections.add_argument('-H', dest='print_auto_template', action='store_true',
-                        help='Print/Show the example template file for routine processing.')
-
-    return parser
+def log_message(logdir, msg):
+    f = open(os.path.join(logdir, 'log'), 'a+')
+    dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+    string = dateStr + " * " + msg
+    print(string)
+    f.write(string + "\n")
+    f.close()
+    return
 
 ################################################################################
 
@@ -136,72 +53,6 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
     last_row = np.rint(np.max(rows)).astype(int) + 10
     first_col = np.rint(np.min(cols)).astype(int) - 10
     last_col = np.rint(np.max(cols)).astype(int) + 10
-
-    image_coord = [first_row, last_row, first_col, last_col]
-
-    return image_coord
-
-
-def convert_geo2image_coord_old(geo_master_dir, master_dir, lat_south, lat_north, lon_west, lon_east):
-    """ Finds the corresponding line and sample based on geographical coordinates. """
-
-    import isceobj.Planet.AstronomicalHandbook as AstronomicalHandbook
-    from isceobj.Planet.Ellipsoid import Ellipsoid
-
-    master_xml = glob.glob(master_dir + '/IW*.xml')[0]
-    metadata = extract_tops_metadata(master_xml)[0]
-    gmeta = extract_geometry_metadata(geo_master_dir + '/lat.rdr.full.xml', metadata)
-    rmeta = readfile.read_isce_xml(geo_master_dir + '/lat.rdr.full.xml')
-
-    # Read Attributes
-    range_n = float(gmeta['startingRange'])
-    dR = float(gmeta['rangePixelSize'])
-    width = int(rmeta['WIDTH'])
-    Re = float(gmeta['earthRadius'])
-    Height = float(gmeta['altitude'])
-    range_f = range_n + dR * width
-    inc_angle_n = (np.pi - np.arccos((Re ** 2 + range_n ** 2 - (Re + Height) ** 2) / (2 * Re * range_n))) * 180.0 / np.pi
-    inc_angle_f = (np.pi - np.arccos((Re ** 2 + range_f ** 2 - (Re + Height) ** 2) / (2 * Re * range_f))) * 180.0 / np.pi
-
-    inc_angle = (inc_angle_n + inc_angle_f) / 2.0
-    rg_step = float(dR) / np.sin(inc_angle / 180.0 * np.pi)
-    az_step = float(gmeta['azimuthPixelSize']) * Re / (Re + Height)
-
-    lat = [lat_south, lat_north]
-    lon = [lon_west, lon_east]
-
-    lat_c = (np.nanmax(lat) + np.nanmin(lat)) / 2.
-    az_step_deg = 180. / np.pi * az_step / Re
-    rg_step_deg = 180. / np.pi * rg_step / (Re * np.cos(lat_c * np.pi / 180.))
-
-    y_factor = 10 * az_step_deg
-    x_factor = 10 * rg_step_deg
-
-    ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
-    lut_y = ds.GetRasterBand(1).ReadAsArray()
-
-    ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
-    lut_x = ds.GetRasterBand(1).ReadAsArray()
-
-    rows = []
-    cols = []
-
-    for lat0 in lat:
-        for lon0 in lon:
-            ymin = lat0 - y_factor;   ymax = lat0 + y_factor
-            xmin = lon0 - x_factor;   xmax = lon0 + x_factor
-
-            mask_y = np.multiply(lut_y >= ymin, lut_y <= ymax)
-            mask_x = np.multiply(lut_x >= xmin, lut_x <= xmax)
-            mask_yx = np.multiply(mask_y, mask_x)
-            row, col = np.nanmean(np.where(mask_yx), axis=1)
-            rows.append(row)
-            cols.append(col)
-
-    first_row = np.rint(np.min(rows)).astype(int)
-    last_row = np.rint(np.max(rows)).astype(int)
-    first_col = np.rint(np.min(cols)).astype(int)
-    last_col = np.rint(np.max(cols)).astype(int)
 
     image_coord = [first_row, last_row, first_col, last_col]
 
@@ -249,11 +100,16 @@ def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
 ################################################################################
 
 
-def read_image(image_file):
+def read_image(image_file, box=None):
     """ Reads images from isce. """
 
     ds = gdal.Open(image_file + '.vrt', gdal.GA_ReadOnly)
-    image = ds.GetRasterBand(1).ReadAsArray()
+    if not box is None:
+        band = ds.GetRasterBand(1)
+        image = band.ReadAsArray()[box[1]:box[3], box[0]:box[2]]
+    else:
+        image = ds.GetRasterBand(1).ReadAsArray()
+
     del ds
 
     return image
@@ -327,18 +183,23 @@ def regularize_matrix(M):
 ###############################################################################
 
 
-def gam_pta(ph_filt, ph_refined):
-    """ Returns squeesar PTA coherence between the initial and estimated phase vectors. """
+def gam_pta(ph_filt, vec_refined):
+    """ Returns squeesar PTA coherence between the initial and estimated phase vectors.
+    :param ph_filt: np.angle(coh) before inversion
+    :param vec_refined: refined complex vector after inversion
+    """
+    nm = np.shape(ph_filt)[0]
+    diagones = np.diag(np.diag(np.ones([nm, nm])+1j))
+    phi_mat = np.exp(1j * ph_filt)
+    ph_refined = np.angle(vec_refined)
+    g1 = np.exp(-1j * ph_refined).reshape(nm, 1)
+    g2 = np.exp(1j * ph_refined).reshape(1, nm)
+    theta_mat = np.matmul(g1, g2)
+    ifgram_diff = np.multiply(phi_mat, theta_mat)
+    ifgram_diff = ifgram_diff - np.multiply(ifgram_diff, diagones)
+    temp_coh = np.abs(np.sum(ifgram_diff) / (nm ** 2 - nm))
 
-    n = np.shape(ph_filt)[0]
-    indx = np.triu_indices(n, 1)
-    phi_mat = ph_filt[indx]
-    g1 = np.exp(1j * ph_refined).reshape(n, 1)
-    g2 = np.exp(-1j * ph_refined).reshape(1, n)
-    theta_mat = np.angle(np.matmul(g1, g2))
-    theta_mat = theta_mat[indx]
-    ifgram_diff = phi_mat - theta_mat
-    temp_coh = np.real(np.sum(np.exp(1j * ifgram_diff))) * 2 / (n ** 2 - n)
+    #print(temp_coh)
 
     return temp_coh
 
@@ -349,10 +210,9 @@ def optphase(x0, inverse_gam):
     """ Returns the PTA maximum likelihood function value. """
 
     n = len(x0)
-    x = np.ones([n+1, 1])+0j
-    x[1::, 0] = np.exp(1j*x0[:])
+    x = np.exp(1j * x0).reshape(n, 1)
     x = np.matrix(x)
-    y = -np.matmul(x.getH(), inverse_gam)
+    y = np.matmul(x.getH(), inverse_gam)
     y = np.matmul(y, x)
     f = np.abs(np.log(y))
 
@@ -361,63 +221,54 @@ def optphase(x0, inverse_gam):
 ###############################################################################
 
 
-def PTA_L_BFGS(xm):
+def PTA_L_BFGS(coh0):
     """ Uses L-BFGS method to optimize PTA function and estimate phase values. """
 
-    n = len(xm)
-    x0 = np.zeros([n-1, 1])
-    x0[:, 0] = np.real(xm[1::, 0])
-    coh = 1j*np.zeros([n, n])
-    coh[:, :] = xm[:, 1::]
-    abs_coh = regularize_matrix(np.abs(coh))
-    if np.size(abs_coh) == np.size(coh):
-        inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh))
+    n = coh0.shape[0]
+    x0 = np.angle(EMI_phase_estimation(coh0))
+    x0 = x0 - x0[0]
+    abs_coh = regularize_matrix(np.abs(coh0))
+    if np.size(abs_coh) == np.size(coh0):
+        inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh0))
         res = minimize(optphase, x0, args=inverse_gam, method='L-BFGS-B',
-                       bounds=Bounds(-100, 100, keep_feasible=False),
                        tol=None, options={'gtol': 1e-6, 'disp': False})
+        out = res.x.reshape(n, 1)
+        vec = np.multiply(np.abs(x0), np.exp(1j * out)).reshape(n, 1)
 
-        out = np.zeros([n, 1])
-        out[1::, 0] = res.x
-        #out = np.unwrap(out, np.pi, axis=0)
+        x0 = np.exp(1j * np.angle(vec[0]))
+        vec = np.multiply(vec, np.conj(x0))
 
-        return out
+        return vec
 
     else:
 
         print('warning: coherence matrix not positive semidifinite, It is switched from PTA to EVD')
-        return EVD_phase_estimation(coh)
+        return EVD_phase_estimation(coh0)
 
 ###############################################################################
 
 
 def EVD_phase_estimation(coh0):
     """ Estimates the phase values based on eigen value decomosition """
-
-    Eigen_value, Eigen_vector = LA.eigh(coh0)
-    f = np.where(np.abs(Eigen_value) == np.sort(np.abs(Eigen_value))[len(coh0)-1])
-    vec = Eigen_vector[:, f].reshape(len(Eigen_value), 1)
-    x0 = np.angle(vec)
-    x0 = x0 - x0[0, 0]
-    #x0 = np.unwrap(x0, np.pi, axis=0)
-
-    return x0
+    eigen_value, eigen_vector = LA.eigh(coh0)
+    vec = eigen_vector[:, -1].reshape(len(eigen_value), 1)
+    x0 = np.exp(1j * np.angle(vec[0]))
+    vec = np.multiply(vec, np.conj(x0))
+    return vec
 
 ###############################################################################
 
 
 def EMI_phase_estimation(coh0):
     """ Estimates the phase values based on EMI decomosition (Homa Ansari, 2018 paper) """
-
     abscoh = regularize_matrix(np.abs(coh0))
     if np.size(abscoh) == np.size(coh0):
         M = np.multiply(LA.pinv(abscoh), coh0)
-        Eigen_value, Eigen_vector = LA.eigh(M)
-        f = np.where(np.abs(Eigen_value) == np.sort(np.abs(Eigen_value))[0])
-        vec = Eigen_vector[:, f[0][0]].reshape(Eigen_vector.shape[0], 1)
-        x0 = np.angle(vec).reshape(len(Eigen_value), 1)
-        x0 = x0 - x0[0, 0]
-        #x0 = np.unwrap(x0, np.pi, axis=0)
-        return x0
+        eigen_value, eigen_vector = LA.eigh(M)
+        vec = eigen_vector[:, 0].reshape(len(eigen_value), 1)
+        x0 = np.exp(1j * np.angle(vec[0]))
+        vec = np.multiply(vec, np.conj(x0))
+        return vec
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
         return EVD_phase_estimation(coh0)
@@ -425,23 +276,25 @@ def EMI_phase_estimation(coh0):
 ###############################################################################
 
 
-def test_PS(ccg):
+def test_PS(coh_mat):
     """ checks if the pixel is PS """
 
-    coh_mat = est_corr(ccg)
     Eigen_value, Eigen_vector = LA.eigh(coh_mat)
-    med_w = np.median(Eigen_value)
-    MAD = np.median(np.absolute(Eigen_value - med_w))
+    norm_eigenvalues = Eigen_value*100/np.sum(Eigen_value)
+    indx = np.where(norm_eigenvalues > 25)[0]
 
-    thold1 = np.abs(med_w + 3.5*MAD)
-    thold2 = np.abs(med_w - 3.5*MAD)
-    treshhold = np.max([thold1, thold2])
-    status = len(np.where(np.abs(Eigen_value) > treshhold))
-
-    if status > 0:
-        return True
+    if len(indx) >= 1:
+        msk = (norm_eigenvalues <= 25)
+        Eigen_value[msk] = 0.
+        CM = np.dot(Eigen_vector, np.dot(np.diag(np.sqrt(Eigen_value)), np.matrix.getH(Eigen_vector)))
+        vec = EMI_phase_estimation(CM)
     else:
-        return False
+        vec = EMI_phase_estimation(coh_mat)
+
+    x0 = np.exp(1j * np.angle(vec[0]))
+    vec = np.multiply(vec, np.conj(x0))
+
+    return vec
 
 ###############################################################################
 
@@ -519,7 +372,7 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
     for ii in range(length):
         for jj in range(ii + 1, length):
             if seasonal:
-                factor = (A + B * np.cos(2 * np.pi * t[ii] / 90)) * (A + B * np.cos(2 * np.pi * t[jj] / 90))
+                factor = (A + B * np.cos(2 * np.pi * t[ii] / 180)) * (A + B * np.cos(2 * np.pi * t[jj] / 180))
             gamma = factor * (np.exp((t[ii] - t[jj]) / Tau0) + gammaf)
             C[ii, jj] = gamma * np.exp(1j * (ph[ii] - ph[jj]))
             C[jj, ii] = np.conj(C[ii, jj])
@@ -530,18 +383,16 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
 
 
 def simulate_noise(corr_matrix):
-    N = corr_matrix.shape[0]
-
     nsar = corr_matrix.shape[0]
-    w, v = np.linalg.eigh(corr_matrix)
-    msk = (w < 1e-3)
-    w[msk] = 0.
-    # corr_matrix =  np.dot(v, np.dot(np.diag(w), np.matrix.getH(v)))
+    eigen_value, eigen_vector = np.linalg.eigh(corr_matrix)
+    msk = (eigen_value < 1e-3)
+    eigen_value[msk] = 0.
+    # corr_matrix =  np.dot(eigen_vector, np.dot(np.diag(eigen_value), np.matrix.getH(eigen_vector)))
 
     # C = np.linalg.cholesky(corr_matrix)
-    C = np.dot(v, np.dot(np.diag(np.sqrt(w)), np.matrix.getH(v)))
-    Z = (np.random.randn(N) + 1j*np.random.randn(N)) / np.sqrt(2)
-    noise = np.dot(C, Z)
+    CM = np.dot(eigen_vector, np.dot(np.diag(np.sqrt(eigen_value)), np.matrix.getH(eigen_vector)))
+    Zr = (np.random.randn(nsar) + 1j*np.random.randn(nsar)) / np.sqrt(2)
+    noise = np.dot(CM, Zr)
 
     return noise
 
@@ -555,7 +406,7 @@ def simulate_neighborhood_stack(corr_matrix, neighborSamples=300):
     neighbor_stack = np.zeros((numberOfSlc, neighborSamples), dtype=np.complex64)
     for ii in range(neighborSamples):
         cpxSLC = simulate_noise(corr_matrix)
-        neighbor_stack[:,ii] = cpxSLC
+        neighbor_stack[:, ii] = cpxSLC
     return neighbor_stack
 
 ##############################################################################
@@ -566,7 +417,7 @@ def double_solve(f1,f2,x0,y0):
 
     from scipy.optimize import fsolve
     func = lambda x: [f1(x[0], x[1]), f2(x[0], x[1])]
-    return fsolve(func,[x0,y0])
+    return fsolve(func, [x0, y0])
 
 ###############################################################################
 
@@ -576,11 +427,13 @@ def est_corr(CCGsam):
 
     CCGS = np.matrix(CCGsam)
 
-    corr_mat = np.matmul(CCGS, CCGS.getH()) / CCGS.shape[1]
+    cov_mat = np.matmul(CCGS, CCGS.getH()) / CCGS.shape[1]
 
-    coh = np.multiply(cov2corr(np.abs(corr_mat)), np.exp(1j * np.angle(corr_mat)))
+    corr_matrix = cov2corr(cov_mat)
 
-    return coh
+    #corr_matrix = np.multiply(cov2corr(np.abs(cov_mat)), np.exp(1j * np.angle(cov_mat)))
+
+    return corr_matrix
 
 ###############################################################################
 
@@ -615,12 +468,7 @@ def phase_linking_process(ccg_sample, stepp, method, squeez=True):
     coh_mat = est_corr(ccg_sample)
 
     if 'PTA' in method:
-        ph_EMI = EMI_phase_estimation(coh_mat)
-        xm = np.zeros([len(ph_EMI), len(ph_EMI) + 1]) + 0j
-        xm[:, 0:1] = np.reshape(ph_EMI, [len(ph_EMI), 1])
-        xm[:, 1::] = coh_mat[:, :]
-        res = PTA_L_BFGS(xm)
-
+        res = PTA_L_BFGS(coh_mat)
     elif 'EMI' in method:
         res = EMI_phase_estimation(coh_mat)
     else:
@@ -629,20 +477,14 @@ def phase_linking_process(ccg_sample, stepp, method, squeez=True):
     res = res.reshape(len(res), 1)
 
     if squeez:
-        vm = np.matrix(np.exp(1j * res[stepp::, 0:1]) / LA.norm(np.exp(1j * res[stepp::, 0:1])))
-        squeezed = np.matmul(np.conjugate(vm.T), ccg_sample[stepp::, :])
-        # squeezed = squeez_im(res[stepp::, 0], ccg_sample[stepp::, :])
+
+        vm = np.exp(1j * np.angle(np.matrix(res[stepp::, :])))
+        vm = np.matrix(vm / LA.norm(vm))
+        squeezed = np.matmul(vm.getH(), ccg_sample[stepp::, :])
+
         return res, squeezed
     else:
-        return res,
-
-
-def squeez_im(ph, ccg):
-    """Squeeze a stack of images in to one (PCA)"""
-
-    vm = np.matrix(np.exp(1j * ph) / LA.norm(np.exp(1j * ph)))
-    squeezed = np.complex64(np.matmul(np.conjugate(vm), ccg))
-    return squeezed
+        return res
 
 
 ###############################################################################
@@ -661,65 +503,62 @@ def CRLB_cov(gama, L):
 ###############################################################################
 
 
-def sequential_phase_linking(full_stack_complex_samples, method, num_stack=1):
+def sequential_phase_linking(full_stack_complex_samples, method, num_stack=10):
     """ phase linking of each pixel sequentially and applying a datum shift at the end """
 
     n_image = full_stack_complex_samples.shape[0]
     mini_stack_size = 10
     num_mini_stacks = np.int(np.floor(n_image / mini_stack_size))
-    phas_refined = np.zeros([np.shape(full_stack_complex_samples)[0], 1])
+    vec_refined = np.zeros([np.shape(full_stack_complex_samples)[0], 1]) + 0j
 
-    for step in range(0, num_mini_stacks):
+    for sstep in range(0, num_mini_stacks):
 
-        first_line = step * mini_stack_size
-        if step == num_mini_stacks - 1:
+        first_line = sstep * mini_stack_size
+        if sstep == num_mini_stacks - 1:
             last_line = n_image
         else:
             last_line = first_line + mini_stack_size
         num_lines = last_line - first_line
 
-        if step == 0:
-            mini_stack_complex_samples = full_stack_complex_samples[first_line:last_line, :]
-            res, squeezed_images = phase_linking_process(mini_stack_complex_samples, step, method)
+        if sstep == 0:
 
-            phas_refined[first_line:last_line, 0:1] = res[step::, 0:1]
+            mini_stack_complex_samples = full_stack_complex_samples[first_line:last_line, :]
+            res, squeezed_images = phase_linking_process(mini_stack_complex_samples, sstep, method)
+
+            vec_refined[first_line:last_line, 0:1] = res[sstep::, 0:1]
         else:
 
             if num_stack == 1:
-                mini_stack_complex_samples = np.zeros([1 + num_lines, full_stack_complex_samples.shape[1]]) + 1j
+                mini_stack_complex_samples = np.zeros([1 + num_lines, full_stack_complex_samples.shape[1]]) + 0j
                 mini_stack_complex_samples[0, :] = np.complex64(squeezed_images[-1, :])
                 mini_stack_complex_samples[1::, :] = full_stack_complex_samples[first_line:last_line, :]
                 res, new_squeezed_image = phase_linking_process(mini_stack_complex_samples, 1, method)
-                phas_refined[first_line:last_line, 0:1] = res[1::, 0:1]
+                vec_refined[first_line:last_line, :] = res[1::, :]
                 squeezed_images = np.vstack([squeezed_images, new_squeezed_image])
             else:
-
-                mini_stack_complex_samples = np.zeros([step + num_lines, full_stack_complex_samples.shape[1]]) + 1j
-                mini_stack_complex_samples[0:step, :] = np.complex64(squeezed_images)
-                mini_stack_complex_samples[step::, :] = full_stack_complex_samples[first_line:last_line, :]
-                res, new_squeezed_image = phase_linking_process(mini_stack_complex_samples, step, method)
-                phas_refined[first_line:last_line, 0:1] = res[step::, 0:1]
+                mini_stack_complex_samples = np.zeros([sstep + num_lines, full_stack_complex_samples.shape[1]]) + 0j
+                mini_stack_complex_samples[0:sstep, :] = squeezed_images
+                mini_stack_complex_samples[sstep::, :] = full_stack_complex_samples[first_line:last_line, :]
+                res, new_squeezed_image = phase_linking_process(mini_stack_complex_samples, sstep, method)
+                vec_refined[first_line:last_line, :] = res[sstep::, :]
                 squeezed_images = np.vstack([squeezed_images, new_squeezed_image])
             ###
 
     datum_connection_samples = squeezed_images
-    datum_shift, squeezed_datum = phase_linking_process(datum_connection_samples, 0, 'EMI')
+    datum_shift = np.angle(phase_linking_process(datum_connection_samples, 0, 'PTA', squeez=False))
 
-    # phas_refined_no_datum_shift = np.zeros(np.shape(phas_refined))
-    # phas_refined_no_datum_shift[:, :] = phas_refined[:, :]
-
-    for step in range(len(datum_shift)):
-        first_line = step * mini_stack_size
-        if step == num_mini_stacks - 1:
+    for sstep in range(len(datum_shift)):
+        first_line = sstep * mini_stack_size
+        if sstep == num_mini_stacks - 1:
             last_line = n_image
         else:
             last_line = first_line + mini_stack_size
 
-        phas_refined[first_line:last_line, 0:1] = phas_refined[first_line:last_line, 0:1] - \
-                                                  datum_shift[step:step + 1, 0:1]
+        vec_refined[first_line:last_line, 0:1] = np.multiply(vec_refined[first_line:last_line, 0:1],
+                                                  np.exp(1j * datum_shift[sstep:sstep + 1, 0:1]))
 
-    # return phas_refined_no_datum_shift, phas_refined
-    return phas_refined
+    # return vec_refined_no_datum_shift, vec_refined
+    return vec_refined
 
 #############################################
 
@@ -755,10 +594,21 @@ def ks2smapletest(S1, S2, threshold=0.4):
         return 0
 
 
+def ks2smapletestp(S1, S2, alpha=0.05):
+    try:
+        distance = ks_2samp(S1, S2)
+        if distance[1] >= alpha:
+             return 1
+        else:
+            return 0
+    except:
+        return 0
+
+
 def ttest_indtest(S1, S2):
     try:
         test = ttest_ind(S1, S2, equal_var=False)
-        if test[1] <= 0.05:
+        if test[1] >= 0.05:
              return 1
         else:
             return 0
@@ -769,7 +619,7 @@ def ttest_indtest(S1, S2):
 def ADtest(S1, S2):
     try:
         test = anderson_ksamp([S1, S2])
-        if test.significance_level <= 0.05:
+        if test.significance_level >= 0.05:
              return 1
         else:
             return 0
@@ -793,7 +643,7 @@ def ks_lut(N1, N2, alpha=0.05):
     return np.min(critical_distance)
 
 
-def ecdf_distance(S1, S2):
+def ecdf_distance_old(S1, S2):
     data1 = np.sort(S1.flatten())
     data2 = np.sort(S2.flatten())
     n1 = len(data1)
@@ -803,6 +653,18 @@ def ecdf_distance(S1, S2):
     cdf2 = np.searchsorted(data2, data_all, side='right') / (1.0 * n2)
     d = np.max(np.absolute(cdf1 - cdf2))
     return d
+
+
+def ecdf_distance(data):
+    data_all = np.array(data).flatten()
+    n1 = int(len(data_all)/2)
+    data1 = data_all[0:n1]
+    data2 = data_all[n1::]
+    data_all = np.sort(data_all)
+    cdf1 = np.searchsorted(data1, data_all, side='right') / (1.0 * n1)
+    cdf2 = np.searchsorted(data2, data_all, side='right') / (1.0 * n1)
+    di = np.max(np.absolute(cdf1 - cdf2))
+    return di
 
 
 def affine_transform(rows, cols, ovs_x, ovs_y):
@@ -854,3 +716,41 @@ def apply_affine(rows, cols, ovs_x, ovs_y, transf):
             out_col[row, col] = col0
 
     return out_row, out_col
+
+#################################
+
+
+def email_minopy(work_dir):
+    """ email mintpy results """
+
+    import subprocess
+    import sys
+
+    email_address = os.getenv('NOTIFICATIONEMAIL')
+
+    textStr = 'email mintpy results'
+
+    cwd = os.getcwd()
+
+    pic_dir = os.path.join(work_dir, 'pic')
+    flist = ['avgPhaseVelocity.png', 'avgSpatialCoh.png', 'geo_maskTempCoh.png', 'geo_temporalCoherence.png',
+             'geo_velocity.png', 'maskConnComp.png', 'Network.pdf', 'BperpHistory.pdf', 'CoherenceMatrix.pdf',
+             'rms_timeseriesResidual_ramp.pdf', 'geo_velocity.kmz']
+
+    file_list = [os.path.join(pic_dir, i) for i in flist]
+    print(file_list)
+
+    attachmentStr = ''
+    i = 0
+    for fileList in file_list:
+        i = i + 1
+        attachmentStr = attachmentStr + ' -a ' + fileList
+
+    mailCmd = 'echo \"' + textStr + '\" | mail -s ' + cwd + ' ' + attachmentStr + ' ' + email_address
+    command = 'ssh pegasus.ccs.miami.edu \"cd ' + cwd + '; ' + mailCmd + '\"'
+    print(command)
+    status = subprocess.Popen(command, shell=True).wait()
+    if status is not 0:
+        sys.exit('Error in email_minopy')
+
+    return
