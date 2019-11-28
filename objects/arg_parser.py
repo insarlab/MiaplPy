@@ -78,7 +78,7 @@ class MinoPyParser:
     def out_minopy_wrapper(self, sinps):
         inps = sinps
         STEP_LIST = self.STEP_LIST
-        template_file = os.path.join(os.path.dirname(os.getenv('MINOPY_HOME')), 'defaults/minopy_templates.cfg')
+        template_file = os.path.join(os.path.abspath(os.getenv('MINOPY_HOME')), 'defaults/minopy_template.cfg')
 
         # print default template
         if inps.print_template:
