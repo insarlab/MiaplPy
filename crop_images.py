@@ -65,7 +65,7 @@ def main(iargs=None):
     if any([stackObj, geomRadarObj, geomGeoObj]) and not os.path.isdir(inps.outdir):
         os.makedirs(inps.outdir)
         print('create directory: {}'.format(inps.outdir))
-    '''
+
     # write
     if stackObj and update_object(inps.outfile[0], stackObj, box, updateMode=updateMode):
         print('-'*50)
@@ -74,7 +74,7 @@ def main(iargs=None):
                             box=box,
                             compression=comp,
                             extra_metadata=extraDict)
-    '''
+    
     if geomRadarObj and update_object(inps.outfile[1], geomRadarObj, box, updateMode=updateMode):
         print('-'*50)
         geomRadarObj.write2hdf5(outputFile=inps.outfile[1],

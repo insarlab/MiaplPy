@@ -224,14 +224,6 @@ class PhaseLink:
 
         np.apply_along_axis(self.phase_inversion, 0, self.coords)
 
-                    if self.quality[coord[0], coord[1]] < 0.3:
-                        phase_refined = np.angle(self.rslc[:, coord[0], coord[1]])
-                        phase_refined = phase_refined - phase_refined[0]
-                        amp_refined = np.abs(self.rslc[:, coord[0], coord[1]])
-
-                    self.rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = \
-                        np.complex64(np.multiply(amp_refined, np.exp(1j * phase_refined))).reshape(self.n_image, 1, 1)
-
         timep = time.time() - time0
         print('time spent to do phase inversion {}: min'.format(timep / 60))
 
