@@ -373,7 +373,8 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
         for jj in range(ii + 1, length):
             if seasonal:
                 factor = (A + B * np.cos(2 * np.pi * t[ii] / 180)) * (A + B * np.cos(2 * np.pi * t[jj] / 180))
-            gamma = factor * (np.exp((t[ii] - t[jj]) / Tau0) + gammaf)
+            #gamma = factor*((gamma0-gammaf)*np.exp(-np.abs((t[ii] - t[jj])/Tau0))+gammaf)
+            gamma = factor * (np.exp((t[ii] - t[jj]) / Tau0)) + gammaf
             C[ii, jj] = gamma * np.exp(1j * (ph[ii] - ph[jj]))
             C[jj, ii] = np.conj(C[ii, jj])
 
