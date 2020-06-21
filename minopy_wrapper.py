@@ -16,11 +16,11 @@ import mintpy
 from mintpy.utils import writefile, readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from mintpy.objects import timeseries, ifgramStack
-from mintpy.ifgram_inversion import read_unwrap_phase, mask_unwrap_phase, split2boxes, write2hdf5_auxFiles
+from mintpy.ifgram_inversion import read_unwrap_phase, mask_unwrap_phase, split2boxes #write2hdf5_auxFiles
 import minopy
 import minopy.workflow
 import minopy.submit_jobs as js
-from minopy_utilities import log_message, email_minopy
+from minopy_utilities import log_message, email_minopy, write_SLC
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects.slcStack import slcStack
 from minopy.objects.stack_int import MinopyRun
@@ -34,6 +34,7 @@ STEP_LIST = [
     'crop',
     'create_patch',
     'inversion',
+    'slc_rewrite',
     'ifgrams',
     'unwrap',
     'load_int',
@@ -245,18 +246,15 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             for key in ['SUBSET_XMIN', 'SUBSET_YMIN']:
                 if key in cdict.keys():
                     cdict.pop(key)
-
             self.customTemplate = dict(cdict)
 
             # Update default template file based on custom template
             print('update default template based on input custom template')
             self.templateFile = ut.update_template_file(self.templateFile, self.customTemplate)
-
         print('read default template file:', self.templateFile)
         self.template = readfile.read_template(self.templateFile)
         auto_template_file = os.path.join(os.path.dirname(__file__), 'defaults/minopy_template_defaults.cfg')
         self.template = check_template_auto_value(self.template, auto_file=auto_template_file)
-
         # correct some loose setup conflicts
         if self.template['mintpy.geocode'] is False:
             for key in ['mintpy.save.hdfEos5', 'mintpy.save.kmz']:
@@ -357,17 +355,25 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         # if master_ind is False:
         #    pairs.append((date_list[0], date_list[-1]))
-
         inps = self.inps
         inps.run_dir = self.run_dir
         inps.patch_dir = self.patch_dir
         inps.ifgram_dir = self.ifgram_dir
         inps.template = self.template
-
-        runObj = MinopyRun()
-        runObj.configure(inps, 'run_interferograms')
-        runObj.generateIfg(inps, pairs)
-        runObj.finalize()
+        if 'stripmapStack' in os.getenv('ISCE_STACK'):
+            write_SLC(date_list, os.path.join(self.workDir, 'SLC'), inps.patch_dir,
+                      int(inps.template['mintpy.inversion.range_window']),
+                      int(inps.template['mintpy.inversion.azimuth_window']))
+            runObj = MinopyRun()
+            runObj.configure(inps, 'run_interferograms')
+            low_or_high = "/"
+            runObj.igrams_network(inps, pairs, low_or_high, )
+            runObj.finalize()
+        else:
+            runObj = MinopyRun()
+            runObj.configure(inps, 'run_interferograms')
+            runObj.generateIfg(inps, pairs)
+            runObj.finalize()
 
         os.system('chmod +x {}'.format(self.workDir+'/configs/*'))
 
@@ -383,6 +389,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
     def run_unwrap(self, sname):
         """ Unwrapps single master interferograms
         """
+        if 'stripmapStack' in os.getenv('ISCE_STACK'):
+            print('Unwrap is already done in previous step (This is for stripmap data) ')
+            return
+
         run_file_unwrap = os.path.join(self.run_dir, 'run_unwrap')
 
         slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
@@ -700,7 +710,19 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         temp_coh[ref_y, ref_x] = 1.
 
         num_inv_ifg = np.zeros((length, width), np.int16) + num_ifgram
-        write2hdf5_auxFiles(metadata, temp_coh, num_inv_ifg, suffix='', inps=inps)
+        # 2.3 instantiate temporal coherence
+        dsNameDict = {"temporalCoherence": (np.float32, (length, width))}
+        metadata['FILE_TYPE'] = 'temporalCoherence'
+        metadata['UNIT'] = '1'
+        metadata.pop('REF_DATE')
+        writefile.layout_hdf5(temp_coh, dsNameDict, metadata=metadata)
+
+        # 2.4 instantiate number of inverted observations
+        dsNameDict = {"mask": (np.float32, (length, width))}
+        metadata['FILE_TYPE'] = 'mask'
+        metadata['UNIT'] = '1'
+        writefile.layout_hdf5(num_inv_ifg, dsNameDict, metadata=metadata)
+        #write2hdf5_auxFiles(metadata, temp_coh, num_inv_ifg, suffix='', inps=inps)
 
         self.get_phase_linking_coherence_mask()
 

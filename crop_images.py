@@ -51,7 +51,6 @@ def main(iargs=None):
     # read input options
 
     inpsDict = read_inps2dict(inps)
-
     prepare_metadata(inpsDict)
 
     inpsDict = read_subset_box(inpsDict)
@@ -160,7 +159,6 @@ def prepare_metadata(inpsDict):
     script_name = 'prep_slc_{}.py'.format(processor)
     print('-'*50)
     print('prepare metadata files for {} products'.format(processor))
-
     if processor in ['gamma', 'roipac', 'snap']:
         for key in [i for i in inpsDict.keys() if (i.startswith('mintpy.load.') and i.endswith('File'))]:
             if len(glob.glob(str(inpsDict[key]))) > 0:
@@ -410,7 +408,8 @@ def update_object(outFile, inObj, box, updateMode=True):
 
             outObj = slcStack(outFile)
             out_size = outObj.get_size()[1:]
-            out_date12_list = outObj.get_date12_list(dropIfgram=False)
+            #out_date12_list = outObj.get_date12_list(dropIfgram=False)
+            out_date12_list = outObj.get_date_list()
 
             if out_size == in_size and set(in_date12_list).issubset(set(out_date12_list)):
                 print(('All date12   exists in file {} with same size as required,'

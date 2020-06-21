@@ -5,6 +5,7 @@
 
 import os
 from minopy.defaults.auto_path import PathFind
+from Stack import config as stack_config
 
 noMCF = 'False'
 defoMax = '2'
@@ -144,6 +145,55 @@ class MinopyRun(object):
                 self.runf.write(pathObj.wrappercommandtops + configName + '\n')
             else:
                 self.runf.write(inps.template['topsStack.textCmd'] + pathObj.wrappercommandtops + configName + '\n')
+
+    def igrams_network(self, inps, pairs, low_or_high):
+
+        for pair in pairs:
+            configName = os.path.join(self.config_path, 'config_generate_ifgram_{}_{}'.format(pair[0], pair[1]))
+            configObj = stack_config(configName)
+            configObj.configure(self)
+            configObj.alks = '1'
+            configObj.rlks = '1'
+            configObj.filtStrength = '0.8'
+            configObj.unwMethod = 'snaphu'
+            self.text_cmd = ''
+
+            configObj.masterSlc = os.path.join(self.work_dir, 'SLC', pair[0] + low_or_high + pair[0] + '.slc')
+            configObj.slaveSlc = os.path.join(self.work_dir, 'SLC', pair[1] + low_or_high + pair[1] + '.slc')
+
+            configObj.outDir = os.path.join(self.ifgram_dir + low_or_high +
+                                            pair[0] + '_' + pair[1] + '/' + pair[0] + '_' + pair[1])
+            configObj.generateIgram('[Function-1]')  ###
+
+            configObj.igram = configObj.outDir + '.int'
+            configObj.filtIgram = os.path.dirname(configObj.outDir) + '/filt_' + pair[0] + '_' + pair[1] + '.int'
+            configObj.coherence = os.path.dirname(configObj.outDir) + '/filt_' + pair[0] + '_' + pair[1] + '.cor'
+            # configObj.filtStrength = filtStrength
+            configObj.filterCoherence('[Function-2]')  ###
+
+            configObj.igram = configObj.filtIgram
+            configObj.unwIfg = os.path.dirname(configObj.outDir) + '/filt_' + pair[0] + '_' + pair[1]
+            configObj.noMCF = noMCF
+            configObj.master = os.path.join(self.work_dir + '/inputs/master/data')
+            configObj.defoMax = defoMax
+            configObj.unwrap('[Function-3]')  ###
+
+            configObj.finalize()
+            self.runf.write(self.text_cmd + 'stripmapWrapper.py -c ' + configName + '\n')
+
+        configName = os.path.join(self.config_path, 'config_generate_quality_map')
+        configObj = MinopyConfig(self.config_path, configName)
+        configObj.configure(self)
+        configObj.work_dir = self.work_dir
+        configObj.ifgDir = os.path.join(self.work_dir, 'inputs')
+        configObj.rangeWindow = inps.template['mintpy.inversion.range_window']
+        configObj.azimuthWindow = inps.template['mintpy.inversion.azimuth_window']
+        configObj.generate_igram('[Function-1]')
+        configObj.finalize()
+        if inps.template['topsStack.textCmd'] is None or inps.template['topsStack.textCmd'] == 'None':
+            self.runf.write('stripmapWrapper.py -c ' + configName + '\n')
+        else:
+            self.runf.write(inps.template['topsStack.textCmd'] + 'stripmapWrapper.py -c ' + configName + '\n')
 
     def finalize(self):
         self.runf.close()
