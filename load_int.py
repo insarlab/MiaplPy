@@ -575,7 +575,7 @@ def prepare_metadata(inpsDict):
             meta_file = meta_files[0]
             baseline_dir = inpsDict['mintpy.load.baselineDir']
             geom_dir = os.path.dirname(inpsDict['mintpy.load.demFile'])
-            cmd = '{s} -i {i} -f {f} -m {m} -b {b} -g {g}'.format(s=script_name,
+            cmd = '{s} -d {i} -f {f} -m {m} -b {b} -g {g}'.format(s=script_name,
                                                                   i=ifgram_dir,
                                                                   f=ifgram_file,
                                                                   m=meta_file,

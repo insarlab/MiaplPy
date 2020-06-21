@@ -5,8 +5,9 @@
 ############################################################
 # Modified from prep4timeseries.py in ISCE-2.2.0/contrib/stack/topsStack
 #
-
-
+import isce
+import isceobj.StripmapProc.StripmapProc as St
+from isceobj.Planet.Planet import Planet
 import os
 import glob
 import shelve
@@ -127,10 +128,6 @@ def extract_stripmap_metadata(meta_file):
     Parameters: meta_file : str, path of the shelve file, i.e. masterShelve/data.dat
     Returns:    meta      : dict, metadata
     """
-    import isce
-    import isceobj
-    import isceobj.StripmapProc.StripmapProc as St
-    from isceobj.Planet.Planet import Planet
 
     if os.path.basename(meta_file) == "data.dat":    #shelve file from stripmapStack
         fbase = os.path.splitext(meta_file)[0]
@@ -371,7 +368,7 @@ def read_baseline_timeseries(baseline_dir, beam_mode='IW'):
             bDict[dates[1]] = read_stripmap_baseline(bFile)
         else:
             raise ValueError('Unrecognized beam_mode/processor: {}'.format(beam_mode))
-    bDict[dates[0]] = [0, 0]
+        bDict[dates[0]] = [0, 0]
     return bDict
 
 
@@ -380,16 +377,20 @@ def prepare_geometry(geom_dir, metadata=dict(), update_mode=True):
     """Prepare and extract metadata from geometry files"""
     print('prepare .rsc file for geometry files')
     # grab all existed files
-    isce_files = [os.path.join(os.path.abspath(geom_dir), '{}.rdr.full.xml'.format(i))
-                  for i in ['hgt', 'lat', 'lon', 'los', 'shadowMask', 'incLocal']]
-    isce_files = [i for i in isce_files if os.path.isfile(i)]
+    isce_files = ['hgt', 'lat', 'lon', 'los', 'shadowMask', 'incLocal']
+    isce_files = [os.path.join(os.path.abspath(geom_dir), x + '.rdr.full.xml') for x in isce_files]
+    # isce_files = [os.path.join(os.path.abspath(geom_dir), '{}.rdr.full.xml'.format(i))
+    #              for i in ['hgt', 'lat', 'lon', 'los', 'shadowMask', 'incLocal']]
+    if not os.path.exists(isce_files[0]):
+        isce_files = ['hgt', 'lat', 'lon', 'los', 'shadowMask', 'incLocal']
+        isce_files = [os.path.join(os.path.abspath(geom_dir), x + '.rdr.xml') for x in isce_files]
 
+    isce_files = [i for i in isce_files if os.path.isfile(i)]
     # write rsc file for each file
     for isce_file in isce_files:
         # prepare metadata for current file
         geom_metadata = read_attribute(isce_file.split('.xml')[0], metafile_ext='.xml')
         geom_metadata.update(metadata)
-
         # write .rsc file
         rsc_file = isce_file.split('.xml')[0]+'.rsc'
         writefile.write_roipac_rsc(geom_metadata, rsc_file,
@@ -400,6 +401,8 @@ def prepare_geometry(geom_dir, metadata=dict(), update_mode=True):
 
 def prepare_stack(inputDir, filePattern, metadata=dict(), baseline_dict=dict(), update_mode=True):
     print('prepare .rsc file for ', filePattern)
+    if not os.path.exists(os.path.join(os.path.abspath(inputDir), '*', filePattern)):
+        filePattern = filePattern.split('.full')[0]
     isce_files = sorted(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern + '.xml')))
     if len(isce_files) == 0:
         raise FileNotFoundError('no file found in pattern: {}'.format(filePattern))

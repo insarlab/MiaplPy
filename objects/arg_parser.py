@@ -281,6 +281,7 @@ class MinoPyParser:
             'crop',
             'create_patch',
             'inversion',
+            'slc_rewrite',
             'ifgrams',
             'unwrap',
             'load_int',

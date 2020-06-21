@@ -16,7 +16,8 @@ import gdal
 import isce
 import isceobj
 import matplotlib.pyplot as plt
-
+import glob
+import shutil
 ################################################################################
 
 
@@ -96,6 +97,82 @@ def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
     del ds
     out = slc_image[first_row:last_row, first_col:last_col]
     return out
+
+###############################################################################
+
+
+def write_SLC(date_list, slc_dir, patch_dir, range_win, azimuth_win):
+    merge_dir = slc_dir.split('minopy')[0] + '/merged/SLC'
+    if not os.path.exists(slc_dir):
+        os.mkdir(slc_dir)
+    patch_list = glob.glob(patch_dir + '/patch*')
+    patch_rows = np.load(patch_dir + '/rowpatch.npy')
+    patch_cols = np.load(patch_dir + '/colpatch.npy')
+    patch_rows_overlap = np.zeros(np.shape(patch_rows), dtype=int)
+    patch_rows_overlap[:, :, :] = patch_rows[:, :, :]
+    patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win + 1
+    patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + azimuth_win + 1
+    patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - azimuth_win + 1
+    patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + azimuth_win - 1
+
+    patch_cols_overlap = np.zeros(np.shape(patch_cols), dtype=int)
+    patch_cols_overlap[:, :, :] = patch_cols[:, :, :]
+    patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - range_win + 1
+    patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win + 1
+    patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win + 1
+    patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + range_win - 1
+
+    first_row = patch_rows_overlap[0, 0, 0]
+    last_row = patch_rows_overlap[1, 0, -1]
+    first_col = patch_cols_overlap[0, 0, 0]
+    last_col = patch_cols_overlap[1, 0, -1]
+
+    n_line = last_row - first_row
+    width = last_col - first_col
+    n_image = len(date_list)
+
+    for date_ind, date in enumerate(date_list):
+        print(date)
+        date_dir = os.path.join(slc_dir, date)
+        if not os.path.exists(date_dir):
+            os.mkdir(date_dir)
+        out_slc = os.path.join(date_dir, date + '.slc')
+        if os.path.exists(out_slc + '.xml'):
+            continue
+        slc = np.memmap(out_slc, dtype=np.complex64, mode='w+', shape=(n_line, width))
+        for patch in patch_list:
+            row = int(patch.split('patch')[-1].split('_')[0])
+            col = int(patch.split('patch')[-1].split('_')[1])
+            row1 = patch_rows_overlap[0, 0, row]
+            row2 = patch_rows_overlap[1, 0, row]
+            col1 = patch_cols_overlap[0, 0, col]
+            col2 = patch_cols_overlap[1, 0, col]
+
+            patch_lines = patch_rows[1, 0, row] - patch_rows[0, 0, row]
+            patch_samples = patch_cols[1, 0, col] - patch_cols[0, 0, col]
+
+            f_row = row1 - patch_rows[0, 0, row]
+            l_row = row2 - patch_rows[0, 0, row]
+            f_col = col1 - patch_cols[0, 0, col]
+            l_col = col2 - patch_cols[0, 0, col]
+
+            rslc_patch = np.memmap(patch + '/rslc_ref',
+                                   dtype=np.complex64, mode='r', shape=(np.int(n_image), patch_lines, patch_samples))
+            slc[row1:row2 + 1, col1:col2 + 1] = rslc_patch[date_ind, f_row:l_row + 1, f_col:l_col + 1]
+
+        obj_slc = isceobj.createSlcImage()
+        obj_slc.setFilename(out_slc)
+        obj_slc.setWidth(width)
+        obj_slc.setLength(n_line)
+        obj_slc.bands = 1
+        obj_slc.scheme = 'BIL'
+        obj_slc.dataType = 'CFLOAT'
+        obj_slc.setAccessMode('read')
+        obj_slc.renderHdr()
+        shutil.copytree(os.path.join(merge_dir, date, 'masterShelve'), os.path.join(date_dir, 'masterShelve'))
+        shutil.copytree(os.path.join(merge_dir, date, 'slaveShelve'), os.path.join(date_dir, 'slaveShelve'))
+
+    return
 
 ################################################################################
 

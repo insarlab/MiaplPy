@@ -151,9 +151,8 @@ class slcStackDict:
                     slcObj = self.pairsDict[self.pairs[i]]
                     data = slcObj.read(dsName, box=box)[0]
                     ds[i, :, :] = data
-                    self.bperp[i] = slcObj.get_perp_baseline()
-                    prog_bar.update(i+1, suffix='{}_{}'.format(self.pairs[i][0],
-                                                               self.pairs[i][1]))
+                    #self.bperp[i] = slcObj.get_perp_baseline()
+                    prog_bar.update(i+1, suffix='{}'.format(self.pairs[i][0]))
 
                 prog_bar.close()
             ds.attrs['MODIFICATION_TIME'] = str(time.time())
