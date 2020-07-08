@@ -8,11 +8,9 @@ import shutil
 import glob
 from natsort import natsorted
 from mintpy.objects.coord import coordinate
-from minopy.minopy_utilities import read_image
 import h5py
 from mintpy.utils import readfile
-from minopy.minopy_utilities import read_image
-from mintpy.utils.readfile import standardize_metadata
+#from minopy.minopy_utilities import read_image
 from mintpy.objects import (
     datasetUnitDict,
     geometry,
@@ -527,7 +525,7 @@ def read_hdf5_file(fname, datasetName=None, box=None):
 
 
 #########################################################################
-def read_binary_file(fname, datasetName=None, box=None):
+def read_binary_file(fname, datasetName=None):   # , box=None):
     """Read data from binary file, such as .unw, .cor, etc.
     Parameters: fname : str, path/name of binary file
                 datasetName : str, dataset name for file with multiple bands of data
@@ -543,10 +541,10 @@ def read_binary_file(fname, datasetName=None, box=None):
     # metadata
     atr = read_attribute(fname, metafile_ext='.xml')
     processor = atr['PROCESSOR']
-    length = int(atr['LENGTH'])
-    width = int(atr['WIDTH'])
-    if not box:
-        box = (0, 0, width, length)
+    #length = int(atr['LENGTH'])
+    #width = int(atr['WIDTH'])
+    #if not box:
+    #    box = (0, 0, width, length)
 
     # default data structure
     data_type = atr.get('DATA_TYPE', 'float32').lower()
@@ -666,11 +664,12 @@ def read_binary_file(fname, datasetName=None, box=None):
         print('Unknown InSAR processor.')
 
     # reading
-    data = read_image(fname, box=box)
+    # data = read_image(fname, box=box)
 
     if 'DATA_TYPE' not in atr:
         atr['DATA_TYPE'] = data_type
-    return data, atr
+    #return data, atr
+    return atr
 
 
 def get_slice_list(fname):
@@ -747,3 +746,32 @@ def get_slice_list(fname):
         else:
             slice_list = ['']
     return slice_list
+
+#############################################################################
+
+
+def most_common(L, k=1):
+    """Return the k most common item in the list L.
+    Examples:
+        5, 8 = most_common([4,5,5,5,5,8,8,8,9], k=2)
+        'duck' = most_common(['goose','duck','duck','dog'])
+        'goose' = most_common(['goose','duck','duck','goose'])
+    """
+    from collections import Counter
+    cnt = Counter(L)
+    item_mm = [i[0] for i in cnt.most_common(k)]
+    if k == 1:
+        item_mm = item_mm[0]
+    return item_mm
+
+
+def print_write_setting(inpsDict):
+    updateMode = inpsDict['updateMode']
+    comp = inpsDict['compression']
+    print('-'*50)
+    print('updateMode : {}'.format(updateMode))
+    print('compression: {}'.format(comp))
+    box = inpsDict['box']
+    boxGeo = inpsDict['box4geo_lut']
+    return updateMode, comp, box, boxGeo
+

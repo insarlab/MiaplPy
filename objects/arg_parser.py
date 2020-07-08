@@ -3,13 +3,16 @@
 # Project: Argument parser for minopy
 # Author: Sara Mirzaee
 ###############################################################################
+import sys
 import argparse
 from minopy.defaults import auto_path
 from minopy.defaults.auto_path import autoPath, PathFind
-import mintpy
+import minopy
 import os
 import datetime
 pathObj = PathFind()
+
+CLUSTER_LIST = ['lsf', 'pbs', 'slurm', 'local']
 
 
 
@@ -34,8 +37,12 @@ class MinoPyParser:
             self.parser = self.create_patch_parser()
         elif self.script == 'patch_inversion':
             self.parser = self.patch_inversion_parser()
+        elif self.script == 'phase_inversion':
+            self.parser = self.phase_inversion_parser()
         elif self.script == 'generate_ifgram':
             self.parser = self.generate_ifgrams_parser()
+        elif self.script == 'generate_interferograms':
+            self.parser = self.generate_interferograms_parser()
         elif self.script == 'minopy_wrapper':
             self.parser = self.minopy_wrapper_parser()
 
@@ -56,7 +63,9 @@ class MinoPyParser:
                     {}\n
                     {}\n
                     {}\n
-                    """.format(auto_path.isceAutoPath,
+                    {}\n
+                    """.format(auto_path.isceTopsAutoPath,
+                               auto_path.isceStripmapAutoPath,
                                auto_path.roipacAutoPath,
                                auto_path.gammaAutoPath)
 
@@ -65,7 +74,7 @@ class MinoPyParser:
         elif inps.print_example_template:
             raise SystemExit(DEFAULT_TEMPLATE)
         else:
-            parser.print_usage()
+            self.parser.print_usage()
             print(('{}: error: one of the following arguments are required:'
                    ' -t/--template, -H'.format(os.path.basename(__file__))))
             print('{} -H to show the example template file'.format(os.path.basename(__file__)))
@@ -86,13 +95,13 @@ class MinoPyParser:
 
         # print software version
         if inps.version:
-            raise SystemExit(mintpy.version.description)
+            raise SystemExit(minopy.version.description)
 
         if (not inps.customTemplateFile
                 and not os.path.isfile(os.path.basename(template_file))
                 and not inps.generate_template):
-            parser.print_usage()
-            print(EXAMPLE)
+            self.parser.print_usage()
+            #print(EXAMPLE)
             msg = "ERROR: no template file found! It requires:"
             msg += "\n  1) input a custom template file, OR"
             msg += "\n  2) there is a default template 'smallbaselineApp.cfg' in current directory."
@@ -135,9 +144,9 @@ class MinoPyParser:
 
         # message - software version
         if len(inps.runSteps) <= 1:
-            print(mintpy.version.description)
+            print(minopy.version.description)
         else:
-            print(mintpy.version.logo)
+            print(minopy.version.logo)
 
         # mssage - processing steps
         if len(inps.runSteps) > 0:
@@ -154,14 +163,16 @@ class MinoPyParser:
             print('Project name:', inps.project_name)
 
         if not inps.workDir:
-            if autoPath and 'SCRATCHDIR' in os.environ and inps.project_name:
+            if os.path.basename(os.getcwd()) == 'minopy':
+                inps.workDir = os.getcwd()
+            elif autoPath and 'SCRATCHDIR' in os.environ and inps.project_name:
                 inps.workDir = os.path.join(os.getenv('SCRATCHDIR'), inps.project_name, pathObj.minopydir)
             else:
                 inps.workDir = os.getcwd()
         inps.workDir = os.path.abspath(inps.workDir)
 
         if not os.path.exists(inps.workDir):
-            os.mkdir((inps.workDir))
+            os.mkdir(inps.workDir)
 
         print('-' * 50)
         return inps
@@ -177,27 +188,27 @@ class MinoPyParser:
         ## no   - save   0% disk usage, fast [default]
         ## lzf  - save ~57% disk usage, relative slow
         ## gzip - save ~62% disk usage, very slow [not recommend]
-        mintpy.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isce
-        mintpy.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
-        mintpy.load.compression    = auto  #[gzip / lzf / no], auto for no.
+        minopy.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isce
+        minopy.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
+        minopy.load.compression    = auto  #[gzip / lzf / no], auto for no.
         ##---------for ISCE only:
-        mintpy.load.metaFile       = auto  #[path2metadata_file], i.e.: ./master/IW1.xml, ./masterShelve/data.dat
-        mintpy.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
+        minopy.load.metaFile       = auto  #[path2metadata_file], i.e.: ./master/IW1.xml, ./masterShelve/data.dat
+        minopy.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
         ##---------slc datasets:
-        mintpy.load.slcFile        = auto  #[path2slc]
+        minopy.load.slcFile        = auto  #[path2slc]
         ##---------geometry datasets:
-        mintpy.load.demFile        = auto  #[path2hgt_file]
-        mintpy.load.lookupYFile    = auto  #[path2lat_file], not required for geocoded data
-        mintpy.load.lookupXFile    = auto  #[path2lon_file], not required for geocoded data
-        mintpy.load.incAngleFile   = auto  #[path2los_file], optional
-        mintpy.load.azAngleFile    = auto  #[path2los_file], optional
-        mintpy.load.shadowMaskFile = auto  #[path2shadow_file], optional
-        mintpy.load.waterMaskFile  = auto  #[path2water_mask_file], optional
-        mintpy.load.bperpFile      = auto  #[path2bperp_file], optional
+        minopy.load.demFile        = auto  #[path2hgt_file]
+        minopy.load.lookupYFile    = auto  #[path2lat_file], not required for geocoded data
+        minopy.load.lookupXFile    = auto  #[path2lon_file], not required for geocoded data
+        minopy.load.incAngleFile   = auto  #[path2los_file], optional
+        minopy.load.azAngleFile    = auto  #[path2los_file], optional
+        minopy.load.shadowMaskFile = auto  #[path2shadow_file], optional
+        minopy.load.waterMaskFile  = auto  #[path2water_mask_file], optional
+        minopy.load.bperpFile      = auto  #[path2bperp_file], optional
         ##---------subset (optional):
         ## if both yx and lalo are specified, use lalo option unless a) no lookup file AND b) dataset is in radar coord
-        mintpy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
-        mintpy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
+        minopy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
+        minopy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
         """
 
         EXAMPLE = """example:
@@ -218,7 +229,7 @@ class MinoPyParser:
         parser.add_argument('--project', type=str, dest='PROJECT_NAME',
                             help='project name of dataset for INSARMAPS Web Viewer')
         parser.add_argument('--processor', type=str, dest='processor',
-                            choices={'isce', 'snap', 'gamma', 'roipac', 'doris', 'gmtsar'},
+                            choices={'isce', 'gamma', 'roipac'},
                             help='InSAR processor/software of the file (This version only supports isce)',
                             default='isce')
         parser.add_argument('--enforce', '-f', dest='updateMode', action='store_false',
@@ -233,20 +244,9 @@ class MinoPyParser:
                             help='output HDF5 file')
         return parser
 
-    def create_patch_parser(self):
+    def phase_inversion_parser(self):
         parser = self.parser
-        patch = parser.add_argument_group('Create Patch options')
-        patch.add_argument('-w', '--workDir', type=str, dest='work_dir', help='minopy directory')
-        patch.add_argument('-r', '--rangeWin', type=int, dest='range_window', default=15,
-                           help='range window size for shp finding')
-        patch.add_argument('-a', '--azimuthWin', type=int, dest='azimuth_window', default=15,
-                           help='azimuth window size for shp finding')
-        patch.add_argument('-s', '--patchSize', type=int, dest='patch_size', default=200, help='azimuth window size for shp finding')
-        return parser
-
-    def patch_inversion_parser(self):
-        parser = self.parser
-        patch = parser.add_argument_group('Patch inversion option')
+        patch = parser.add_argument_group('Phase inversion option')
         patch.add_argument('-w', '--workDir', type=str, dest='work_dir', help='minopy directory')
         patch.add_argument('-r', '--rangeWin', type=int, dest='range_window', default=15,
                            help='range window size for shp finding')
@@ -256,7 +256,20 @@ class MinoPyParser:
                            help='inversion method (EMI, EVD, PTA, sequential_EMI, ...)')
         patch.add_argument('-t', '--test', type=str, dest='shp_test', default='ks',
                            help='shp statistical test (ks, ad, ttest)')
-        patch.add_argument('-p', '--patch', type=str, dest='patch_dir', help='patch directory ex: patch1_4')
+        patch.add_argument('-p', '--patchSize', type=int, dest='patch_size', default=200,
+                           help='azimuth window size for shp finding')
+        patch.add_argument('-s', '--slcStack', type=str, dest='slc_stack', help='SLC stack file')
+        patch.add_argument('-i', '--index', type=int, dest='index_inversion', default=0,
+                           help='The index of the first image in the ministack')
+
+        par = parser.add_argument_group('parallel', 'parallel processing using dask')
+        par.add_argument('-c', '--cluster', '--cluster-type', dest='cluster', type=str,
+                         default='local', choices=CLUSTER_LIST + ['no'],
+                         help='Cluster to use for parallel computing, no to turn OFF. (default: %(default)s).')
+        par.add_argument('--num-worker', dest='numWorker', type=str, default='4',
+                         help='Number of workers to use (default: %(default)s).')
+        par.add_argument('--config', '--config-name', dest='config', type=str, default=None,
+                         help='Configuration name to use in dask.yaml (default: %(default)s).')
         return parser
 
     @staticmethod
@@ -275,22 +288,35 @@ class MinoPyParser:
                             , help='SHP searching window size in azimuth direction. -- Default : 15')
         return parser
 
+    @staticmethod
+    def generate_interferograms_parser():
+
+        parser = argparse.ArgumentParser(description='Generate interferogram, spatial and temporal coherence from '
+                                                     'inversion outputs')
+        parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
+        parser.add_argument('-s', '--slcFile', dest='slc_file', type=str, required=True,
+                            help='Inverted interferograms')
+        parser.add_argument('-o', '--outDir', dest='ifg_dir', type=str, required=True,
+                            help='interferogram directory')
+        parser.add_argument('-b1', '--band_master', dest='band_master', type=int, default=1
+                            , help='master band in rslc_ref file. -- default = 1')
+        parser.add_argument('-b2', '--band_slave', dest='band_slave', type=int, default=None
+                            , help='master band in rslc_ref file. -- default = None')
+        parser.add_argument('-p', '--prefix', dest='prefix', type=str, default='tops'
+                            , help='ISCE stack processor: options= tops, stripmap -- default = tops')
+        return parser
+
     def minopy_wrapper_parser(self):
 
         STEP_LIST = [
             'crop',
-            'create_patch',
             'inversion',
-            'slc_rewrite',
             'ifgrams',
             'unwrap',
             'load_int',
-            'modify_network',
             'reference_point',
             'correct_unwrap_error',
             'write_to_timeseries',
-            'stack_interferograms',
-            'correct_LOD',
             'correct_troposphere',
             'deramp',
             'correct_topography',

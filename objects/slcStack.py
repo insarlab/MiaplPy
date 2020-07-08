@@ -9,11 +9,10 @@
 
 import os
 import time
-import warnings
 import h5py
 import numpy as np
-from datetime import datetime as dt
-
+from datetime import datetime
+import gdal
 try:
     from skimage.transform import resize
 except ImportError:
@@ -57,6 +56,7 @@ class slcStackDict:
 
     def __init__(self, name='slc', pairsDict=None):
         self.name = name
+        #self.pairsDict = pairsDict
         self.pairsDict = pairsDict
 
     def get_size(self, box=None):
@@ -71,10 +71,9 @@ class slcStackDict:
             self.width = slcObj.width
         return self.numSlc, self.length, self.width
 
-    def get_date12_list(self):
-        pairs = [pair for pair in self.pairsDict.keys()]
-        self.date12List = ['{}_{}'.format(i[0], i[1]) for i in pairs]
-        return self.date12List
+    def get_date_list(self):
+        self.dateList = self.pairsDict.keys()
+        return self.dateList
 
     def get_metadata(self):
         slcObj = [v for v in self.pairsDict.values()][0]
@@ -110,8 +109,10 @@ class slcStackDict:
         f = h5py.File(self.outputFile, access_mode)
         print('create HDF5 file {} with {} mode'.format(self.outputFile, access_mode))
 
-        self.pairs = sorted([pair for pair in self.pairsDict.keys()])
-        self.dsNames = list(self.pairsDict[self.pairs[0]].datasetDict.keys())
+        # self.pairs = sorted([pair for pair in self.pairsDict.keys()])
+        # self.dsNames = list(self.pairsDict[self.pairs[0]].datasetDict.keys())
+        self.dates = sorted([date for date in self.pairsDict.keys()])
+        self.dsNames = list(self.pairsDict[self.dates[0]].datasetDict.keys())
         self.dsNames = [i for i in slcDatasetNames if i in self.dsNames]
         maxDigit = max([len(i) for i in self.dsNames])
         self.get_size(box)
@@ -148,11 +149,20 @@ class slcStackDict:
                 prog_bar = ptime.progressBar(maxValue=self.numSlc)
 
                 for i in range(self.numSlc):
-                    slcObj = self.pairsDict[self.pairs[i]]
-                    data = slcObj.read(dsName, box=box)[0]
-                    ds[i, :, :] = data
-                    #self.bperp[i] = slcObj.get_perp_baseline()
-                    prog_bar.update(i+1, suffix='{}'.format(self.pairs[i][0]))
+                    slcObj = self.pairsDict[self.dates[i]]
+                    # fname, metadata = slcObj.read(dsName, box=box)
+                    fname, metadata = slcObj.read(dsName)
+
+                    if not box:
+                        box = (0, 0, self.width, self.length)
+
+                    dsSlc = gdal.Open(fname + '.vrt', gdal.GA_ReadOnly)
+                    for line in range(self.length):
+                        data = dsSlc.GetRasterBand(1).ReadAsArray()[box[1] + line:box[1] + line + 1, box[0]:box[2]]
+                        ds[i, line, :] = data
+
+                    self.bperp[i] = slcObj.get_perp_baseline()
+                    prog_bar.update(i+1, suffix='{}'.format(self.dates[i][0]))
 
                 prog_bar.close()
             ds.attrs['MODIFICATION_TIME'] = str(time.time())
@@ -166,7 +176,7 @@ class slcStackDict:
                                                                           w=maxDigit,
                                                                           t=str(dsDataType),
                                                                           s=dsShape))
-        data = np.array(self.pairs, dtype=dsDataType)
+        data = np.array(self.dates, dtype=dsDataType)
         f.create_dataset(dsName, data=data)
 
         ###############################
@@ -247,7 +257,8 @@ class slcStack:
                 self.pbase -= self.pbase[self.refIndex]
             except:
                 self.pbase = None
-        self.times = np.array([dt(*time.strptime(i, "%Y%m%d")[0:5]) for i in self.dateList])
+
+        self.times = np.array([datetime(*time.strptime(i, "%Y%m%d")[0:5]) for i in self.dateList])
         self.tbase = np.array([i.days for i in self.times - self.times[self.refIndex]],
                               dtype=np.float32)
         # list of float for year, 2014.95
@@ -512,19 +523,20 @@ class slcDict:
             dsname4atr = datasetName.split('-')[0]
         atr = read_attribute(fname, datasetName=dsname4atr, metafile_ext='.rsc')
 
-        # box
-        length, width = int(atr['LENGTH']), int(atr['WIDTH'])
-        if not box:
-            box = (0, 0, width, length)
 
         # Read Data
         fext = os.path.splitext(os.path.basename(fname))[1].lower()
         if fext in ['.h5', '.he5']:
+            # box
+            length, width = int(atr['LENGTH']), int(atr['WIDTH'])
+            if not box:
+                box = (0, 0, width, length)
             data = readfile.read_hdf5_file(fname, datasetName=datasetName, box=box)
+            return data
         else:
-            data, metadata = read_binary_file(fname, datasetName=datasetName, box=box)
-
-        return data, metadata
+            # data, metadata = read_binary_file(fname, datasetName=datasetName, box=box)
+            metadata = read_binary_file(fname, datasetName=datasetName)
+            return fname, metadata
 
     def get_size(self, family='slc'):
         self.file = self.datasetDict[family].split('.xml')[0]
