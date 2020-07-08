@@ -855,12 +855,12 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
     date12_list = stack_obj.get_date12_list(dropIfgram=True)
     date_list = stack_obj.get_date_list(dropIfgram=False)
 
-    if template['minopy.interferograms.masterDate']:
-        master_date = template['minopy.interferograms.masterDate']
+    if template['MINOPY.interferograms.masterDate']:
+        master_date = template['MINOPY.interferograms.masterDate']
     else:
         master_date = date_list[0]
 
-    if template['minopy.interferograms.type'] == 'sequential':
+    if template['MINOPY.interferograms.type'] == 'sequential':
         master_ind = False
     else:
         master_ind = date_list.index(master_date)
@@ -916,8 +916,8 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
     box_list, num_box = split2boxes(ifgram_file, memory_size=100e6)
 
     unwDatasetName = [i for i in ['unwrapPhase_bridging', 'unwrapPhase'] if i in stack_obj.datasetNames][0]
-    mask_dataset_name = template['minopy.networkInversion.maskDataset']
-    mask_threshold = float(template['minopy.networkInversion.maskThreshold'])
+    mask_dataset_name = template['mintpy.networkInversion.maskDataset']
+    mask_threshold = float(template['mintpy.networkInversion.maskThreshold'])
 
     ref_phase = stack_obj.get_reference_phase(unwDatasetName=unwDatasetName,
                                               skip_reference=True,
@@ -1096,7 +1096,7 @@ def get_phase_linking_coherence_mask(template, work_dir, functions):
     tcoh_file = os.path.join(work_dir, 'temporalCoherence.h5')
     mask_file = os.path.join(work_dir, 'maskTempCoh.h5')
 
-    tcoh_min = float(template['minopy.networkInversion.minTempCoh'])
+    tcoh_min = float(template['mintpy.networkInversion.minTempCoh'])
 
     scp_args = '{} -m {} --nonzero -o {} --update'.format(tcoh_file, tcoh_min, mask_file)
     print('generate_mask.py', scp_args)
@@ -1116,7 +1116,7 @@ def get_phase_linking_coherence_mask(template, work_dir, functions):
         generate_mask.main(scp_args.split())
         # update configKeys
         atr = {}
-        atr['minopy.networkInversion.minTempCoh'] = tcoh_min
+        atr['mintpy.networkInversion.minTempCoh'] = tcoh_min
         add_attribute(mask_file, atr)
         add_attribute(mask_file, atr)
 
@@ -1124,7 +1124,7 @@ def get_phase_linking_coherence_mask(template, work_dir, functions):
     num_pixel = np.sum(readfile.read(mask_file)[0] != 0.)
     print('number of reliable pixels: {}'.format(num_pixel))
 
-    min_num_pixel = float(template['minopy.networkInversion.minNumPixel'])
+    min_num_pixel = float(template['mintpy.networkInversion.minNumPixel'])
     if num_pixel < min_num_pixel:
         msg = "Not enough reliable pixels (minimum of {}). ".format(int(min_num_pixel))
         msg += "Try the following:\n"

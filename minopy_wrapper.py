@@ -97,22 +97,23 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.customTemplateFile = customTemplateFile
         self.cwd = os.path.abspath(os.getcwd())
 
-        # 1. Get project name
+        # 1. Go to the work directory
+        # 1.1 Get workDir
+        current_dir = os.getcwd()
+        if not self.workDir:
+            if 'minopy' in current_dir:
+                self.workDir = current_dir.split('minopy')[0] + 'minopy'
+            else:
+                self.workDir = os.path.join(current_dir, 'minopy')
+        self.workDir = os.path.abspath(self.workDir)
+
+        # 2. Get project name
         self.project_name = None
         if self.customTemplateFile and not os.path.basename(self.customTemplateFile) == 'minopy_template.cfg':
             self.project_name = os.path.splitext(os.path.basename(self.customTemplateFile))[0]
             print('Project name:', self.project_name)
         else:
             self.project_name = os.path.dirname(self.workDir)
-
-        # 2. Go to the work directory
-        # 2.1 Get workDir
-        if not self.workDir:
-            if autoPath and 'SCRATCHDIR' in os.environ and self.project_name:
-                self.workDir = os.path.join(os.getenv('SCRATCHDIR'), self.project_name, pathObj.minopydir)
-            else:
-                self.workDir = os.getcwd()
-        self.workDir = os.path.abspath(self.workDir)
 
         self.run_dir = os.path.join(self.workDir, pathObj.rundir)
         # self.patch_dir = os.path.join(self.workDir, pathObj.patchdir)
@@ -197,12 +198,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 if value in standardValues.keys():
                     cdict[key] = standardValues[value]
 
-            for key in ['minopy.deramp', 'minopy.troposphericDelay.method']:
+            for key in ['mintpy.deramp', 'mintpy.troposphericDelay.method']:
                 if key in cdict.keys():
                     cdict[key] = cdict[key].lower().replace('-', '_')
 
             if 'processor' in cdict.keys():
-                cdict['minopy.load.processor'] = cdict['processor']
+                cdict['MINOPY.load.processor'] = cdict['processor']
 
             # these metadata are used in load_data.py only, not needed afterwards
             # (in order to manually add extra offset when the lookup table is shifted)
@@ -220,11 +221,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         auto_template_file = os.path.join(os.path.dirname(__file__), 'defaults/minopy_template_defaults.cfg')
         self.template = check_template_auto_value(self.template, auto_file=auto_template_file)
         # correct some loose setup conflicts
-        if self.template['minopy.geocode'] is False:
-            for key in ['minopy.save.hdfEos5', 'minopy.save.kmz']:
+        if self.template['mintpy.geocode'] is False:
+            for key in ['mintpy.save.hdfEos5', 'mintpy.save.kmz']:
                 if self.template[key] is True:
-                    self.template['minopy.geocode'] = True
-                    print('Turn ON minopy.geocode in order to run {}.'.format(key))
+                    self.template['mintpy.geocode'] = True
+                    print('Turn ON mintpy.geocode in order to run {}.'.format(key))
                     break
 
         minopy_template = self.template.copy()
@@ -239,8 +240,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         os.chdir(self.workDir)
 
-        if self.template['minopy.subset.lalo'] == 'None' and self.template['minopy.subset.yx'] == 'None':
-            print('WARNING: No crop area given in minopy.subset, the whole image is going to be used.')
+        if self.template['mintpy.subset.lalo'] == 'None' and self.template['mintpy.subset.yx'] == 'None':
+            print('WARNING: No crop area given in mintpy.subset, the whole image is going to be used.')
             print('WARNING: May take days to process!')
         else:
             scp_args = '--template {}'.format(self.templateFile)
@@ -272,14 +273,14 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         updated_index = self.update_inversion_test()
 
         scp_args = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5} -s {a6} -i {a7} -c {a8} ' \
-                   '--num-worker {a9} \n'.format(a0=self.workDir, a1=self.template['minopy.inversion.range_window'],
-                                                 a2=self.template['minopy.inversion.azimuth_window'],
-                                                 a3=self.template['minopy.inversion.plmethod'],
-                                                 a4=self.template['minopy.inversion.shp_test'],
-                                                 a5=self.template['minopy.inversion.patch_size'],
+                   '--num-worker {a9} \n'.format(a0=self.workDir, a1=self.template['MINOPY.inversion.range_window'],
+                                                 a2=self.template['MINOPY.inversion.azimuth_window'],
+                                                 a3=self.template['MINOPY.inversion.plmethod'],
+                                                 a4=self.template['MINOPY.inversion.shp_test'],
+                                                 a5=self.template['MINOPY.inversion.patch_size'],
                                                  a6=os.path.join(self.workDir, 'inputs/slcStack.h5'),
                                                  a7=updated_index,
-                                                 a8=self.template['mintpy.compute.cluster '],
+                                                 a8=self.template['mintpy.compute.cluster'],
                                                  a9=self.template['mintpy.compute.numWorker'])
 
         print('phase_inversion.py ', scp_args)
@@ -305,12 +306,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         else:
             sensor_type = 'tops'
 
-        if self.template['minopy.interferograms.masterDate']:
-            master_date = self.template['minopy.interferograms.masterDate']
+        if self.template['MINOPY.interferograms.masterDate']:
+            master_date = self.template['MINOPY.interferograms.masterDate']
         else:
             master_date = date_list[0]
 
-        if self.template['minopy.interferograms.type'] == 'sequential':
+        if self.template['MINOPY.interferograms.type'] == 'sequential':
             master_ind = None
         else:
             master_ind = date_list.index(master_date)
@@ -355,12 +356,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         else:
             sensor_type = 'tops'
 
-        if self.template['minopy.interferograms.masterDate']:
-            master_date = self.template['minopy.interferograms.masterDate']
+        if self.template['MINOPY.interferograms.masterDate']:
+            master_date = self.template['MINOPY.interferograms.masterDate']
         else:
             master_date = date_list[0]
 
-        if self.template['minopy.interferograms.type'] == 'sequential':
+        if self.template['MINOPY.interferograms.type'] == 'sequential':
             master_ind = None
         else:
             master_ind = date_list.index(master_date)
@@ -461,7 +462,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
            2) generate average spatial coherence and its mask
            3) add REF_X/Y and/or REF_LAT/LON attribute to stack file
         """
-        self.template['mintpy.plot'] = self.template['minopy.plot']
         self.run_network_modification(step_name)
         self.generate_ifgram_aux_file()
 
@@ -506,16 +506,16 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
                 ifgram_file = os.path.join(self.workDir, 'inputs/ifgramStack.h5')
                 with h5py.File(ifgram_file, 'a') as f:
-                    f.attrs['minopy.reference.yx'] = self.template['minopy.reference.yx']
-                    f.attrs['minopy.reference.lalo'] = self.template['minopy.reference.lalo']
+                    f.attrs['mintpy.reference.yx'] = self.template['mintpy.reference.yx']
+                    f.attrs['mintpy.reference.lalo'] = self.template['mintpy.reference.lalo']
                 f.close()
 
                 self.run_reference_point(sname)
 
             elif sname == 'correct_unwrap_error':
 
-                if self.template['minopy.unwrapError.method']:
-                    self.template['minopy.unwrapError.method'] = 'bridging'
+                if self.template['mintpy.unwrapError.method']:
+                    self.template['mintpy.unwrapError.method'] = 'bridging'
                 ifgram_file = os.path.join(self.workDir, 'inputs/ifgramStack.h5')
                 with h5py.File(ifgram_file, 'a') as f:
                     if 'unwrapPhase_bridging' in f.keys():

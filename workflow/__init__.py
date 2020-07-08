@@ -5,9 +5,9 @@
 
 
 from pathlib import Path
-import importlib
 import logging
 import warnings
+import importlib
 
 
 warnings.filterwarnings("ignore")
@@ -21,10 +21,8 @@ sg_logger.setLevel(logging.WARNING)
 as_logger = logging.getLogger('asyncio')
 as_logger.setLevel(logging.WARNING)
 
-
 # expose the following modules
 __all__ = [
-    'create_patch',
     'crop_images',
     'generate_interferograms',
     'phase_inversion',

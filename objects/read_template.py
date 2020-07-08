@@ -109,7 +109,7 @@ class Template:
             '1' ---> 1
             -1 0.15 -91.6 -90.9 ---> '-1 0.15 -91.6 -90.9'
         """
-        for item in ['minopy.subset.yx', 'minopy.subset.lalo']:
+        for item in ['mintpy.subset.yx', 'mintpy.subset.lalo']:
             if item in options_in.keys():
                 value_orig = options_in[item]
                 value_new = self.check_correct_quotes(value_orig)

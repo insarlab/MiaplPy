@@ -116,16 +116,16 @@ class MinopyRun(object):
             configObj.noMCF = noMCF
             configObj.master = os.path.join(self.work_dir, 'inputs/master')
             configObj.defoMax = defoMax
-            configObj.unwMethod = inps.template['minopy.stack.unwMethod']
+            configObj.unwMethod = inps.template['MINOPY.stack.unwMethod']
             configObj.rangeLooks = '1'
             configObj.azimuthLooks = '1'
             configObj.rmFilter = 'True'
             configObj.unwrap_tops('[Function-1]')
             configObj.finalize()
-            if inps.template['minopy.stack.textCmd'] in [None, 'None']:
+            if inps.template['MINOPY.stack.textCmd'] in [None, 'None']:
                 self.runf.write(pathObj.wrappercommandtops + configName + '\n')
             else:
-                self.runf.write(inps.template['minopy.stack.textCmd'] + pathObj.wrappercommandtops + configName + '\n')
+                self.runf.write(inps.template['MINOPY.stack.textCmd'] + pathObj.wrappercommandtops + configName + '\n')
 
     def unwrap_stripmap(self, inps, pairs):
         for pair in pairs:
@@ -144,10 +144,10 @@ class MinopyRun(object):
             configObj.defoMax = defoMax
             configObj.unwrap_stripmap('[Function-1]')  ###
             configObj.finalize()
-            if inps.template['minopy.stack.textCmd'] in [None, 'None']:
+            if inps.template['MINOPY.stack.textCmd'] in [None, 'None']:
                 self.runf.write(pathObj.wrappercommandtops + configName + '\n')
             else:
-                self.runf.write(inps.template['minopy.stack.textCmd'] + pathObj.wrappercommandtops + configName + '\n')
+                self.runf.write(inps.template['MINOPY.stack.textCmd'] + pathObj.wrappercommandtops + configName + '\n')
 
     def finalize(self):
         self.runf.close()

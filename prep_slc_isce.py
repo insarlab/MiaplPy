@@ -5,6 +5,13 @@
 ############################################################
 # Modified from prep4timeseries.py in ISCE-2.2.0/contrib/stack/topsStack
 
+import warnings
+import logging
+warnings.filterwarnings("ignore")
+
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
+
 from isceobj.Planet.Planet import Planet
 import os
 import glob
@@ -13,6 +20,7 @@ import argparse
 import numpy as np
 from minopy.objects.utils import read_attribute, read
 from mintpy.utils import isce_utils, ptime, readfile, writefile, utils as ut
+
 
 
 EXAMPLE = """example:
@@ -109,6 +117,14 @@ def extract_tops_metadata(xml_file):
     # for Sentinel-1
     metadata['beam_mode'] = 'IW'
     metadata['swathNumber'] = burst.swathNumber
+
+    # Sentinel-1 TOPS spatial resolution
+    iw_str = 'IW2'
+    if os.path.basename(xml_file).startswith('IW'):
+        iw_str = os.path.splitext(os.path.basename(xml_file))[0]
+    metadata['azimuthResolution'] = isce_utils.S1_TOPS_RESOLUTION[iw_str]['azimuthResolution']
+    metadata['rangeResolution'] = isce_utils.S1_TOPS_RESOLUTION[iw_str]['rangeResolution']
+
     # 1. multipel subswaths
     xml_files = glob.glob(os.path.join(os.path.dirname(xml_file), 'IW*.xml'))
     if len(xml_files) > 1:
@@ -213,12 +229,16 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
     fbase = os.path.basename(meta_file)
     if fbase.startswith("IW"):
         print('extract metadata from ISCE/topsStack xml file:', meta_file)
-        metadata = extract_tops_metadata(meta_file)[0]
+        #metadata = extract_tops_metadata(meta_file)[0]
+        metadata = isce_utils.extract_tops_metadata(meta_file)[0]
     elif fbase.startswith("data"):
         print('extract metadata from ISCE/stripmapStack shelve file:', meta_file)
-        metadata = extract_stripmap_metadata(meta_file)[0]
+        #metadata = extract_stripmap_metadata(meta_file)[0]
+        metadata = isce_utils.extract_stripmap_metadata(meta_file)[0]
     elif fbase.endswith(".xml"):
-        metadata = extract_stripmap_metadata(meta_file)[0]
+        #metadata = extract_stripmap_metadata(meta_file)[0]
+        metadata = isce_utils.extract_stripmap_metadata(meta_file)[0]
+
     else:
         raise ValueError("unrecognized ISCE metadata file: {}".format(meta_file))
 

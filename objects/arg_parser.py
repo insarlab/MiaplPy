@@ -157,19 +157,21 @@ class MinoPyParser:
                 print('--dostep option enabled, disable the plotting at the end of the processing.')
                 inps.plot = False
 
+        current_dir = os.getcwd()
+        if not inps.workDir:
+            if 'minopy' in current_dir:
+                inps.workDir = current_dir.split('minopy')[0] + 'minopy'
+            else:
+                inps.workDir = os.path.join(current_dir, 'minopy')
+
+        inps.workDir = os.path.abspath(inps.workDir)
+
         inps.project_name = None
         if inps.customTemplateFile and not os.path.basename(inps.customTemplateFile) == 'minopy_template.cfg':
             inps.project_name = os.path.splitext(os.path.basename(inps.customTemplateFile))[0]
             print('Project name:', inps.project_name)
-
-        if not inps.workDir:
-            if os.path.basename(os.getcwd()) == 'minopy':
-                inps.workDir = os.getcwd()
-            elif autoPath and 'SCRATCHDIR' in os.environ and inps.project_name:
-                inps.workDir = os.path.join(os.getenv('SCRATCHDIR'), inps.project_name, pathObj.minopydir)
-            else:
-                inps.workDir = os.getcwd()
-        inps.workDir = os.path.abspath(inps.workDir)
+        else:
+            inps.project_name = os.path.dirname(inps.workDir)
 
         if not os.path.exists(inps.workDir):
             os.mkdir(inps.workDir)
@@ -188,27 +190,27 @@ class MinoPyParser:
         ## no   - save   0% disk usage, fast [default]
         ## lzf  - save ~57% disk usage, relative slow
         ## gzip - save ~62% disk usage, very slow [not recommend]
-        minopy.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isce
-        minopy.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
-        minopy.load.compression    = auto  #[gzip / lzf / no], auto for no.
+        MINOPY.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isce
+        MINOPY.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
+        MINOPY.load.compression    = auto  #[gzip / lzf / no], auto for no.
         ##---------for ISCE only:
-        minopy.load.metaFile       = auto  #[path2metadata_file], i.e.: ./master/IW1.xml, ./masterShelve/data.dat
-        minopy.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
+        MINOPY.load.metaFile       = auto  #[path2metadata_file], i.e.: ./master/IW1.xml, ./masterShelve/data.dat
+        MINOPY.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
         ##---------slc datasets:
-        minopy.load.slcFile        = auto  #[path2slc]
+        MINOPY.load.slcFile        = auto  #[path2slc]
         ##---------geometry datasets:
-        minopy.load.demFile        = auto  #[path2hgt_file]
-        minopy.load.lookupYFile    = auto  #[path2lat_file], not required for geocoded data
-        minopy.load.lookupXFile    = auto  #[path2lon_file], not required for geocoded data
-        minopy.load.incAngleFile   = auto  #[path2los_file], optional
-        minopy.load.azAngleFile    = auto  #[path2los_file], optional
-        minopy.load.shadowMaskFile = auto  #[path2shadow_file], optional
-        minopy.load.waterMaskFile  = auto  #[path2water_mask_file], optional
-        minopy.load.bperpFile      = auto  #[path2bperp_file], optional
+        MINOPY.load.demFile        = auto  #[path2hgt_file]
+        MINOPY.load.lookupYFile    = auto  #[path2lat_file], not required for geocoded data
+        MINOPY.load.lookupXFile    = auto  #[path2lon_file], not required for geocoded data
+        MINOPY.load.incAngleFile   = auto  #[path2los_file], optional
+        MINOPY.load.azAngleFile    = auto  #[path2los_file], optional
+        MINOPY.load.shadowMaskFile = auto  #[path2shadow_file], optional
+        MINOPY.load.waterMaskFile  = auto  #[path2water_mask_file], optional
+        MINOPY.load.bperpFile      = auto  #[path2bperp_file], optional
         ##---------subset (optional):
         ## if both yx and lalo are specified, use lalo option unless a) no lookup file AND b) dataset is in radar coord
-        minopy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
-        minopy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
+        mintpy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
+        mintpy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
         """
 
         EXAMPLE = """example:
