@@ -8,12 +8,12 @@
 
 
 import time
-from mintpy.objects.cluster import DaskCluster
+from mintpy.objects import cluster
 
 # supported / tested clusters
 CLUSTER_LIST = ['lsf', 'pbs', 'slurm', 'local']
 
-class MDaskCluster(DaskCluster):
+class MDaskCluster(cluster.DaskCluster):
     """
         Generic dask cluster wrapper for parallel processing in blocks.
 
@@ -49,7 +49,6 @@ class MDaskCluster(DaskCluster):
         # or "main" block, each worker will try to create its own client (which is bad) when loading the module
         print('initiate Dask client')
         self.client = Client(self.cluster)
-
         # split the primary box into sub boxes for each worker
         box = func_data["box"]
         range_window = func_data['range_window']
@@ -65,6 +64,43 @@ class MDaskCluster(DaskCluster):
 
         # assemble results from all workers
         return self.collect_result(futures, submission_time)
+
+    @staticmethod
+    def split_box2sub_boxes_old(box, range_window, azimuth_window, num_split):
+        """Divide the input box into `num_split` different sub_boxes.
+
+        :param box: [x0, y0, x1, y1]: list[int] of size 4
+        :param range_window: range window size for shp finding
+        :param azimuth_window: azimuth window size for shp finding
+        :param num_split: int, the number of sub_boxes to split a box into
+        :param dimension: str = 'y' or 'x', the dimension along which to split the boxes
+        :return: sub_boxes: list(list(4 int)), the splited sub boxes
+        """
+
+        x0, y0, x1, y1 = box
+        length, width = y1 - y0, x1 - x0
+        num_split_x = num_split
+        num_split_y = num_split
+
+        sub_boxes = []
+        if (length // num_split_y) < (2 * azimuth_window):
+            num_split_y = length // (2 * azimuth_window)
+        if (width // num_split_x) < (2 * range_window):
+            num_split_x = width // (2 * range_window)
+
+        for i in range(num_split_y):
+            start_y = (i * length) // num_split_y + y0
+            end_y = ((i + 1) * length) // num_split_y + y0
+            if i == num_split_y - 1:
+                end_y = y1
+            for j in range(num_split_x):
+                start_x = (j * width) // num_split_x + x0
+                end_x = ((j + 1) * width) // num_split_x + x0
+                if j == num_split_x - 1:
+                    end_x = x1
+                sub_boxes.append([start_x, start_y, end_x, end_y])
+
+        return sub_boxes
 
     @staticmethod
     def split_box2sub_boxes(box, range_window, azimuth_window, num_split, dimension='x'):

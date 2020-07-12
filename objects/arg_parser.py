@@ -261,9 +261,7 @@ class MinoPyParser:
         patch.add_argument('-p', '--patchSize', type=int, dest='patch_size', default=200,
                            help='azimuth window size for shp finding')
         patch.add_argument('-s', '--slcStack', type=str, dest='slc_stack', help='SLC stack file')
-        patch.add_argument('-i', '--index', type=int, dest='index_inversion', default=0,
-                           help='The index of the first image in the ministack')
-
+       
         par = parser.add_argument_group('parallel', 'parallel processing using dask')
         par.add_argument('-c', '--cluster', '--cluster-type', dest='cluster', type=str,
                          default='local', choices=CLUSTER_LIST + ['no'],

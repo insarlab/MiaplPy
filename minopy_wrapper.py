@@ -254,38 +254,22 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             minopy.crop_images.main(scp_args.split())
         return
 
-    def update_inversion_test(self):
-
-        slcStackObj = slcStack(self.workDir + '/inputs/slcStack.h5')
-        inverted_date_list = self.workDir + '/inverted/inverted_date_list.txt'
-
-        if not os.path.exists(inverted_date_list):
-            self.status = True
-            updated_index = 0
-        else:
-            self.status, updated_index = mut.update_or_skip_inversion(inverted_date_list, slcStackObj)
-        return updated_index
-
     def run_phase_inversion(self, sname):
         """ Non-Linear phase inversion.
         """
-
-        updated_index = self.update_inversion_test()
-
-        scp_args = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5} -s {a6} -i {a7} -c {a8} ' \
-                   '--num-worker {a9} \n'.format(a0=self.workDir, a1=self.template['MINOPY.inversion.range_window'],
+        scp_args = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5} -s {a6} -c {a7} ' \
+                   '--num-worker {a8} \n'.format(a0=self.workDir, a1=self.template['MINOPY.inversion.range_window'],
                                                  a2=self.template['MINOPY.inversion.azimuth_window'],
                                                  a3=self.template['MINOPY.inversion.plmethod'],
                                                  a4=self.template['MINOPY.inversion.shp_test'],
                                                  a5=self.template['MINOPY.inversion.patch_size'],
                                                  a6=os.path.join(self.workDir, 'inputs/slcStack.h5'),
-                                                 a7=updated_index,
-                                                 a8=self.template['mintpy.compute.cluster'],
-                                                 a9=self.template['mintpy.compute.numWorker'])
+                                                 a7=self.template['mintpy.compute.cluster'],
+                                                 a8=self.template['mintpy.compute.numWorker'])
 
         print('phase_inversion.py ', scp_args)
-        if self.status:
-            minopy.phase_inversion.main(scp_args.split())
+        minopy.phase_inversion.main(scp_args.split())
+
         return
 
     def run_interferogram(self, sname):
