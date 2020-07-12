@@ -10,14 +10,16 @@ import numpy as np
 import cmath
 import datetime
 from scipy import linalg as LA
-from scipy.optimize import minimize, Bounds
-from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind, median_absolute_deviation
+from scipy.optimize import minimize
+from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 import gdal
-import isce
 import isceobj
-import matplotlib.pyplot as plt
 import glob
 import shutil
+import warnings
+import h5py
+from mintpy.objects import timeseries, ifgramStack
+from mintpy.ifgram_inversion import split2boxes, read_unwrap_phase, mask_unwrap_phase
 ################################################################################
 
 
@@ -74,7 +76,7 @@ def patch_slice(lines, samples, azimuth_window, range_window, patch_size=200):
     patch_col_2 = patch_col_1+patch_size
     patch_col_2[-1] = samples
     patch_col_1[1::] = patch_col_1[1::] - 2*range_window
-    patch_row = [[patch_row_1], [patch_row_2]]
+    patch_rows = [[patch_row_1], [patch_row_2]]
     patch_cols = [[patch_col_1], [patch_col_2]]
     patchlist = []
 
@@ -82,7 +84,7 @@ def patch_slice(lines, samples, azimuth_window, range_window, patch_size=200):
         for col in range(len(patch_col_1)):
             patchlist.append(str(row) + '_' + str(col))
 
-    return patch_row, patch_cols, patchlist
+    return patch_rows, patch_cols, patchlist
 
 ##############################################################################
 
@@ -832,3 +834,328 @@ def email_minopy(work_dir):
         sys.exit('Error in email_minopy')
 
     return
+
+#################################
+
+
+def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
+
+    ## 1. input info
+    inps = inps_dict
+    inps.timeseriesFile = os.path.join(work_dir, 'timeseries.h5')
+    inps.tempCohFile = os.path.join(work_dir, 'temporalCoherence.h5')
+    inps.timeseriesFiles = [os.path.join(work_dir, 'timeseries.h5')]  # all ts files
+    inps.numInvFile = os.path.join(work_dir, 'numInvIfgram.h5')
+
+    ifgram_file = os.path.join(work_dir, 'inputs/ifgramStack.h5')
+
+    stack_obj = ifgramStack(ifgram_file)
+    stack_obj.open(print_msg=False)
+
+    date12_list = stack_obj.get_date12_list(dropIfgram=True)
+    date_list = stack_obj.get_date_list(dropIfgram=False)
+
+    if template['MINOPY.interferograms.masterDate']:
+        master_date = template['MINOPY.interferograms.masterDate']
+    else:
+        master_date = date_list[0]
+
+    if template['MINOPY.interferograms.type'] == 'sequential':
+        master_ind = False
+    else:
+        master_ind = date_list.index(master_date)
+
+    # 1.2 design matrix
+    A = stack_obj.get_design_matrix4timeseries(date12_list=date12_list, refDate=master_date)[0]
+    num_ifgram, num_date = A.shape[0], A.shape[1] + 1
+    inps.numIfgram = num_ifgram
+    length, width = stack_obj.length, stack_obj.width
+
+    ## 2. prepare output
+
+    # 2.1 metadata
+    metadata = dict(stack_obj.metadata)
+    metadata['REF_DATE'] = date_list[0]
+    metadata['FILE_TYPE'] = 'timeseries'
+    metadata['UNIT'] = 'm'
+
+    # 2.2 instantiate time-series
+    dsNameDict = {
+        "date": (np.dtype('S8'), (num_date,)),
+        "bperp": (np.float32, (num_date,)),
+        "timeseries": (np.float32, (num_date, length, width)),
+    }
+
+    ts_obj = timeseries(inps.timeseriesFile)
+    ts_obj.layout_hdf5(dsNameDict, metadata)
+
+    # write date time-series
+    date_list_utf8 = [dt.encode('utf-8') for dt in date_list]
+    writefile.write_hdf5_block(inps.timeseriesFile, date_list_utf8, datasetName='date')
+
+    # write bperp time-series
+    pbase = stack_obj.get_perp_baseline_timeseries(dropIfgram=True)
+    writefile.write_hdf5_block(inps.timeseriesFile, pbase, datasetName='bperp')
+
+    # 2.3 instantiate temporal coherence
+    dsNameDict = {"temporalCoherence": (np.float32, (length, width))}
+    metadata['FILE_TYPE'] = 'temporalCoherence'
+    metadata['UNIT'] = '1'
+    metadata.pop('REF_DATE')
+    writefile.layout_hdf5(inps.tempCohFile, dsNameDict, metadata=metadata)
+
+    # 2.4 instantiate number of inverted observations
+    dsNameDict = {"mask": (np.float32, (length, width))}
+    metadata['FILE_TYPE'] = 'mask'
+    metadata['UNIT'] = '1'
+    writefile.layout_hdf5(inps.numInvFile, dsNameDict, metadata=metadata)
+
+    ## 3. run the inversion / estimation and write to disk
+    # 3.1 split ifgram_file into blocks to save memory
+
+    box_list, num_box = split2boxes(ifgram_file, memory_size=100e6)
+
+    unwDatasetName = [i for i in ['unwrapPhase_bridging', 'unwrapPhase'] if i in stack_obj.datasetNames][0]
+    mask_dataset_name = template['mintpy.networkInversion.maskDataset']
+    mask_threshold = float(template['mintpy.networkInversion.maskThreshold'])
+
+    ref_phase = stack_obj.get_reference_phase(unwDatasetName=unwDatasetName,
+                                              skip_reference=True,
+                                              dropIfgram=False)
+
+    phase2range = -1 * float(metadata['WAVELENGTH']) / (4. * np.pi)
+
+    quality_name = os.path.join(work_dir, 'inverted/quality')
+    quality = np.memmap(quality_name, mode='r', dtype='float32', shape=(length, width))
+
+    for i in range(num_box):
+        box = box_list[i]
+        num_row = box[3] - box[1]
+        num_col = box[2] - box[0]
+        num_pixel = num_row * num_col
+
+        temp_coh = quality[box[1]:box[3], box[0]:box[2]]
+
+        print('\n------- Processing Patch {} out of {} --------------'.format(i + 1, num_box))
+
+        # Read/Mask unwrapPhase
+        pha_data = read_unwrap_phase(stack_obj,
+                                     box,
+                                     ref_phase,
+                                     obs_ds_name=unwDatasetName,
+                                     dropIfgram=True)
+
+        pha_data = mask_unwrap_phase(pha_data,
+                                     stack_obj,
+                                     box,
+                                     dropIfgram=True,
+                                     mask_ds_name=mask_dataset_name,
+                                     mask_threshold=mask_threshold)
+
+        # Mask for pixels to invert
+        mask = np.ones(num_pixel, np.bool_)
+
+        # Mask for Zero Phase in ALL ifgrams
+        if 'phase' in unwDatasetName.lower():
+            print('skip pixels with zero/nan value in all interferograms')
+            with warnings.catch_warnings():
+                # ignore warning message for all-NaN slices
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                phase_stack = np.nanmean(pha_data, axis=0)
+            mask *= np.multiply(~np.isnan(phase_stack), phase_stack != 0.)
+            del phase_stack
+
+        num_pixel2inv = int(np.sum(mask))
+        idx_pixel2inv = np.where(mask)[0]
+        print('number of pixels to invert: {} out of {} ({:.1f}%)'.format(
+            num_pixel2inv, num_pixel, num_pixel2inv / num_pixel * 100))
+
+        # initiale the output matrices
+        ts = np.zeros((num_date, num_pixel), np.float32)
+        num_inv_ifg = np.zeros((num_row, num_col), np.int16) + num_ifgram
+
+        if num_pixel2inv < 1:
+            ts = ts.reshape(num_date, num_row, num_col)
+        else:
+
+            # Mask for Non-Zero Phase in ALL ifgrams (share one B in sbas inversion)
+            mask_all_net = np.all(pha_data, axis=0)
+            mask_all_net *= mask
+            # mask_all_net *= mask_Coh
+            idx_pixel2inv = np.where(mask_all_net)[0]
+
+            if np.sum(mask_all_net) > 0:
+                tsi = LA.lstsq(A, pha_data[:, mask_all_net], cond=1e-5)[0]
+
+            ts[0:master_ind, idx_pixel2inv] = tsi[0:master_ind, :]
+            ts[master_ind + 1::, idx_pixel2inv] = tsi[master_ind::, :]
+            ts = ts.reshape(num_date, num_row, num_col)
+
+        print('converting phase to range')
+        ts *= phase2range
+
+        block = [0, num_date, box[1], box[3], box[0], box[2]]
+        writefile.write_hdf5_block(inps.timeseriesFile,
+                                   data=ts,
+                                   datasetName='timeseries',
+                                   block=block)
+
+        # temporal coherence - 2D
+        block = [box[1], box[3], box[0], box[2]]
+        writefile.write_hdf5_block(inps.tempCohFile,
+                                   data=temp_coh,
+                                   datasetName='temporalCoherence',
+                                   block=block)
+
+        # number of inverted obs - 2D
+        writefile.write_hdf5_block(inps.numInvFile,
+                                   data=num_inv_ifg,
+                                   datasetName='mask',
+                                   block=block)
+
+    # 4 update output data on the reference pixel
+    inps.skip_ref = True  # temporary
+    if not inps.skip_ref:
+        # grab ref_y/x
+        ref_y = int(stack_obj.metadata['REF_Y'])
+        ref_x = int(stack_obj.metadata['REF_X'])
+        print('-' * 50)
+        print('update values on the reference pixel: ({}, {})'.format(ref_y, ref_x))
+
+        print('set temporal coherence on the reference pixel to 1.')
+        with h5py.File(inps.tempCohFile, 'r+') as f:
+            f['temporalCoherence'][ref_y, ref_x] = 1.
+    return
+
+################################################################
+
+
+def get_latest_template(work_dir):
+    from minopy.objects.read_template import Template
+
+    """Get the latest version of default template file.
+    If an obsolete file exists in the working directory, the existing option values are kept.
+    """
+    lfile = os.path.join(os.path.dirname(__file__), 'defaults/minopy_template.cfg')  # latest version
+    cfile = os.path.join(work_dir, 'minopy_template.cfg')  # current version
+    if not os.path.isfile(cfile):
+        print('copy default template file {} to work directory'.format(lfile))
+        shutil.copy2(lfile, work_dir)
+    else:
+        # read custom template from file
+        cdict = Template(cfile).options
+        ldict = Template(lfile).options
+
+        if any([key not in cdict.keys() for key in ldict.keys()]):
+            print('obsolete default template detected, update to the latest version.')
+            shutil.copy2(lfile, work_dir)
+            orig_dict = Template(cfile).options
+            for key, value in orig_dict.items():
+                if key in cdict.keys() and cdict[key] != value:
+                    update = True
+            if not update:
+                print('No new option value found, skip updating ' + cfile)
+                return cfile
+
+            # Update template_file with new value from extra_dict
+            tmp_file = cfile + '.tmp'
+            f_tmp = open(tmp_file, 'w')
+            for line in open(cfile, 'r'):
+                c = [i.strip() for i in line.strip().split('=', 1)]
+                if not line.startswith(('%', '#')) and len(c) > 1:
+                    key = c[0]
+                    value = str.replace(c[1], '\n', '').split("#")[0].strip()
+                    if key in cdict.keys() and cdict[key] != value:
+                        line = line.replace(value, cdict[key], 1)
+                        print('    {}: {} --> {}'.format(key, value, cdict[key]))
+                f_tmp.write(line)
+            f_tmp.close()
+
+            # Overwrite exsting original template file
+            mvCmd = 'mv {} {}'.format(tmp_file, cfile)
+            os.system(mvCmd)
+    return cfile
+
+################################################################
+
+
+def get_phase_linking_coherence_mask(template, work_dir, functions):
+    """
+    Generate reliable pixel mask from temporal coherence
+    functions = [generate_mask, readfile, run_or_skip, add_attribute]
+    # from mintpy import generate_mask
+    # from mintpy.utils import readfile
+    # from mintpy.utils.utils import run_or_skip, add_attribute
+    """
+
+    generate_mask = functions[0]
+    readfile = functions[1]
+    run_or_skip = functions[2]
+    add_attribute = functions[3]
+
+    tcoh_file = os.path.join(work_dir, 'temporalCoherence.h5')
+    mask_file = os.path.join(work_dir, 'maskTempCoh.h5')
+
+    tcoh_min = float(template['mintpy.networkInversion.minTempCoh'])
+
+    scp_args = '{} -m {} --nonzero -o {} --update'.format(tcoh_file, tcoh_min, mask_file)
+    print('generate_mask.py', scp_args)
+
+    # update mode: run only if:
+    # 1) output file exists and newer than input file, AND
+    # 2) all config keys are the same
+
+    print('update mode: ON')
+    flag = 'skip'
+    if run_or_skip(out_file=mask_file, in_file=tcoh_file, print_msg=False) == 'run':
+        flag = 'run'
+
+    print('run or skip: {}'.format(flag))
+
+    if flag == 'run':
+        generate_mask.main(scp_args.split())
+        # update configKeys
+        atr = {}
+        atr['mintpy.networkInversion.minTempCoh'] = tcoh_min
+        add_attribute(mask_file, atr)
+        add_attribute(mask_file, atr)
+
+    # check number of pixels selected in mask file for following analysis
+    num_pixel = np.sum(readfile.read(mask_file)[0] != 0.)
+    print('number of reliable pixels: {}'.format(num_pixel))
+
+    min_num_pixel = float(template['mintpy.networkInversion.minNumPixel'])
+    if num_pixel < min_num_pixel:
+        msg = "Not enough reliable pixels (minimum of {}). ".format(int(min_num_pixel))
+        msg += "Try the following:\n"
+        msg += "1) Check the reference pixel and make sure it's not in areas with unwrapping errors\n"
+        msg += "2) Check the network and make sure it's fully connected without subsets"
+        raise RuntimeError(msg)
+    return
+
+################################################################
+
+
+def update_or_skip_inversion(inverted_date_list, slcStackObj):
+
+    with open(inverted_date_list, 'r') as f:
+        inverted_dates = f.readlines()
+
+    inverted_dates = [date.split('\n')[0] for date in inverted_dates]
+
+    slc_dates = slcStackObj.get_date_list()
+
+    update_flag = True
+    updated_index = None
+    if inverted_dates == slc_dates:
+        print(('All date exists in file {} with same size as required,'
+               ' no need to update inversion.'.format(os.path.basename(inverted_date_list))))
+        update_flag = False
+    elif len(slc_dates) < 10 + len(inverted_dates):
+        update_flag = False
+        print('Number of new images is less than 10 --> wait until at least 10 images are acquired')
+
+    else:
+        updated_index = len(inverted_dates)
+
+    return update_flag, updated_index

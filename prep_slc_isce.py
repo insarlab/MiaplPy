@@ -4,9 +4,14 @@
 # Author:  Sara Mirzaee, Zhang Yunjun, Heresh Fattahi                    #
 ############################################################
 # Modified from prep4timeseries.py in ISCE-2.2.0/contrib/stack/topsStack
-#
-import isce
-import isceobj.StripmapProc.StripmapProc as St
+
+import warnings
+import logging
+warnings.filterwarnings("ignore")
+
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
+
 from isceobj.Planet.Planet import Planet
 import os
 import glob
@@ -14,12 +19,13 @@ import shelve
 import argparse
 import numpy as np
 from minopy.objects.utils import read_attribute, read
-from mintpy.utils import ptime, readfile, writefile, utils as ut
-from mintpy.objects import datasetUnitDict
-import h5py
+from mintpy.utils import isce_utils, ptime, readfile, writefile, utils as ut
+
+
 
 EXAMPLE = """example:
   prep_slc_isce.py -s ./merged/SLC -m ./master/IW1.xml -b ./baselines -g ./merged/geom_master  #for topsStack
+  prep_slc_isce.py -s ./merged/SLC -m .merged/SLC/20190510/masterShelve/data.dat -b ./baselines -g ./merged/geom_master  #for stripmapStack
   """
 
 
@@ -111,6 +117,14 @@ def extract_tops_metadata(xml_file):
     # for Sentinel-1
     metadata['beam_mode'] = 'IW'
     metadata['swathNumber'] = burst.swathNumber
+
+    # Sentinel-1 TOPS spatial resolution
+    iw_str = 'IW2'
+    if os.path.basename(xml_file).startswith('IW'):
+        iw_str = os.path.splitext(os.path.basename(xml_file))[0]
+    metadata['azimuthResolution'] = isce_utils.S1_TOPS_RESOLUTION[iw_str]['azimuthResolution']
+    metadata['rangeResolution'] = isce_utils.S1_TOPS_RESOLUTION[iw_str]['rangeResolution']
+
     # 1. multipel subswaths
     xml_files = glob.glob(os.path.join(os.path.dirname(xml_file), 'IW*.xml'))
     if len(xml_files) > 1:
@@ -196,65 +210,6 @@ def extract_multilook_number(geom_dir, metadata=dict()):
             metadata[key] = 1
     return metadata
 
-
-def extract_geometry_metadata(geom_dir, metadata=dict()):
-    """extract metadata from geometry files"""
-
-    def get_nonzero_row_number(data, buffer=2):
-        """Find the first and last row number of rows without zero value
-        for multiple swaths data
-        """
-        if np.all(data):
-            r0, r1 = 0 + buffer, -1 - buffer
-        else:
-            row_flag = np.sum(data != 0., axis=1) == data.shape[1]
-            row_idx = np.where(row_flag)[0]
-            r0, r1 = row_idx[0] + buffer, row_idx[-1] - buffer
-        return r0, r1
-
-    # grab existing files
-    geom_files = [os.path.join(os.path.abspath(geom_dir), '{}.rdr.full.xml'.format(i))
-                  for i in ['hgt', 'lat', 'lon', 'los']]
-    geom_files = [i.split('.xml')[0] for i in geom_files if os.path.isfile(i)]
-    print('extract metadata from geometry files: {}'.format(
-        [os.path.basename(i) for i in geom_files]))
-
-    # get A/RLOOKS
-    metadata = extract_multilook_number(geom_dir, metadata)
-
-    # update pixel_size for multilooked data
-    metadata['rangePixelSize'] *= metadata['RLOOKS']
-    metadata['azimuthPixelSize'] *= metadata['ALOOKS']
-
-    # get LAT/LON_REF1/2/3/4 and HEADING into metadata
-    for geom_file in geom_files:
-        if 'lat' in os.path.basename(geom_file):
-            data = read(geom_file)[0]
-            r0, r1 = get_nonzero_row_number(data)
-            metadata['LAT_REF1'] = str(data[r0, 0])
-            metadata['LAT_REF2'] = str(data[r0, -1])
-            metadata['LAT_REF3'] = str(data[r1, 0])
-            metadata['LAT_REF4'] = str(data[r1, -1])
-
-        if 'lon' in os.path.basename(geom_file):
-            data = read(geom_file)[0]
-            r0, r1 = get_nonzero_row_number(data)
-            metadata['LON_REF1'] = str(data[r0, 0])
-            metadata['LON_REF2'] = str(data[r0, -1])
-            metadata['LON_REF3'] = str(data[r1, 0])
-            metadata['LON_REF4'] = str(data[r1, -1])
-
-        if 'los' in os.path.basename(geom_file):
-            data = readfile.read(geom_file, datasetName='az')[0]
-            data[data == 0.] = np.nan
-            az_angle = np.nanmean(data)
-            # convert isce azimuth angle to roipac orbit heading angle
-            head_angle = -1 * (270 + az_angle)
-            head_angle -= np.round(head_angle / 360.) * 360.
-            metadata['HEADING'] = str(head_angle)
-    return metadata
-
-
 def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=True):
     """Extract metadata from ISCE stack products
     Parameters: meta_file : str, path of metadata file, master/IW1.xml or masterShelve/data.dat
@@ -262,6 +217,7 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
                 rsc_file  : str, output file name of ROIPAC format rsc file
     Returns:    metadata  : dict
     """
+
     if not rsc_file:
         rsc_file = os.path.join(os.path.dirname(meta_file), 'data.rsc')
 
@@ -273,18 +229,22 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
     fbase = os.path.basename(meta_file)
     if fbase.startswith("IW"):
         print('extract metadata from ISCE/topsStack xml file:', meta_file)
-        metadata = extract_tops_metadata(meta_file)[0]
+        #metadata = extract_tops_metadata(meta_file)[0]
+        metadata = isce_utils.extract_tops_metadata(meta_file)[0]
     elif fbase.startswith("data"):
         print('extract metadata from ISCE/stripmapStack shelve file:', meta_file)
-        metadata = extract_stripmap_metadata(meta_file)[0]
+        #metadata = extract_stripmap_metadata(meta_file)[0]
+        metadata = isce_utils.extract_stripmap_metadata(meta_file)[0]
     elif fbase.endswith(".xml"):
-        metadata = extract_stripmap_metadata(meta_file)[0]
+        #metadata = extract_stripmap_metadata(meta_file)[0]
+        metadata = isce_utils.extract_stripmap_metadata(meta_file)[0]
+
     else:
         raise ValueError("unrecognized ISCE metadata file: {}".format(meta_file))
 
     # 2. extract metadata from geometry file
     if geom_dir:
-        metadata = extract_geometry_metadata(geom_dir, metadata)
+        metadata = isce_utils.extract_geometry_metadata(geom_dir, metadata)
 
     # 3. common metadata
     metadata['PROCESSOR'] = 'isce'
@@ -377,6 +337,7 @@ def prepare_geometry(geom_dir, metadata=dict(), update_mode=True):
     """Prepare and extract metadata from geometry files"""
     print('prepare .rsc file for geometry files')
     # grab all existed files
+
     isce_files = ['hgt', 'lat', 'lon', 'los', 'shadowMask', 'incLocal']
     isce_files = [os.path.join(os.path.abspath(geom_dir), x + '.rdr.full.xml') for x in isce_files]
     # isce_files = [os.path.join(os.path.abspath(geom_dir), '{}.rdr.full.xml'.format(i))
@@ -401,7 +362,7 @@ def prepare_geometry(geom_dir, metadata=dict(), update_mode=True):
 
 def prepare_stack(inputDir, filePattern, metadata=dict(), baseline_dict=dict(), update_mode=True):
     print('prepare .rsc file for ', filePattern)
-    if not os.path.exists(os.path.join(os.path.abspath(inputDir), '*', filePattern)):
+    if not os.path.exists(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern))[0]):
         filePattern = filePattern.split('.full')[0]
     isce_files = sorted(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern + '.xml')))
     if len(isce_files) == 0:
