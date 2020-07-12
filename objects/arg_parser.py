@@ -80,8 +80,8 @@ class MinoPyParser:
             print('{} -H to show the example template file'.format(os.path.basename(__file__)))
             sys.exit(1)
 
-        inps.outfile = [os.path.abspath(i) for i in inps.outfile]
-        inps.outdir = os.path.dirname(inps.outfile[0])
+        inps.out_file = [os.path.abspath(i) for i in inps.out_file]
+        inps.out_dir = os.path.dirname(inps.out_file[0])
         return inps
 
     def out_minopy_wrapper(self, sinps):
@@ -239,7 +239,7 @@ class MinoPyParser:
         parser.add_argument('--compression', choices={'gzip', 'lzf', None}, default=None,
                             help='compress loaded geometry while writing HDF5 file, default: None.')
 
-        parser.add_argument('-o', '--output', type=str, nargs=3, dest='outfile',
+        parser.add_argument('-o', '--output', type=str, nargs=3, dest='out_file',
                             default=['./inputs/slcStack.h5',
                                      './inputs/geometryRadar.h5',
                                      './inputs/geometryGeo.h5'],

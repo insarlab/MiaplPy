@@ -1053,6 +1053,8 @@ def get_latest_template(work_dir):
             for key, value in orig_dict.items():
                 if key in cdict.keys() and cdict[key] != value:
                     update = True
+                else:
+                    update = False
             if not update:
                 print('No new option value found, skip updating ' + cfile)
                 return cfile

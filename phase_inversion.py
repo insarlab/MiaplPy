@@ -227,6 +227,8 @@ class PhaseLink:
             data_kwargs['patch_width'] = box_width
             data_kwargs['patch_dir'] = patch_dir
             data_kwargs['box'] = box
+            data_kwargs['patch_row_0'] = box[1]
+            data_kwargs['patch_col_0'] = box[0]
 
             #self.cluster = 'no'
             if self.cluster == 'no':
