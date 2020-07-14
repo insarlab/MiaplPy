@@ -55,18 +55,25 @@ def main(iargs=None):
     Parser = MinoPyParser(iargs, script='minopy_wrapper')
     inps = Parser.parse()
 
-    job_file_name = 'minopy_wrapper'
-    job_name = job_file_name
-
-    if inps.wall_time == 'None':
-        inps.wall_time = '24:00'
+    if not iargs is None:
+        input_arguments = iargs
+    else:
+        input_arguments = sys.argv[1::]
 
     #########################################
     # Submit job
     #########################################
+    inps.out_dir = inps.workDir
+    inps.work_dir = inps.workDir
+    job_obj = JOB_SUBMIT(inps)
 
-    #if inps.submit_flag:
-    #    js.submit_script(job_name, job_file_name, sys.argv[:], inps.workDir, inps.wall_time, queue_name=inps.queue_name)
+    if inps.submit_flag:
+        job_name = inps.project_name
+        job_file_name = 'minopy_wrapper'
+        if '--submit' in input_arguments:
+            input_arguments.remove('--submit')
+        command = [os.path.abspath(__file__)] + input_arguments
+        job_obj.submit_script(job_name, job_file_name, command)
 
     if not iargs is None:
         mut.log_message(inps.workDir, os.path.basename(__file__) + ' ' + ' '.join(iargs[:]))
@@ -257,6 +264,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
     def run_phase_inversion(self, sname):
         """ Non-Linear phase inversion.
         """
+        if self.template['mintpy.compute.cluster'] is False:
+            self.template['mintpy.compute.cluster'] = 'no'
         scp_args = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5} -s {a6} -c {a7} ' \
                    '--num-worker {a8} \n'.format(a0=self.workDir, a1=self.template['MINOPY.inversion.range_window'],
                                                  a2=self.template['MINOPY.inversion.azimuth_window'],

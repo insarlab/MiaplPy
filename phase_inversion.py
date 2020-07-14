@@ -6,16 +6,19 @@
 import os
 import time
 import numpy as np
-import minopy_utilities as mut
-from skimage.measure import label
-from minopy.objects.arg_parser import MinoPyParser
 import h5py
-from minopy.objects import cluster_minopy
-from mintpy.utils import ptime
-from isceobj.Util.ImageUtil import ImageLib as IML
-import gdal
+import shutil
+import pickle
+
+import minopy_utilities as mut
+from minopy.objects.arg_parser import MinoPyParser
+#from minopy.objects import cluster_minopy
+#from mintpy.utils import ptime
 from minopy.objects.slcStack import slcStack
 import minopy.objects.inversion_utils as iut
+
+from minsar.job_submission import JOB_SUBMIT
+import minsar.utils.process_utilities as putils
 #################################
 
 
@@ -28,10 +31,10 @@ def main(iargs=None):
     inps = Parser.parse()
 
     # --cluster and --num-worker option
-    inps.numWorker = str(cluster_minopy.cluster.DaskCluster.format_num_worker(inps.cluster, inps.numWorker))
-    if inps.cluster != 'no' and inps.numWorker == '1':
-        print('WARNING: number of workers is 1, turn OFF parallel processing and continue')
-        inps.cluster = 'no'
+    #inps.numWorker = str(cluster_minopy.cluster.DaskCluster.format_num_worker(inps.cluster, inps.numWorker))
+    #if inps.cluster != 'no' and inps.numWorker == '1':
+    #    print('WARNING: number of workers is 1, turn OFF parallel processing and continue')
+    #    inps.cluster = 'no'
 
     inversionObj = PhaseLink(inps)
 
@@ -45,6 +48,7 @@ def main(iargs=None):
 
 class PhaseLink:
     def __init__(self, inps):
+        self.inps = inps
         self.work_dir = inps.work_dir
         self.phase_linking_method = inps.inversion_method
         self.range_window = inps.range_window
@@ -201,7 +205,7 @@ class PhaseLink:
             "azimuth_window": self.azimuth_window,
             "range_window": self.range_window,
             "phase_linking_method": self.phase_linking_method,
-            "total_mini_stack_slc_size": self.total_mini_stack_slc_size,
+            "total_mini_stack_slc_size": self.total_mini_stack_slc_size.flatten(),
             "samples": {"sample_rows": sample_rows, "sample_cols": sample_cols,
                         "reference_row": reference_row, "reference_col": reference_col},
             "slc_start_index": self.start_index,
@@ -211,6 +215,8 @@ class PhaseLink:
 
         if 'sequential' in self.phase_linking_method:
             data_kwargs['new_num_mini_stacks'] = self.new_num_mini_stacks
+
+        run_commands = []
 
         # invert / write block-by-block
         for i, box in enumerate(self.box_list):
@@ -222,6 +228,10 @@ class PhaseLink:
                 print('box length: {}'.format(box_length))
 
             patch_dir = os.path.join(self.out_dir, 'PATCH_{}'.format(i))
+
+            if os.path.exists(patch_dir + '/flag.npy'):
+                continue
+
             iut.initiate_stacks(patch_dir, box, n_inverted, len(self.all_date_list), self.shp_size)
             data_kwargs['patch_length'] = box_length
             data_kwargs['patch_width'] = box_width
@@ -230,6 +240,36 @@ class PhaseLink:
             data_kwargs['patch_row_0'] = box[1]
             data_kwargs['patch_col_0'] = box[0]
 
+            args_file = patch_dir + '/data_kwargs.pkl'
+            with open(args_file, 'wb') as handle:
+                pickle.dump(data_kwargs, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+            cmd = 'patch_invert.py --dataArg {a1} --cluster {a2} --num-worker {a3} --config-name {a4}\n'.format(
+                a1=args_file, a2=self.cluster, a3=self.numWorker, a4=self.config)
+            run_commands.append(cmd)
+
+        if len(run_commands) > 0:
+            run_dir = self.work_dir + '/run_file'
+            os.makedirs(run_dir, exist_ok=True)
+            run_file_inversion = os.path.join(run_dir, 'run_minopy_inversion')
+            with open(run_file_inversion, 'w+') as f:
+                f.writelines(run_commands)
+
+        inps_args = self.inps
+        inps_args.work_dir = run_dir
+        inps_args.out_dir = run_dir
+        job_obj = JOB_SUBMIT(inps_args)
+
+        putils.remove_last_job_running_products(run_file=run_file_inversion)
+        job_status = job_obj.submit_batch_jobs(batch_file=run_file_inversion)
+        if job_status:
+            putils.remove_zero_size_or_length_error_files(run_file=run_file_inversion)
+            putils.rerun_job_if_exit_code_140(run_file=run_file_inversion, inps_dict=inps_args)
+            putils.raise_exception_if_job_exited(run_file=run_file_inversion)
+            putils.concatenate_error_files(run_file=run_file_inversion, work_dir=inps_args.work_dir)
+            putils.move_out_job_files_to_stdout(run_file=run_file_inversion)
+
+            '''
             #self.cluster = 'no'
             if self.cluster == 'no':
                 iut.inversion(**data_kwargs)
@@ -247,67 +287,108 @@ class PhaseLink:
                 cluster_obj.close()
 
                 print('------- finished parallel processing -------\n\n')
+            '''
 
         timep = time.time() - time0
         print('time spent to do phase inversion {}: min'.format(timep / 60))
         return
 
     def close(self):
+        from isceobj.Util.ImageUtil import ImageLib as IML
+
         with open(self.out_dir + '/inverted_date_list.txt', 'w+') as f:
-            dates = [date + '\n' for date in self.date_list]
+            dates = [date + '\n' for date in self.all_date_list]
             f.writelines(dates)
 
         if 'sequential' in self.phase_linking_method:
-
-            if os.path.exists(self.out_dir + '/old'):
-                os.system('rm -r {}'.format(self.out_dir + '/old'))
 
             datum_file = os.path.join(self.out_dir, 'datum.h5')
             squeezed_image_file = os.path.join(self.out_dir, 'squeezed_images')
             datum_shift_file = os.path.join(self.out_dir, 'datum_shift')
 
             squeezed_images_memmap = np.memmap(squeezed_image_file, dtype='complex64', mode='r',
-                                        shape=(len(self.temp_mini_stack_slc_size), self.length, self.width))
+                                        shape=(len(self.total_mini_stack_slc_size), self.length, self.width))
             datum_shift_memmap = np.memmap(datum_shift_file, dtype='float32', mode='r',
-                                        shape=(len(self.temp_mini_stack_slc_size), self.length, self.width))
-
+                                        shape=(len(self.total_mini_stack_slc_size), self.length, self.width))
 
             with h5py.File(datum_file, 'a') as ds:
                 if 'squeezed_images' in ds.keys():
-                    del ds['squeezed_images']
-                    del ds['datum_shift']
-                    del ds['miniStack_size']
+                    ds['squeezed_images'].resize(len(self.total_mini_stack_slc_size), 0)
+                    ds['datum_shift'].resize(len(self.total_mini_stack_slc_size), 0)
+                    ds['miniStack_size'].resize(len(self.total_mini_stack_slc_size), 0)
+                else:
+                    ds.create_dataset('squeezed_images',
+                                      shape=(len(self.total_mini_stack_slc_size), self.length, self.width),
+                                      maxshape=(None, self.length, self.width),
+                                      dtype='complex64')
+                    ds.create_dataset('datum_shift',
+                                      shape=(len(self.total_mini_stack_slc_size), self.length, self.width),
+                                      maxshape=(None, self.length, self.width),
+                                      dtype='float32')
+                    ds.create_dataset('miniStack_size',
+                                      shape=(len(self.total_mini_stack_slc_size), 1),
+                                      maxshape=(None, 1),
+                                      dtype='float32')
 
-                squeezed_images = ds.create_dataset('squeezed_images',
-                                                    shape=(len(self.temp_mini_stack_slc_size), self.length, self.width),
-                                                    maxshape=(None, self.length, self.width),
-                                                    dtype='complex64')
-                datum_shift = ds.create_dataset('datum_shift',
-                                                    shape=(len(self.temp_mini_stack_slc_size), self.length, self.width),
-                                                    maxshape=(None, self.length, self.width),
-                                                    dtype='float32')
-                for line in range(self.length):
-                    squeezed_images[:, line:line+1, :] = squeezed_images_memmap[:, line:line+1, :]
-                    datum_shift[:, line:line+1, :] = datum_shift_memmap[:, line:line+1, :]
-
-                miniStack_size = ds.create_dataset('miniStack_size',
-                                                    shape=(len(self.temp_mini_stack_slc_size), 1),
-                                                    maxshape=(None, 1),
-                                                    dtype='float32')
-                miniStack_size[:] = self.temp_mini_stack_slc_size[:]
+                ds['squeezed_images'][:, :, :] = squeezed_images_memmap[:, :, :]
+                ds['datum_shift'][:, :, :] = datum_shift_memmap[:, :, :]
+                ds['miniStack_size'][:] = self.total_mini_stack_slc_size[:]
 
                 self.metadata['FILE_TYPE'] = 'datum'
                 for key, value in self.metadata.items():
                     ds.attrs[key] = value
 
-            os.system('rm -r {} {}'.format(squeezed_image_file, datum_shift_file))
+        quality_file = self.out_dir + '/quality'
+        if not os.path.exists(quality_file):
+            quality_memmap = np.memmap(quality_file, mode='write', dtype='float32', shape=(self.length, self.width))
+            IML.renderISCEXML(quality_file, bands=1, nyy=self.length, nxx=self.width, datatype='float32', scheme='BIL')
+        else:
+            quality_memmap = np.memmap(quality_file, mode='r+', dtype='float32', shape=(self.length, self.width))
 
+        RSLCfile = self.out_dir + '/rslc_ref.h5'
+        RSLC = h5py.File(RSLCfile, 'a')
+        if 'slc' in RSLC.keys():
+            RSLC['slc'].resize(len(self.all_date_list), 0)
+            shp_update = False
+        else:
+            RSLC.create_dataset('slc',
+                              shape=(len(self.all_date_list), self.length, self.width),
+                              maxshape=(None, self.length, self.width),
+                              dtype='complex64')
+
+            RSLC.create_dataset('shp',
+                              shape=(self.shp_size, self.length, self.width),
+                              maxshape=(None, self.length, self.width),
+                              dtype='complex64')
+            shp_update = True
+        patch_list = []
+        for i, box in enumerate(self.box_list):
+            patch_dir = self.out_dir + '/PATCH_{}'.format(i)
+            patch_list.append(patch_dir)
+            box_length = box[3] - box[1]
+            box_width = box[2] - box[0]
+            rslc_ref = np.memmap(patch_dir + '/rslc_ref', mode='r+', dtype='complexx64',
+                                 shape=(len(self.all_date_list), box_length, box_width))
+            quality = np.memmap(patch_dir + '/quality', mode='r+', dtype='float32', shape=(box_length, box_width))
+
+            RSLC['slc'][:, box[1]:box[3], box[0]:box[2]] = rslc_ref[:, :, :]
+            quality_memmap[:, box[1]:box[3], box[0]:box[2]] = quality[:, :]
+
+            if shp_update:
+                shp = np.memmap(patch_dir + '/shp', mode='r+', dtype='float32',
+                                shape=(self.shp_size, box_length, box_width))
+                RSLC['shp'][:, box[1]:box[3], box[0]:box[2]] = shp[:, :, :]
+
+        RSLC.close()
+
+        remove_directories = [squeezed_image_file, datum_shift_file] + patch_list
+        for item in remove_directories:
+            if os.path.exists(item):
+                shutil.rmtree(item)
         return
 
 
 #################################################
-
-
 
 if __name__ == '__main__':
     main()

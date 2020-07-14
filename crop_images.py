@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 ############################################################
 # Program is part of MiNoPy                                #
-# Author:  Sara Mirzaee, Zhang Yunjun, Heresh Fattahi      #
+# Author:  Sara Mirzaee                                    #
 ############################################################
 import os
 import glob
@@ -24,22 +24,22 @@ from minopy.objects.utils import read_attribute, coord_rev
 from minopy.objects.arg_parser import MinoPyParser
 
 #################################################################
-datasetName2templateKey = {'slc': 'mintpy.load.slcFile',
-                           'unwrapPhase': 'mintpy.load.unwFile',
-                           'coherence': 'mintpy.load.corFile',
-                           'connectComponent': 'mintpy.load.connCompFile',
-                           'wrapPhase': 'mintpy.load.intFile',
-                           'iono': 'mintpy.load.ionoFile',
-                           'height': 'mintpy.load.demFile',
-                           'latitude': 'mintpy.load.lookupYFile',
-                           'longitude': 'mintpy.load.lookupXFile',
-                           'azimuthCoord': 'mintpy.load.lookupYFile',
-                           'rangeCoord': 'mintpy.load.lookupXFile',
-                           'incidenceAngle': 'mintpy.load.incAngleFile',
-                           'azimuthAngle': 'mintpy.load.azAngleFile',
-                           'shadowMask': 'mintpy.load.shadowMaskFile',
-                           'waterMask': 'mintpy.load.waterMaskFile',
-                           'bperp': 'mintpy.load.bperpFile'
+datasetName2templateKey = {'slc': 'MINOPY.load.slcFile',
+                           'unwrapPhase': 'MINOPY.load.unwFile',
+                           'coherence': 'MINOPY.load.corFile',
+                           'connectComponent': 'MINOPY.load.connCompFile',
+                           'wrapPhase': 'MINOPY.load.intFile',
+                           'iono': 'MINOPY.load.ionoFile',
+                           'height': 'MINOPY.load.demFile',
+                           'latitude': 'MINOPY.load.lookupYFile',
+                           'longitude': 'MINOPY.load.lookupXFile',
+                           'azimuthCoord': 'MINOPY.load.lookupYFile',
+                           'rangeCoord': 'MINOPY.load.lookupXFile',
+                           'incidenceAngle': 'MINOPY.load.incAngleFile',
+                           'azimuthAngle': 'MINOPY.load.azAngleFile',
+                           'shadowMask': 'MINOPY.load.shadowMaskFile',
+                           'waterMask': 'MINOPY.load.waterMaskFile',
+                           'bperp': 'MINOPY.load.bperpFile'
                            }
 
 
@@ -116,9 +116,9 @@ def read_inps2dict(inps):
     for key, value in template.items():
         inpsDict[key] = value
     if 'processor' in template.keys():
-        template['mintpy.load.processor'] = template['processor']
+        template['MINOPY.load.processor'] = template['processor']
 
-    prefix = 'mintpy.load.'
+    prefix = 'MINOPY.load.'
     key_list = [i.split(prefix)[1] for i in template.keys() if i.startswith(prefix)]
     for key in key_list:
         value = template[prefix + key]
@@ -145,7 +145,7 @@ def read_inps2dict(inps):
     if (auto_path.autoPath
             and 'SCRATCHDIR' in os.environ
             and inpsDict['PROJECT_NAME'] is not None
-            and inpsDict['mintpy.load.slcFile'] == 'auto'):
+            and inpsDict['MINOPY.load.slcFile'] == 'auto'):
         print(('check auto path setting for Univ of Miami users'
                ' for processor: {}'.format(inpsDict['processor'])))
         inpsDict = auto_path.get_auto_path(processor=inpsDict['processor'],
@@ -163,7 +163,7 @@ def prepare_metadata(inpsDict):
     print('-' * 50)
     print('prepare metadata files for {} products'.format(processor))
     if processor in ['gamma', 'roipac', 'snap']:
-        for key in [i for i in inpsDict.keys() if (i.startswith('mintpy.load.') and i.endswith('File'))]:
+        for key in [i for i in inpsDict.keys() if (i.startswith('MINOPY.load.') and i.endswith('File'))]:
             if len(glob.glob(str(inpsDict[key]))) > 0:
                 cmd = '{} {}'.format(script_name, inpsDict[key])
                 print(cmd)
@@ -171,15 +171,15 @@ def prepare_metadata(inpsDict):
 
     elif processor == 'isce':
 
-        slc_dir = os.path.dirname(os.path.dirname(inpsDict['mintpy.load.slcFile']))
-        slc_file = os.path.basename(inpsDict['mintpy.load.slcFile'])
-        meta_files = sorted(glob.glob(inpsDict['mintpy.load.metaFile']))
+        slc_dir = os.path.dirname(os.path.dirname(inpsDict['MINOPY.load.slcFile']))
+        slc_file = os.path.basename(inpsDict['MINOPY.load.slcFile'])
+        meta_files = sorted(glob.glob(inpsDict['MINOPY.load.metaFile']))
         if len(meta_files) < 1:
-            warnings.warn('No input metadata file found: {}'.format(inpsDict['mintpy.load.metaFile']))
+            warnings.warn('No input metadata file found: {}'.format(inpsDict['MINOPY.load.metaFile']))
         try:
             meta_file = meta_files[0]
-            baseline_dir = inpsDict['mintpy.load.baselineDir']
-            geom_dir = os.path.dirname(inpsDict['mintpy.load.demFile'])
+            baseline_dir = inpsDict['MINOPY.load.baselineDir']
+            geom_dir = os.path.dirname(inpsDict['MINOPY.load.demFile'])
             cmd = '{s} -s {i} -f {f} -m {m} -b {b} -g {g}'.format(s=script_name,
                                                                   i=slc_dir,
                                                                   f=slc_file,
@@ -205,8 +205,8 @@ def read_subset_box(inpsDict):
     # Grab required info to read input geo_box into pix_box
 
     try:
-        lookupFile = [glob.glob(str(inpsDict['mintpy.load.lookupYFile'] + '.xml'))[0],
-                      glob.glob(str(inpsDict['mintpy.load.lookupXFile'] + '.xml'))[0]]
+        lookupFile = [glob.glob(str(inpsDict['MINOPY.load.lookupYFile'] + '.xml'))[0],
+                      glob.glob(str(inpsDict['MINOPY.load.lookupXFile'] + '.xml'))[0]]
         lookupFile = [x.split('.xml')[0] for x in lookupFile]
     except:
         lookupFile = None
@@ -240,7 +240,7 @@ def read_subset_box(inpsDict):
         # ONLY IF there is no input subset
         # Use the min bbox if files size are different
         if inpsDict['processor'] == 'snap':
-            fnames = ut.get_file_list(inpsDict['mintpy.load.slcFile'])
+            fnames = ut.get_file_list(inpsDict['MINOPY.load.slcFile'])
             pix_box = update_box4files_with_inconsistent_size(fnames)
 
         if not pix_box:

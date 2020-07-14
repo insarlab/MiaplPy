@@ -39,8 +39,8 @@ class MinoPyParser:
             self.parser = self.patch_inversion_parser()
         elif self.script == 'phase_inversion':
             self.parser = self.phase_inversion_parser()
-        elif self.script == 'generate_ifgram':
-            self.parser = self.generate_ifgrams_parser()
+        elif self.script == 'patch_invert':
+            self.parser = self.patch_inversion_parser()
         elif self.script == 'generate_interferograms':
             self.parser = self.generate_interferograms_parser()
         elif self.script == 'minopy_wrapper':
@@ -273,19 +273,20 @@ class MinoPyParser:
         return parser
 
     @staticmethod
-    def generate_ifgrams_parser():
+    def patch_inversion_parser():
 
-        parser = argparse.ArgumentParser(description='Generate interferogram, spatial and temporal coherence from '
-                                                     'inversion outputs')
-        parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-        parser.add_argument('-w', '--workDir', dest='work_dir', type=str, required=True,
-                            help='minopy directory (inversion results)')
-        parser.add_argument('-i', '--ifgDir', dest='ifg_dir', type=str, required=True,
-                            help='interferogram directory')
-        parser.add_argument('-r', '--rangeWindow', dest='range_win', type=str, default='15'
-                            , help='SHP searching window size in range direction. -- Default : 15')
-        parser.add_argument('-a', '--azimuthWindow', dest='azimuth_win', type=str, default='15'
-                            , help='SHP searching window size in azimuth direction. -- Default : 15')
+        parser = argparse.ArgumentParser(description='patch inversion options')
+        parser.add_argument('-d', '--dataArg', dest='data_kwargs', type=str, required=True,
+                            help='dictionary of input arguments')
+        par = parser.add_argument_group('parallel', 'parallel processing using dask')
+        par.add_argument('-c', '--cluster', '--cluster-type', dest='cluster', type=str,
+                         default='local', choices=CLUSTER_LIST + ['no'],
+                         help='Cluster to use for parallel computing, no to turn OFF. (default: %(default)s).')
+        par.add_argument('--num-worker', dest='numWorker', type=str, default='4',
+                         help='Number of workers to use (default: %(default)s).')
+        par.add_argument('--config', '--config-name', dest='config', type=str, default=None,
+                         help='Configuration name to use in dask.yaml (default: %(default)s).')
+
         return parser
 
     @staticmethod

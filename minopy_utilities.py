@@ -13,7 +13,7 @@ from scipy import linalg as LA
 from scipy.optimize import minimize
 from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 import gdal
-import isceobj
+#import isceobj
 import glob
 import shutil
 import warnings
@@ -91,7 +91,7 @@ def patch_slice(lines, samples, azimuth_window, range_window, patch_size=200):
 
 def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
     """ Read SLC file and return crop. """
-
+    import isceobj
     obj_slc = isceobj.createSlcImage()
     obj_slc.load(slc_file + '.xml')
     ds = gdal.Open(slc_file + '.vrt', gdal.GA_ReadOnly)
@@ -104,6 +104,7 @@ def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
 
 
 def write_SLC(date_list, slc_dir, patch_dir, range_win, azimuth_win):
+    import isceobj
     merge_dir = slc_dir.split('minopy')[0] + '/merged/SLC'
     if not os.path.exists(slc_dir):
         os.mkdir(slc_dir)
@@ -293,8 +294,7 @@ def optphase(x0, inverse_gam):
     x = np.matrix(x)
     y = np.matmul(x.getH(), inverse_gam)
     y = np.matmul(y, x)
-    f = np.abs(np.log(y))
-
+    f = float(np.abs(np.log(y)))
     return f
 
 ###############################################################################
@@ -302,8 +302,7 @@ def optphase(x0, inverse_gam):
 
 def PTA_L_BFGS(coh0):
     """ Uses L-BFGS method to optimize PTA function and estimate phase values. """
-
-    n = coh0.shape[0]
+    n_image = coh0.shape[0]
     x0 = np.angle(EMI_phase_estimation(coh0))
     x0 = x0 - x0[0]
     abs_coh = regularize_matrix(np.abs(coh0))
@@ -311,8 +310,8 @@ def PTA_L_BFGS(coh0):
         inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh0))
         res = minimize(optphase, x0, args=inverse_gam, method='L-BFGS-B',
                        tol=None, options={'gtol': 1e-6, 'disp': False})
-        out = res.x.reshape(n, 1)
-        vec = np.multiply(np.abs(x0), np.exp(1j * out)).reshape(n, 1)
+        out = res.x.reshape(n_image, 1)
+        vec = np.multiply(np.abs(x0), np.exp(1j * out)).reshape(n_image, 1)
 
         x0 = np.exp(1j * np.angle(vec[0]))
         vec = np.multiply(vec, np.conj(x0))

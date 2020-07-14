@@ -9,7 +9,7 @@ import minopy_utilities as mut
 from skimage.measure import label
 import h5py
 from mintpy.utils import ptime
-from isceobj.Util.ImageUtil import ImageLib as IML
+from minopy.objects.arg_parser import MinoPyParser
 
 
 def inversion(slc_stack_file=None, distance_thresh=None, azimuth_window=None, range_window=None, phase_linking_method='EMI',
@@ -153,7 +153,7 @@ def inversion(slc_stack_file=None, distance_thresh=None, azimuth_window=None, ra
 
                 temp_datum_shift[:, coord[0]:coord[0] + 1, coord[1]: coord[1] + 1] = datum_shift.reshape(-1, 1, 1)
 
-        prog_bar.update(i + 1, every=1000, suffix='{}/{} pixels'.format(i + 1, num_pixel2inv))
+        prog_bar.update(i + 1, every=100, suffix='{}/{} pixels'.format(i + 1, num_pixel2inv))
         i += 1
 
     return
@@ -291,6 +291,7 @@ def get_numpy_data_from_file(out_dir, file, box, dtype, shape=None):
 
 
 def initiate_stacks(patch_dir, box, n_inverted, n_total, shp_size):
+    from isceobj.Util.ImageUtil import ImageLib as IML
 
     out_dir = os.path.dirname(patch_dir)
     RSLCfile = out_dir + '/rslc_ref.h5'
