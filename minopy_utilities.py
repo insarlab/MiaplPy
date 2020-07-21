@@ -1137,14 +1137,14 @@ def get_phase_linking_coherence_mask(template, work_dir, functions):
 ################################################################
 
 
-def update_or_skip_inversion(inverted_date_list, slcStackObj):
+def update_or_skip_inversion(inverted_date_list, slc_dates):
 
     with open(inverted_date_list, 'r') as f:
         inverted_dates = f.readlines()
 
     inverted_dates = [date.split('\n')[0] for date in inverted_dates]
-
-    slc_dates = slcStackObj.get_date_list()
+    new_slc_dates = list(set(slc_dates) - set(inverted_dates))
+    all_date_list = new_slc_dates + inverted_dates
 
     update_flag = True
     updated_index = None
@@ -1159,4 +1159,4 @@ def update_or_skip_inversion(inverted_date_list, slcStackObj):
     else:
         updated_index = len(inverted_dates)
 
-    return update_flag, updated_index
+    return updated_index, all_date_list

@@ -50,16 +50,16 @@ MINOPY.load.baselineDir    = ${PROJECT_DIR}/baselines
 MINOPY.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc
 MINOPY.load.unwFile        = ${PROJECT_DIR}/minopy/inverted/interferograms/*/fine*.unw
 MINOPY.load.corFile        = ${PROJECT_DIR}/minopy/inverted/interferograms/*/fine*.cor
-MINOPY.load.connCompFile   = ${PROJECT_DIR}/minopy/inverted/interferograms/*/*.unw.conncomp
+MINOPY.load.connCompFile   = ${PROJECT_DIR}/minopy/inverted/interferograms/*/*.conncomp
 MINOPY.load.ionoFile       = None
 MINOPY.load.intFile        = None
 
-MINOPY.load.demFile        = ${PROJECT_DIR}/merged/geom_master/hgt.rdr.full
-MINOPY.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_master/lat.rdr.full
-MINOPY.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_master/lon.rdr.full
-MINOPY.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_master/los.rdr.full
-MINOPY.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_master/los.rdr.full
-MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_master/shadowMask.rdr.full
+MINOPY.load.demFile        = ${PROJECT_DIR}/merged/geom_master/hgt.rdr
+MINOPY.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_master/lat.rdr
+MINOPY.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_master/lon.rdr
+MINOPY.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_master/los.rdr
+MINOPY.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_master/los.rdr
+MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_master/shadowMask.rdr
 MINOPY.load.bperpFile      = None
 
 '''

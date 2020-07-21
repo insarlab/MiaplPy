@@ -65,6 +65,7 @@ def main(iargs=None):
     #########################################
     inps.out_dir = inps.workDir
     inps.work_dir = inps.workDir
+    inps.custom_template_file = inps.customTemplateFile
     job_obj = JOB_SUBMIT(inps)
 
     if inps.submit_flag:
@@ -275,6 +276,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                  a6=os.path.join(self.workDir, 'inputs/slcStack.h5'),
                                                  a7=self.template['mintpy.compute.cluster'],
                                                  a8=self.template['mintpy.compute.numWorker'])
+
+        if not self.inps.wall_time in ['None', None]:
+            scp_args += '--walltime {}'.format(self.inps.wall_time)
 
         print('phase_inversion.py ', scp_args)
         minopy.phase_inversion.main(scp_args.split())

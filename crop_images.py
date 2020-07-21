@@ -20,7 +20,7 @@ from mintpy.utils import readfile, ptime, utils as ut
 from mintpy import subset
 import mintpy.load_data as mld
 from minopy.objects.utils import check_template_auto_value
-from minopy.objects.utils import read_attribute, coord_rev
+from minopy.objects.utils import read_attribute, coord_rev, print_write_setting
 from minopy.objects.arg_parser import MinoPyParser
 
 #################################################################
@@ -409,14 +409,14 @@ def update_object(outFile, inObj, box, updateMode=True):
     if updateMode and ut.run_or_skip(outFile, check_readable=True) == 'skip':
         if inObj.name == 'slc':
             in_size = inObj.get_size(box=box)[1:]
-            in_date12_list = inObj.get_date12_list()
+            in_date_list = inObj.get_date_list()
 
             outObj = slcStack(outFile)
             out_size = outObj.get_size()[1:]
             # out_date12_list = outObj.get_date12_list(dropIfgram=False)
-            out_date12_list = outObj.get_date_list()
+            out_date_list = outObj.get_date_list()
 
-            if out_size == in_size and set(in_date12_list).issubset(set(out_date12_list)):
+            if out_size == in_size and set(in_date_list).issubset(set(out_date_list)):
                 print(('All date12   exists in file {} with same size as required,'
                        ' no need to re-load.'.format(os.path.basename(outFile))))
                 write_flag = False

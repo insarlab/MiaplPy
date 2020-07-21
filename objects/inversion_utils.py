@@ -4,6 +4,7 @@
 ############################################################
 
 import os
+import sys
 import numpy as np
 import minopy_utilities as mut
 from skimage.measure import label
@@ -99,6 +100,9 @@ def inversion(slc_stack_file=None, distance_thresh=None, azimuth_window=None, ra
 
             num_shp = len(shp[shp > 0])
             shp_rows, shp_cols = np.where(shp == 1)
+            #rowcol_set = [(r, c) for r, c in zip(shp_rows, shp_cols)]
+            #target_index = rowcol_set.index((int(reference_row), int(reference_col)))
+
             shp_rows = np.array(shp_rows + data[0] - (azimuth_window - 1) / 2).astype(int)
             shp_cols = np.array(shp_cols + data[1] - (range_window - 1) / 2).astype(int)
 
@@ -143,19 +147,14 @@ def inversion(slc_stack_file=None, distance_thresh=None, azimuth_window=None, ra
                                   total_mini_stack_slc_size,
                                   old_datum_shift)
 
-                rowcol_set = [(r, c) for r, c in zip(shp_rows, shp_cols)]
-                ref_row = int(reference_row + data[0] - (azimuth_window - 1) / 2)
-                ref_col = int(reference_col + data[1] - (range_window - 1) / 2)
-                target_index = rowcol_set.index((ref_row, ref_col))
+                #temp_squeezed_images[:, data[0]:data[0] + 1, data[1]: data[1] + 1] = \
+                #    np.array(squeezed_images[:, target_index]).reshape(-1, 1, 1)
 
-                temp_squeezed_images[:, data[0]:data[0] + 1, data[1]: data[1] + 1] = \
-                    np.array(squeezed_images[:, target_index]).reshape(-1, 1, 1)
-
-                temp_datum_shift[:, coord[0]:coord[0] + 1, coord[1]: coord[1] + 1] = datum_shift.reshape(-1, 1, 1)
+                #temp_datum_shift[:, coord[0]:coord[0] + 1, coord[1]: coord[1] + 1] = datum_shift.reshape(-1, 1, 1)
 
         prog_bar.update(i + 1, every=100, suffix='{}/{} pixels'.format(i + 1, num_pixel2inv))
         i += 1
-
+    np.save(patch_dir + '/flag.npy', 'This patch is done')
     return
 
 def sequential_phase_linking(full_stack_complex_samples, method, mini_stack_default_size, new_num_mini_stacks):

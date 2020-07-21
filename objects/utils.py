@@ -10,7 +10,7 @@ from natsort import natsorted
 from mintpy.objects.coord import coordinate
 import h5py
 from mintpy.utils import readfile
-#from minopy.minopy_utilities import read_image
+from minopy.minopy_utilities import read_image
 from mintpy.objects import (
     datasetUnitDict,
     geometry,
@@ -525,7 +525,7 @@ def read_hdf5_file(fname, datasetName=None, box=None):
 
 
 #########################################################################
-def read_binary_file(fname, datasetName=None):   # , box=None):
+def read_binary_file(fname, datasetName=None, box=None):
     """Read data from binary file, such as .unw, .cor, etc.
     Parameters: fname : str, path/name of binary file
                 datasetName : str, dataset name for file with multiple bands of data
@@ -664,12 +664,12 @@ def read_binary_file(fname, datasetName=None):   # , box=None):
         print('Unknown InSAR processor.')
 
     # reading
-    # data = read_image(fname, box=box)
+    data = read_image(fname, box=box)
 
     if 'DATA_TYPE' not in atr:
         atr['DATA_TYPE'] = data_type
-    #return data, atr
-    return atr
+    return data, atr
+    #return atr
 
 
 def get_slice_list(fname):

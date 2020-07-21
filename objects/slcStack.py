@@ -155,11 +155,8 @@ class slcStackDict:
 
                     if not box:
                         box = (0, 0, self.width, self.length)
-
                     dsSlc = gdal.Open(fname + '.vrt', gdal.GA_ReadOnly)
-                    for line in range(self.length):
-                        data = dsSlc.GetRasterBand(1).ReadAsArray()[box[1] + line:box[1] + line + 1, box[0]:box[2]]
-                        ds[i, line, :] = data
+                    ds[i, :, :] = dsSlc.GetRasterBand(1).ReadAsArray(box[0], box[1], self.width, self.length)
 
                     self.bperp[i] = slcObj.get_perp_baseline()
                     prog_bar.update(i+1, suffix='{}'.format(self.dates[i][0]))

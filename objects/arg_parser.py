@@ -27,7 +27,7 @@ class MinoPyParser:
         commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
         commonp.add_argument('--walltime', dest='wall_time', default='None',
                              help='walltime for submitting the script as a job')
-        commonp.add_argument('--queue', dest='queue_name', default=None, help='Queue name')
+        commonp.add_argument('--queue', dest='queue', default=None, help='Queue name')
 
     def parse(self):
 
@@ -44,7 +44,7 @@ class MinoPyParser:
         elif self.script == 'generate_interferograms':
             self.parser = self.generate_interferograms_parser()
         elif self.script == 'minopy_wrapper':
-            self.parser = self.minopy_wrapper_parser()
+            self.parser, self.STEP_LIST = self.minopy_wrapper_parser()
 
         inps = self.parser.parse_args(args=self.iargs)
 
@@ -113,9 +113,9 @@ class MinoPyParser:
             inps.customTemplateFile = os.path.abspath(inps.customTemplateFile)
             if not os.path.isfile(inps.customTemplateFile):
                 raise FileNotFoundError(inps.customTemplateFile)
-            elif os.path.basename(inps.customTemplateFile) == os.path.basename(template_file):
-                # ignore if smallbaselineApp.cfg is input as custom template
-                inps.customTemplateFile = None
+            #elif os.path.basename(inps.customTemplateFile) == os.path.basename(template_file):
+            #    # ignore if minopy_template.cfg is input as custom template
+            #    inps.customTemplateFile = None
 
         # check input --start/end/dostep
         for key in ['startStep', 'endStep', 'doStep']:
@@ -307,7 +307,8 @@ class MinoPyParser:
                             , help='ISCE stack processor: options= tops, stripmap -- default = tops')
         return parser
 
-    def minopy_wrapper_parser(self):
+    @staticmethod
+    def minopy_wrapper_parser():
 
         STEP_LIST = [
             'crop',
@@ -350,7 +351,6 @@ class MinoPyParser:
               minopy_wrapper.py GalapagosSenDT128.template --start crop         # start from the step 'download' 
               minopy_wrapper.py GalapagosSenDT128.template --stop  unwrap       # end after step 'interferogram'
               """
-
         parser = argparse.ArgumentParser(description='Routine Time Series Analysis for Small Baseline InSAR Stack',
                                          formatter_class=argparse.RawTextHelpFormatter,
                                          epilog=EXAMPLE)
@@ -378,7 +378,7 @@ class MinoPyParser:
         parser.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
         parser.add_argument('--walltime', dest='wall_time', default='None',
                             help='walltime for submitting the script as a job')
-        parser.add_argument('--queue', dest='queue_name', default=None, help='Queue name')
+        parser.add_argument('--queue', dest='queue', default=None, help='Queue name')
 
         step = parser.add_argument_group('steps processing (start/end/dostep)', STEP_HELP)
         step.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
@@ -388,9 +388,7 @@ class MinoPyParser:
         step.add_argument('--dostep', dest='doStep', metavar='STEP',
                           help='run processing at the named step only')
 
-        self.STEP_LIST = STEP_LIST
-
-        return parser
+        return parser, STEP_LIST
 
 
 

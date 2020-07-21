@@ -13,9 +13,10 @@ import pickle
 import minopy_utilities as mut
 from minopy.objects.arg_parser import MinoPyParser
 #from minopy.objects import cluster_minopy
-#from mintpy.utils import ptime
+from mintpy.utils import ptime
 from minopy.objects.slcStack import slcStack
 import minopy.objects.inversion_utils as iut
+from isceobj.Util.ImageUtil import ImageLib as IML
 
 from minsar.job_submission import JOB_SUBMIT
 import minsar.utils.process_utilities as putils
@@ -37,11 +38,13 @@ def main(iargs=None):
     #    inps.cluster = 'no'
 
     inversionObj = PhaseLink(inps)
+    inversionObj.iterate_coords()
+    inversionObj.close()
 
     # Phase linking inversion:
-    if not inversionObj.start_index is None:
-        inversionObj.iterate_coords()
-        inversionObj.close()
+    #if not inversionObj.start_index is None:
+    #    inversionObj.iterate_coords()
+    #    inversionObj.close()
 
     return None
 
@@ -114,12 +117,12 @@ class PhaseLink:
         sample_rows = np.ogrid[-((self.azimuth_window - 1) / 2):((self.azimuth_window - 1) / 2) + 1]
         sample_rows = sample_rows.astype(int)
         reference_row = np.array([(self.azimuth_window - 1) / 2]).astype(int)
-        reference_row = reference_row - (self.azimuth_window - len(sample_rows))
+        #reference_row = reference_row - (self.azimuth_window - len(sample_rows))
 
         sample_cols = np.ogrid[-((self.range_window - 1) / 2):((self.range_window - 1) / 2) + 1]
         sample_cols = sample_cols.astype(int)
         reference_col = np.array([(self.range_window - 1) / 2]).astype(int)
-        reference_col = reference_col - (self.range_window - len(sample_cols))
+        #reference_col = reference_col - (self.range_window - len(sample_cols))
         return sample_rows, sample_cols, reference_row, reference_col
 
     def patch_slice(self):
@@ -153,7 +156,8 @@ class PhaseLink:
             old_num_mini_stacks = 0
             old_mini_stack_slc_size = None
 
-        total_num_mini_stacks = self.new_num_mini_stacks + old_num_mini_stacks
+        total_num_mini_stacks = len(self.all_date_list) // self.mini_stack_default_size
+        #self.new_num_mini_stacks + old_num_mini_stacks
         total_mini_stack_slc_size = np.zeros([total_num_mini_stacks, 1])
 
         if not old_mini_stack_slc_size is None:
@@ -177,17 +181,24 @@ class PhaseLink:
         else:
             temp_squeezed_image = np.memmap(temp_squeezed_images_file, dtype='complex64', mode='r+',
                                             shape=(total_num_mini_stacks, self.length, self.width))
+            IML.renderISCEXML(temp_squeezed_images_file, bands=total_num_mini_stacks, nyy=self.length,
+                              nxx=self.width, datatype='complex64', scheme='BSQ')
+
 
         if not os.path.exists(temp_datum_shift_file):
-            temp_datum_shift = np.memmap(temp_datum_shift_file, dtype='complex64', mode='write',
+            temp_datum_shift = np.memmap(temp_datum_shift_file, dtype='float32', mode='write',
                                             shape=(total_num_mini_stacks, self.length, self.width))
         else:
-            temp_datum_shift = np.memmap(temp_datum_shift_file, dtype='complex64', mode='r+',
+            temp_datum_shift = np.memmap(temp_datum_shift_file, dtype='float32', mode='r+',
                                             shape=(total_num_mini_stacks, self.length, self.width))
 
+            IML.renderISCEXML(temp_squeezed_images_file, bands=total_num_mini_stacks, nyy=self.length,
+                              nxx=self.width, datatype='float32', scheme='BSQ')
+
         if not old_mini_stack_slc_size is None:
-            temp_squeezed_image[0:old_num_mini_stacks, :, :] = old_squeezed_images[:, :, :]
-            temp_datum_shift[0:old_num_mini_stacks, :, :] = old_datum_shift[:, :, :]
+            for img in range(old_num_mini_stacks):
+                temp_squeezed_image[img, :, :] = old_squeezed_images[img, :, :]
+                temp_datum_shift[img, :, :] = old_datum_shift[img, :, :]
 
         ds.close()
         del temp_squeezed_image, temp_datum_shift
@@ -255,19 +266,19 @@ class PhaseLink:
             with open(run_file_inversion, 'w+') as f:
                 f.writelines(run_commands)
 
-        inps_args = self.inps
-        inps_args.work_dir = run_dir
-        inps_args.out_dir = run_dir
-        job_obj = JOB_SUBMIT(inps_args)
+            inps_args = self.inps
+            inps_args.work_dir = run_dir
+            inps_args.out_dir = run_dir
+            job_obj = JOB_SUBMIT(inps_args)
 
-        putils.remove_last_job_running_products(run_file=run_file_inversion)
-        job_status = job_obj.submit_batch_jobs(batch_file=run_file_inversion)
-        if job_status:
-            putils.remove_zero_size_or_length_error_files(run_file=run_file_inversion)
-            putils.rerun_job_if_exit_code_140(run_file=run_file_inversion, inps_dict=inps_args)
-            putils.raise_exception_if_job_exited(run_file=run_file_inversion)
-            putils.concatenate_error_files(run_file=run_file_inversion, work_dir=inps_args.work_dir)
-            putils.move_out_job_files_to_stdout(run_file=run_file_inversion)
+            putils.remove_last_job_running_products(run_file=run_file_inversion)
+            job_status = job_obj.submit_batch_jobs(batch_file=run_file_inversion)
+            if job_status:
+                putils.remove_zero_size_or_length_error_files(run_file=run_file_inversion)
+                putils.rerun_job_if_exit_code_140(run_file=run_file_inversion, inps_dict=inps_args)
+                putils.raise_exception_if_job_exited(run_file=run_file_inversion)
+                putils.concatenate_error_files(run_file=run_file_inversion, work_dir=inps_args.work_dir)
+                putils.move_out_job_files_to_stdout(run_file=run_file_inversion)
 
             '''
             #self.cluster = 'no'
@@ -294,7 +305,6 @@ class PhaseLink:
         return
 
     def close(self):
-        from isceobj.Util.ImageUtil import ImageLib as IML
 
         with open(self.out_dir + '/inverted_date_list.txt', 'w+') as f:
             dates = [date + '\n' for date in self.all_date_list]
@@ -320,14 +330,17 @@ class PhaseLink:
                     ds.create_dataset('squeezed_images',
                                       shape=(len(self.total_mini_stack_slc_size), self.length, self.width),
                                       maxshape=(None, self.length, self.width),
+                                      chunks=True,
                                       dtype='complex64')
                     ds.create_dataset('datum_shift',
                                       shape=(len(self.total_mini_stack_slc_size), self.length, self.width),
                                       maxshape=(None, self.length, self.width),
+                                      chunks=True,
                                       dtype='float32')
                     ds.create_dataset('miniStack_size',
                                       shape=(len(self.total_mini_stack_slc_size), 1),
                                       maxshape=(None, 1),
+                                      chunks=True,
                                       dtype='float32')
 
                 ds['squeezed_images'][:, :, :] = squeezed_images_memmap[:, :, :]
@@ -351,23 +364,30 @@ class PhaseLink:
             RSLC['slc'].resize(len(self.all_date_list), 0)
             shp_update = False
         else:
+            self.metadata['FILE_TYPE'] = 'slc'
+            for key, value in self.metadata.items():
+                RSLC.attrs[key] = value
             RSLC.create_dataset('slc',
                               shape=(len(self.all_date_list), self.length, self.width),
                               maxshape=(None, self.length, self.width),
+                              chunks=True,
                               dtype='complex64')
 
             RSLC.create_dataset('shp',
                               shape=(self.shp_size, self.length, self.width),
                               maxshape=(None, self.length, self.width),
+                              chunks=True,
                               dtype='complex64')
             shp_update = True
         patch_list = []
+        prog_bar = ptime.progressBar(maxValue=len(self.box_list))
+        i = 0
         for i, box in enumerate(self.box_list):
             patch_dir = self.out_dir + '/PATCH_{}'.format(i)
             patch_list.append(patch_dir)
             box_length = box[3] - box[1]
             box_width = box[2] - box[0]
-            rslc_ref = np.memmap(patch_dir + '/rslc_ref', mode='r+', dtype='complexx64',
+            rslc_ref = np.memmap(patch_dir + '/rslc_ref', mode='r+', dtype='complex64',
                                  shape=(len(self.all_date_list), box_length, box_width))
             quality = np.memmap(patch_dir + '/quality', mode='r+', dtype='float32', shape=(box_length, box_width))
 
@@ -379,12 +399,15 @@ class PhaseLink:
                                 shape=(self.shp_size, box_length, box_width))
                 RSLC['shp'][:, box[1]:box[3], box[0]:box[2]] = shp[:, :, :]
 
+            prog_bar.update(i + 1, every=10, suffix='{}/{} pixels'.format(i + 1, len(self.box_list)))
+            i += 1
+
         RSLC.close()
 
-        remove_directories = [squeezed_image_file, datum_shift_file] + patch_list
-        for item in remove_directories:
-            if os.path.exists(item):
-                shutil.rmtree(item)
+        #remove_directories = [squeezed_image_file, datum_shift_file] + patch_list
+        #for item in remove_directories:
+        #    if os.path.exists(item):
+        #        shutil.rmtree(item)
         return
 
 
