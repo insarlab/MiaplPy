@@ -379,6 +379,9 @@ class PhaseLink:
                               chunks=True,
                               dtype='complex64')
             shp_update = True
+        IML.renderISCEXML(RSLCfile, bands=len(self.all_date_list), nyy=self.length, nxx=self.width,
+                          datatype='complex64', scheme='BSQ')
+        '''
         patch_list = []
         prog_bar = ptime.progressBar(maxValue=len(self.box_list))
         i = 0
@@ -392,7 +395,7 @@ class PhaseLink:
             quality = np.memmap(patch_dir + '/quality', mode='r+', dtype='float32', shape=(box_length, box_width))
 
             RSLC['slc'][:, box[1]:box[3], box[0]:box[2]] = rslc_ref[:, :, :]
-            quality_memmap[:, box[1]:box[3], box[0]:box[2]] = quality[:, :]
+            quality_memmap[box[1]:box[3], box[0]:box[2]] = quality[:, :]
 
             if shp_update:
                 shp = np.memmap(patch_dir + '/shp', mode='r+', dtype='float32',
@@ -401,6 +404,7 @@ class PhaseLink:
 
             prog_bar.update(i + 1, every=10, suffix='{}/{} pixels'.format(i + 1, len(self.box_list)))
             i += 1
+        '''
 
         RSLC.close()
 

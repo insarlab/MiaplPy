@@ -289,7 +289,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """ Export single master interferograms
         """
 
-        inverted_slc = os.path.join(self.workDir, 'inverted/rslc_ref')
+        inverted_slc = os.path.join(self.workDir, 'inverted/rslc_ref.h5')
         ifgram_dir = os.path.join(self.workDir, 'inverted/interferograms')
         os.makedirs(ifgram_dir, exist_ok='True')
 
