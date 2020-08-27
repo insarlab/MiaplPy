@@ -252,7 +252,6 @@ def submit_single_job(job_file_name, work_dir, scheduler=None):
 
     except subprocess.CalledProcessError as grepexc:
         print("error code", grepexc.returncode, grepexc.output)
-
     # get job number to return
     if scheduler == "LSF":
         # works for 'Job <19490923> is submitted to queue <general>.\n'

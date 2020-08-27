@@ -10,6 +10,7 @@ import minopy_utilities as mnp
 from skimage.measure import label
 from minopy.objects.arg_parser import MinoPyParser
 
+
 #################################
 
 
@@ -49,10 +50,15 @@ class PhaseLink:
             self.shp_function = mnp.ADtest
         elif self.shp_test == 'ttest':
             self.shp_function = mnp.ttest_indtest
-        else:   # default is KS 2 sample test
+        else:  # default is KS 2 sample test
             self.shp_function = mnp.ks2smapletest
 
-        count_dim = np.load(self.patch_dir + '/count.npy')
+        try:
+            count_dim = np.load(self.patch_dir + '/count.npy')
+        except not count_dim:
+            os.system('chmod +x {}'.format(self.patch_dir + '/count.npy'))
+            count_dim = np.load(self.patch_dir + '/count.npy')
+
         self.n_image = count_dim[0]
         self.length = count_dim[1]
         self.width = count_dim[2]
@@ -97,8 +103,8 @@ class PhaseLink:
         lin, sam = np.meshgrid(lin, sam)
 
         self.coords = list(map(lambda y, x: (int(y), int(x)),
-                          lin.T.reshape(overlap_length * overlap_width, 1),
-                          sam.T.reshape(overlap_length * overlap_width, 1)))
+                               lin.T.reshape(overlap_length * overlap_width, 1),
+                               sam.T.reshape(overlap_length * overlap_width, 1)))
         self.coords = np.transpose(np.array(self.coords))
 
         self.sample_rows = np.ogrid[-((self.azimuth_window - 1) / 2):((self.azimuth_window - 1) / 2) + 1]
@@ -112,7 +118,7 @@ class PhaseLink:
         self.reference_col = self.reference_col - (self.range_window - len(self.sample_cols))
 
         self.rslc = np.memmap(self.patch_dir + '/rslc', dtype=np.complex64, mode='r',
-                                 shape=(self.n_image, self.length, self.width))
+                              shape=(self.n_image, self.length, self.width))
 
         shp_size = self.range_window * self.azimuth_window
         if not os.path.isfile(self.patch_dir + '/shp'):
@@ -125,18 +131,18 @@ class PhaseLink:
         if not os.path.exists(self.patch_dir + '/rslc_ref'):
 
             self.rslc_ref = np.memmap(self.patch_dir + '/rslc_ref', dtype='complex64', mode='w+',
-                                         shape=(self.n_image, self.length, self.width))
+                                      shape=(self.n_image, self.length, self.width))
 
             self.rslc_ref[:, :, :] = self.rslc[:, :, :]
 
         else:
             self.rslc_ref = np.memmap(self.patch_dir + '/rslc_ref', dtype='complex64', mode='r+',
-                                         shape=(self.n_image, self.length, self.width))
+                                      shape=(self.n_image, self.length, self.width))
 
         if not os.path.exists(self.patch_dir + '/quality'):
 
             self.quality = np.memmap(self.patch_dir + '/quality', dtype='float32', mode='w+',
-                                        shape=(self.length, self.width))
+                                     shape=(self.length, self.width))
             self.quality[:, :] = -1
         else:
             self.quality = np.memmap(self.patch_dir + '/quality', dtype='float32', mode='r+',
@@ -185,7 +191,7 @@ class PhaseLink:
             shp = self.shp[:, coord[0], coord[1]].reshape(self.azimuth_window, self.range_window)
 
         if self.quality[coord[0], coord[1]] == -1:
-
+            
             num_shp = len(shp[shp > 0])
 
             shp_rows, shp_cols = np.where(shp == 1)
@@ -231,7 +237,6 @@ class PhaseLink:
 
 
 if __name__ == '__main__':
-
     main()
 
 #################################################

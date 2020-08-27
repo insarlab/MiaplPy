@@ -10,13 +10,17 @@ import numpy as np
 import cmath
 import datetime
 from scipy import linalg as LA
-from scipy.optimize import minimize, Bounds
-from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind, median_absolute_deviation
+from scipy.optimize import minimize
+from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 import gdal
-import isce
 import isceobj
-import matplotlib.pyplot as plt
-
+from mroipac.looks.Looks import Looks
+import glob
+import shutil
+import warnings
+import h5py
+from mintpy.objects import timeseries, ifgramStack
+from mintpy.ifgram_inversion import split2boxes, read_unwrap_phase, mask_unwrap_phase
 ################################################################################
 
 
@@ -32,14 +36,14 @@ def log_message(logdir, msg):
 ################################################################################
 
 
-def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
+def convert_geo2image_coord(geo_reference_dir, lat_south, lat_north, lon_west, lon_east):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
-    ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
+    ds = gdal.Open(geo_reference_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
     lat_lut = ds.GetRasterBand(1).ReadAsArray()
     del ds
 
-    ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
+    ds = gdal.Open(geo_reference_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
     lon_lut = ds.GetRasterBand(1).ReadAsArray()
     del ds
 
@@ -73,7 +77,7 @@ def patch_slice(lines, samples, azimuth_window, range_window, patch_size=200):
     patch_col_2 = patch_col_1+patch_size
     patch_col_2[-1] = samples
     patch_col_1[1::] = patch_col_1[1::] - 2*range_window
-    patch_row = [[patch_row_1], [patch_row_2]]
+    patch_rows = [[patch_row_1], [patch_row_2]]
     patch_cols = [[patch_col_1], [patch_col_2]]
     patchlist = []
 
@@ -81,14 +85,14 @@ def patch_slice(lines, samples, azimuth_window, range_window, patch_size=200):
         for col in range(len(patch_col_1)):
             patchlist.append(str(row) + '_' + str(col))
 
-    return patch_row, patch_cols, patchlist
+    return patch_rows, patch_cols, patchlist
 
 ##############################################################################
 
 
 def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
     """ Read SLC file and return crop. """
-
+    import isceobj
     obj_slc = isceobj.createSlcImage()
     obj_slc.load(slc_file + '.xml')
     ds = gdal.Open(slc_file + '.vrt', gdal.GA_ReadOnly)
@@ -96,6 +100,83 @@ def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
     del ds
     out = slc_image[first_row:last_row, first_col:last_col]
     return out
+
+###############################################################################
+
+
+def write_SLC(date_list, slc_dir, patch_dir, range_win, azimuth_win):
+    import isceobj
+    merge_dir = slc_dir.split('minopy')[0] + '/merged/SLC'
+    if not os.path.exists(slc_dir):
+        os.mkdir(slc_dir)
+    patch_list = glob.glob(patch_dir + '/patch*')
+    patch_rows = np.load(patch_dir + '/rowpatch.npy')
+    patch_cols = np.load(patch_dir + '/colpatch.npy')
+    patch_rows_overlap = np.zeros(np.shape(patch_rows), dtype=int)
+    patch_rows_overlap[:, :, :] = patch_rows[:, :, :]
+    patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win + 1
+    patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + azimuth_win + 1
+    patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - azimuth_win + 1
+    patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + azimuth_win - 1
+
+    patch_cols_overlap = np.zeros(np.shape(patch_cols), dtype=int)
+    patch_cols_overlap[:, :, :] = patch_cols[:, :, :]
+    patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - range_win + 1
+    patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win + 1
+    patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win + 1
+    patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + range_win - 1
+
+    first_row = patch_rows_overlap[0, 0, 0]
+    last_row = patch_rows_overlap[1, 0, -1]
+    first_col = patch_cols_overlap[0, 0, 0]
+    last_col = patch_cols_overlap[1, 0, -1]
+
+    n_line = last_row - first_row
+    width = last_col - first_col
+    n_image = len(date_list)
+
+    for date_ind, date in enumerate(date_list):
+        print(date)
+        date_dir = os.path.join(slc_dir, date)
+        if not os.path.exists(date_dir):
+            os.mkdir(date_dir)
+        out_slc = os.path.join(date_dir, date + '.slc')
+        if os.path.exists(out_slc + '.xml'):
+            continue
+        slc = np.memmap(out_slc, dtype=np.complex64, mode='w+', shape=(n_line, width))
+        for patch in patch_list:
+            row = int(patch.split('patch')[-1].split('_')[0])
+            col = int(patch.split('patch')[-1].split('_')[1])
+            row1 = patch_rows_overlap[0, 0, row]
+            row2 = patch_rows_overlap[1, 0, row]
+            col1 = patch_cols_overlap[0, 0, col]
+            col2 = patch_cols_overlap[1, 0, col]
+
+            patch_lines = patch_rows[1, 0, row] - patch_rows[0, 0, row]
+            patch_samples = patch_cols[1, 0, col] - patch_cols[0, 0, col]
+
+            f_row = row1 - patch_rows[0, 0, row]
+            l_row = row2 - patch_rows[0, 0, row]
+            f_col = col1 - patch_cols[0, 0, col]
+            l_col = col2 - patch_cols[0, 0, col]
+
+            rslc_patch = np.memmap(patch + '/rslc_ref',
+                                   dtype=np.complex64, mode='r', shape=(np.int(n_image), patch_lines, patch_samples))
+            slc[row1:row2 + 1, col1:col2 + 1] = rslc_patch[date_ind, f_row:l_row + 1, f_col:l_col + 1]
+
+        obj_slc = isceobj.createSlcImage()
+        obj_slc.setFilename(out_slc)
+        obj_slc.setWidth(width)
+        obj_slc.setLength(n_line)
+        obj_slc.bands = 1
+        obj_slc.scheme = 'BIL'
+        obj_slc.dataType = 'CFLOAT'
+        obj_slc.setAccessMode('read')
+        obj_slc.renderHdr()
+        shutil.copytree(os.path.join(merge_dir, date, 'referenceShelve'), os.path.join(date_dir, 'referenceShelve'))
+        shutil.copytree(os.path.join(merge_dir, date, 'secondaryShelve'), os.path.join(date_dir, 'secondaryShelve'))
+
+    return
 
 ################################################################################
 
@@ -214,8 +295,7 @@ def optphase(x0, inverse_gam):
     x = np.matrix(x)
     y = np.matmul(x.getH(), inverse_gam)
     y = np.matmul(y, x)
-    f = np.abs(np.log(y))
-
+    f = float(np.abs(np.log(y)))
     return f
 
 ###############################################################################
@@ -223,8 +303,7 @@ def optphase(x0, inverse_gam):
 
 def PTA_L_BFGS(coh0):
     """ Uses L-BFGS method to optimize PTA function and estimate phase values. """
-
-    n = coh0.shape[0]
+    n_image = coh0.shape[0]
     x0 = np.angle(EMI_phase_estimation(coh0))
     x0 = x0 - x0[0]
     abs_coh = regularize_matrix(np.abs(coh0))
@@ -232,8 +311,8 @@ def PTA_L_BFGS(coh0):
         inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh0))
         res = minimize(optphase, x0, args=inverse_gam, method='L-BFGS-B',
                        tol=None, options={'gtol': 1e-6, 'disp': False})
-        out = res.x.reshape(n, 1)
-        vec = np.multiply(np.abs(x0), np.exp(1j * out)).reshape(n, 1)
+        out = res.x.reshape(n_image, 1)
+        vec = np.multiply(np.abs(x0), np.exp(1j * out)).reshape(n_image, 1)
 
         x0 = np.exp(1j * np.angle(vec[0]))
         vec = np.multiply(vec, np.conj(x0))
@@ -755,3 +834,368 @@ def email_minopy(work_dir):
         sys.exit('Error in email_minopy')
 
     return
+
+#################################
+
+
+def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
+
+    ## 1. input info
+    inps = inps_dict
+    inps.timeseriesFile = os.path.join(work_dir, 'timeseries.h5')
+    inps.tempCohFile = os.path.join(work_dir, 'temporalCoherence.h5')
+    inps.timeseriesFiles = [os.path.join(work_dir, 'timeseries.h5')]  # all ts files
+    inps.numInvFile = os.path.join(work_dir, 'numInvIfgram.h5')
+
+    ifgram_file = os.path.join(work_dir, 'inputs/ifgramStack.h5')
+
+    stack_obj = ifgramStack(ifgram_file)
+    stack_obj.open(print_msg=False)
+
+    date12_list = stack_obj.get_date12_list(dropIfgram=True)
+    date_list = stack_obj.get_date_list(dropIfgram=False)
+
+    if template['MINOPY.interferograms.referenceDate']:
+        reference_date = template['MINOPY.interferograms.referenceDate']
+    else:
+        reference_date = date_list[0]
+
+    if template['MINOPY.interferograms.type'] == 'sequential':
+        reference_ind = False
+    else:
+        reference_ind = date_list.index(reference_date)
+
+    # 1.2 design matrix
+    A = stack_obj.get_design_matrix4timeseries(date12_list=date12_list, refDate=reference_date)[0]
+    num_ifgram, num_date = A.shape[0], A.shape[1] + 1
+    inps.numIfgram = num_ifgram
+    length, width = stack_obj.length, stack_obj.width
+
+    ## 2. prepare output
+
+    # 2.1 metadata
+    metadata = dict(stack_obj.metadata)
+    metadata['REF_DATE'] = date_list[0]
+    metadata['FILE_TYPE'] = 'timeseries'
+    metadata['UNIT'] = 'm'
+
+    # 2.2 instantiate time-series
+    dsNameDict = {
+        "date": (np.dtype('S8'), (num_date,)),
+        "bperp": (np.float32, (num_date,)),
+        "timeseries": (np.float32, (num_date, length, width)),
+    }
+
+    ts_obj = timeseries(inps.timeseriesFile)
+    ts_obj.layout_hdf5(dsNameDict, metadata)
+
+    # write date time-series
+    date_list_utf8 = [dt.encode('utf-8') for dt in date_list]
+    writefile.write_hdf5_block(inps.timeseriesFile, date_list_utf8, datasetName='date')
+
+    # write bperp time-series
+    pbase = stack_obj.get_perp_baseline_timeseries(dropIfgram=True)
+    writefile.write_hdf5_block(inps.timeseriesFile, pbase, datasetName='bperp')
+
+    # 2.3 instantiate temporal coherence
+    dsNameDict = {"temporalCoherence": (np.float32, (length, width))}
+    metadata['FILE_TYPE'] = 'temporalCoherence'
+    metadata['UNIT'] = '1'
+    metadata.pop('REF_DATE')
+    writefile.layout_hdf5(inps.tempCohFile, dsNameDict, metadata=metadata)
+
+    # 2.4 instantiate number of inverted observations
+    dsNameDict = {"mask": (np.float32, (length, width))}
+    metadata['FILE_TYPE'] = 'mask'
+    metadata['UNIT'] = '1'
+    writefile.layout_hdf5(inps.numInvFile, dsNameDict, metadata=metadata)
+
+    ## 3. run the inversion / estimation and write to disk
+    # 3.1 split ifgram_file into blocks to save memory
+
+    box_list, num_box = split2boxes(ifgram_file, memory_size=100e6)
+
+    unwDatasetName = [i for i in ['unwrapPhase_bridging', 'unwrapPhase'] if i in stack_obj.datasetNames][0]
+    mask_dataset_name = template['mintpy.networkInversion.maskDataset']
+    mask_threshold = float(template['mintpy.networkInversion.maskThreshold'])
+
+    ref_phase = stack_obj.get_reference_phase(unwDatasetName=unwDatasetName,
+                                              skip_reference=True,
+                                              dropIfgram=False)
+
+    phase2range = -1 * float(metadata['WAVELENGTH']) / (4. * np.pi)
+
+    quality_name = template['quality_file']
+    quality = np.memmap(quality_name, mode='r', dtype='float32', shape=(length, width))
+
+    for i in range(num_box):
+        box = box_list[i]
+        num_row = box[3] - box[1]
+        num_col = box[2] - box[0]
+        num_pixel = num_row * num_col
+
+        temp_coh = quality[box[1]:box[3], box[0]:box[2]]
+
+        print('\n------- Processing Patch {} out of {} --------------'.format(i + 1, num_box))
+
+        # Read/Mask unwrapPhase
+        pha_data = read_unwrap_phase(stack_obj,
+                                     box,
+                                     ref_phase,
+                                     obs_ds_name=unwDatasetName,
+                                     dropIfgram=True)
+
+        pha_data = mask_unwrap_phase(pha_data,
+                                     stack_obj,
+                                     box,
+                                     dropIfgram=True,
+                                     mask_ds_name=mask_dataset_name,
+                                     mask_threshold=mask_threshold)
+
+        # Mask for pixels to invert
+        mask = np.ones(num_pixel, np.bool_)
+
+        # Mask for Zero Phase in ALL ifgrams
+        if 'phase' in unwDatasetName.lower():
+            print('skip pixels with zero/nan value in all interferograms')
+            with warnings.catch_warnings():
+                # ignore warning message for all-NaN slices
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                phase_stack = np.nanmean(pha_data, axis=0)
+            mask *= np.multiply(~np.isnan(phase_stack), phase_stack != 0.)
+            del phase_stack
+
+        num_pixel2inv = int(np.sum(mask))
+        idx_pixel2inv = np.where(mask)[0]
+        print('number of pixels to invert: {} out of {} ({:.1f}%)'.format(
+            num_pixel2inv, num_pixel, num_pixel2inv / num_pixel * 100))
+
+        # initiale the output matrices
+        ts = np.zeros((num_date, num_pixel), np.float32)
+        num_inv_ifg = np.zeros((num_row, num_col), np.int16) + num_ifgram
+
+        if num_pixel2inv < 1:
+            ts = ts.reshape(num_date, num_row, num_col)
+        else:
+
+            # Mask for Non-Zero Phase in ALL ifgrams (share one B in sbas inversion)
+            mask_all_net = np.all(pha_data, axis=0)
+            mask_all_net *= mask
+            # mask_all_net *= mask_Coh
+            idx_pixel2inv = np.where(mask_all_net)[0]
+
+            if np.sum(mask_all_net) > 0:
+                tsi = LA.lstsq(A, pha_data[:, mask_all_net], cond=1e-5)[0]
+
+            ts[0:reference_ind, idx_pixel2inv] = tsi[0:reference_ind, :]
+            ts[reference_ind + 1::, idx_pixel2inv] = tsi[reference_ind::, :]
+            ts = ts.reshape(num_date, num_row, num_col)
+
+        print('converting phase to range')
+        ts *= phase2range
+
+        block = [0, num_date, box[1], box[3], box[0], box[2]]
+        writefile.write_hdf5_block(inps.timeseriesFile,
+                                   data=ts,
+                                   datasetName='timeseries',
+                                   block=block)
+
+        # temporal coherence - 2D
+        block = [box[1], box[3], box[0], box[2]]
+        writefile.write_hdf5_block(inps.tempCohFile,
+                                   data=temp_coh,
+                                   datasetName='temporalCoherence',
+                                   block=block)
+
+        # number of inverted obs - 2D
+        writefile.write_hdf5_block(inps.numInvFile,
+                                   data=num_inv_ifg,
+                                   datasetName='mask',
+                                   block=block)
+
+    # 4 update output data on the reference pixel
+    inps.skip_ref = True  # temporary
+    if not inps.skip_ref:
+        # grab ref_y/x
+        ref_y = int(stack_obj.metadata['REF_Y'])
+        ref_x = int(stack_obj.metadata['REF_X'])
+        print('-' * 50)
+        print('update values on the reference pixel: ({}, {})'.format(ref_y, ref_x))
+
+        print('set temporal coherence on the reference pixel to 1.')
+        with h5py.File(inps.tempCohFile, 'r+') as f:
+            f['temporalCoherence'][ref_y, ref_x] = 1.
+    return
+
+################################################################
+
+
+def get_latest_template(work_dir):
+    from minopy.objects.read_template import Template
+
+    """Get the latest version of default template file.
+    If an obsolete file exists in the working directory, the existing option values are kept.
+    """
+    lfile = os.path.join(os.path.dirname(__file__), 'defaults/minopy_template.cfg')  # latest version
+    cfile = os.path.join(work_dir, 'minopy_template.cfg')  # current version
+    if not os.path.isfile(cfile):
+        print('copy default template file {} to work directory'.format(lfile))
+        shutil.copy2(lfile, work_dir)
+    else:
+        # read custom template from file
+        cdict = Template(cfile).options
+        ldict = Template(lfile).options
+
+        if any([key not in cdict.keys() for key in ldict.keys()]):
+            print('obsolete default template detected, update to the latest version.')
+            shutil.copy2(lfile, work_dir)
+            orig_dict = Template(cfile).options
+            for key, value in orig_dict.items():
+                if key in cdict.keys() and cdict[key] != value:
+                    update = True
+                else:
+                    update = False
+            if not update:
+                print('No new option value found, skip updating ' + cfile)
+                return cfile
+
+            # Update template_file with new value from extra_dict
+            tmp_file = cfile + '.tmp'
+            f_tmp = open(tmp_file, 'w')
+            for line in open(cfile, 'r'):
+                c = [i.strip() for i in line.strip().split('=', 1)]
+                if not line.startswith(('%', '#')) and len(c) > 1:
+                    key = c[0]
+                    value = str.replace(c[1], '\n', '').split("#")[0].strip()
+                    if key in cdict.keys() and cdict[key] != value:
+                        line = line.replace(value, cdict[key], 1)
+                        print('    {}: {} --> {}'.format(key, value, cdict[key]))
+                f_tmp.write(line)
+            f_tmp.close()
+
+            # Overwrite exsting original template file
+            mvCmd = 'mv {} {}'.format(tmp_file, cfile)
+            os.system(mvCmd)
+    return cfile
+
+################################################################
+
+
+def get_phase_linking_coherence_mask(template, work_dir, functions):
+    """
+    Generate reliable pixel mask from temporal coherence
+    functions = [generate_mask, readfile, run_or_skip, add_attribute]
+    # from mintpy import generate_mask
+    # from mintpy.utils import readfile
+    # from mintpy.utils.utils import run_or_skip, add_attribute
+    """
+
+    generate_mask = functions[0]
+    readfile = functions[1]
+    run_or_skip = functions[2]
+    add_attribute = functions[3]
+
+    tcoh_file = os.path.join(work_dir, 'temporalCoherence.h5')
+    mask_file = os.path.join(work_dir, 'maskTempCoh.h5')
+
+    tcoh_min = float(template['mintpy.networkInversion.minTempCoh'])
+
+    scp_args = '{} -m {} --nonzero -o {} --update'.format(tcoh_file, tcoh_min, mask_file)
+    print('generate_mask.py', scp_args)
+
+    # update mode: run only if:
+    # 1) output file exists and newer than input file, AND
+    # 2) all config keys are the same
+
+    print('update mode: ON')
+    flag = 'skip'
+    if run_or_skip(out_file=mask_file, in_file=tcoh_file, print_msg=False) == 'run':
+        flag = 'run'
+
+    print('run or skip: {}'.format(flag))
+
+    if flag == 'run':
+        generate_mask.main(scp_args.split())
+        # update configKeys
+        atr = {}
+        atr['mintpy.networkInversion.minTempCoh'] = tcoh_min
+        add_attribute(mask_file, atr)
+        add_attribute(mask_file, atr)
+
+    # check number of pixels selected in mask file for following analysis
+    num_pixel = np.sum(readfile.read(mask_file)[0] != 0.)
+    print('number of reliable pixels: {}'.format(num_pixel))
+
+    min_num_pixel = float(template['mintpy.networkInversion.minNumPixel'])
+    if num_pixel < min_num_pixel:
+        msg = "Not enough reliable pixels (minimum of {}). ".format(int(min_num_pixel))
+        msg += "Try the following:\n"
+        msg += "1) Check the reference pixel and make sure it's not in areas with unwrapping errors\n"
+        msg += "2) Check the network and make sure it's fully connected without subsets"
+        raise RuntimeError(msg)
+    return
+
+################################################################
+
+
+def update_or_skip_inversion(inverted_date_list, slc_dates):
+
+    with open(inverted_date_list, 'r') as f:
+        inverted_dates = f.readlines()
+
+    inverted_dates = [date.split('\n')[0] for date in inverted_dates]
+    new_slc_dates = list(set(slc_dates) - set(inverted_dates))
+    all_date_list = new_slc_dates + inverted_dates
+
+    updated_index = None
+    if inverted_dates == slc_dates:
+        print(('All date exists in file {} with same size as required,'
+               ' no need to update inversion.'.format(os.path.basename(inverted_date_list))))
+    elif len(slc_dates) < 10 + len(inverted_dates):
+        print('Number of new images is less than 10 --> wait until at least 10 images are acquired')
+
+    else:
+        updated_index = len(inverted_dates)
+
+    return updated_index, all_date_list
+
+#########################################################
+
+
+def multilook(infile, outfile, rlks, alks, multilook_tool='gdal'):
+
+    if multilook_tool == "gdal":
+
+        print(infile)
+        ds = gdal.Open(infile + ".vrt", gdal.GA_ReadOnly)
+
+        xSize = ds.RasterXSize
+        ySize = ds.RasterYSize
+
+        outXSize = xSize / int(rlks)
+        outYSize = ySize / int(alks)
+
+        gdalTranslateOpts = gdal.TranslateOptions(format="ENVI", width=outXSize, height=outYSize)
+
+        gdal.Translate(outfile, ds, options=gdalTranslateOpts)
+        ds = None
+
+        ds = gdal.Open(outfile, gdal.GA_ReadOnly)
+        gdal.Translate(outfile + ".vrt", ds, options=gdal.TranslateOptions(format="VRT"))
+        ds = None
+
+    else:
+
+        print('Multilooking {0} ...'.format(infile))
+
+        inimg = isceobj.createImage()
+        inimg.load(infile + '.xml')
+
+        lkObj = Looks()
+        lkObj.setDownLooks(alks)
+        lkObj.setAcrossLooks(rlks)
+        lkObj.setInputImage(inimg)
+        lkObj.setOutputFilename(outfile)
+        lkObj.looks()
+
+    return outfile

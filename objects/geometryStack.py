@@ -9,8 +9,8 @@ import time
 import warnings
 import h5py
 import numpy as np
-from minopy.prep_slc_isce import read_attribute
-from minopy.objects.utils import read as read_geo
+#from minopy.prep_slc_isce import read_attribute
+from minopy.objects.utils import read_attribute, read as read_geo
 try:
     from skimage.transform import resize
 except ImportError:
@@ -37,12 +37,12 @@ class geometryDict:
     Example:
         from mintpy.utils import readfile
         from mintpy.utils.insarobj import geometryDict
-        datasetDict = {'height'        :'$PROJECT_DIR/merged/geom_master/hgt.rdr',
-                       'latitude'      :'$PROJECT_DIR/merged/geom_master/lat.rdr',
-                       'longitude'     :'$PROJECT_DIR/merged/geom_master/lon.rdr',
-                       'incidenceAngle':'$PROJECT_DIR/merged/geom_master/los.rdr',
-                       'heandingAngle' :'$PROJECT_DIR/merged/geom_master/los.rdr',
-                       'shadowMask'    :'$PROJECT_DIR/merged/geom_master/shadowMask.rdr',
+        datasetDict = {'height'        :'$PROJECT_DIR/merged/geom_reference/hgt.rdr',
+                       'latitude'      :'$PROJECT_DIR/merged/geom_reference/lat.rdr',
+                       'longitude'     :'$PROJECT_DIR/merged/geom_reference/lon.rdr',
+                       'incidenceAngle':'$PROJECT_DIR/merged/geom_reference/los.rdr',
+                       'heandingAngle' :'$PROJECT_DIR/merged/geom_reference/los.rdr',
+                       'shadowMask'    :'$PROJECT_DIR/merged/geom_reference/shadowMask.rdr',
                        'bperp'         :bperpDict
                        ...
                       }
