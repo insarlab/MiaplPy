@@ -18,7 +18,8 @@ class MinopyConfig(object):
        A class representing the config file
     """
 
-    def __init__(self, config_path, outname):
+    def __init__(self, outname):
+        config_path = os.path.dirname(outname)
         if not os.path.exists(config_path):
             os.makedirs(config_path)
         self.f = open(outname, 'w')
@@ -44,7 +45,7 @@ class MinopyConfig(object):
         self.f.write('unw : ' + self.unwName + '\n')
         self.f.write('coh : ' + self.cohName + '\n')
         self.f.write('nomcf : ' + self.noMCF + '\n')
-        self.f.write('master : ' + self.master + '\n')
+        self.f.write('reference : ' + self.reference + '\n')
         self.f.write('defomax : ' + self.defoMax + '\n')
         self.f.write('alks : ' + self.azimuthLooks + '\n')
         self.f.write('rlks : ' + self.rangeLooks + '\n')
@@ -59,7 +60,7 @@ class MinopyConfig(object):
         self.f.write('coh : ' + self.cohName + '\n')
         self.f.write('unwprefix : ' + self.unwName + '\n')
         self.f.write('nomcf : ' + self.noMCF + '\n')
-        self.f.write('master : ' + self.master + '\n')
+        self.f.write('reference : ' + self.reference + '\n')
         self.f.write('defomax : ' + self.defoMax + '\n')
         self.f.write('alks : ' + self.azimuthLooks + '\n')
         self.f.write('rlks : ' + self.rangeLooks + '\n')
@@ -104,17 +105,17 @@ class MinopyRun(object):
 
     def unwrap_tops(self, inps, pairs):
         for pair in pairs:
-            master = pair[0]
-            slave = pair[1]
-            mergedDir = os.path.join(self.ifgram_dir, master + '_' + slave)
-            configName = os.path.join(self.config_path, 'config_unwrap_ifgram_' + master + '_' + slave)
-            configObj = MinopyConfig(self.config_path, configName)
+            reference = pair[0]
+            secondary = pair[1]
+            mergedDir = os.path.join(self.ifgram_dir, reference + '_' + secondary)
+            configName = os.path.join(self.config_path, 'config_unwrap_ifgram_' + reference + '_' + secondary)
+            configObj = MinopyConfig(configName)
             configObj.configure(self)
             configObj.ifgName = os.path.join(mergedDir, 'filt_fine.int')
-            configObj.cohName = self.quality_file
+            configObj.cohName = os.path.join(mergedDir, 'filt_fine.cor') #self.quality_file
             configObj.unwName = os.path.join(mergedDir, 'filt_fine.unw')
             configObj.noMCF = noMCF
-            configObj.master = os.path.join(self.work_dir, 'inputs/master')
+            configObj.reference = os.path.join(self.work_dir, 'inputs/reference')
             configObj.defoMax = defoMax
             configObj.unwMethod = inps.template['MINOPY.stack.unwMethod']
             configObj.rangeLooks = '1'
@@ -136,18 +137,18 @@ class MinopyRun(object):
             configObj.rangeLooks = '1'
             configObj.unwMethod = 'snaphu'
             configObj.outDir = os.path.join(self.ifgram_dir + '/' +pair[0] + '_' + pair[1])
-            configObj.ifgName = os.path.dirname(configObj.outDir) + '/filt_fine.int'
-            configObj.unwName = os.path.dirname(configObj.outDir) + '/fine.unwrap'
-            configObj.cohName = self.quality_file
+            configObj.ifgName = configObj.outDir + '/filt_fine.int'
+            configObj.unwName = configObj.outDir + '/filt_fine.unwrap'
+            configObj.cohName = configObj.outDir + '/filt_fine.cor' # self.quality_file
             configObj.noMCF = noMCF
-            configObj.master = os.path.join(self.work_dir + '/inputs/master/data')
+            configObj.reference = os.path.join(self.work_dir + '/inputs/reference/data')
             configObj.defoMax = defoMax
             configObj.unwrap_stripmap('[Function-1]')  ###
             configObj.finalize()
             if inps.template['MINOPY.stack.textCmd'] in [None, 'None']:
-                self.runf.write(pathObj.wrappercommandtops + configName + '\n')
+                self.runf.write(pathObj.wrappercommandstripmap + configName + '\n')
             else:
-                self.runf.write(inps.template['MINOPY.stack.textCmd'] + pathObj.wrappercommandtops + configName + '\n')
+                self.runf.write(inps.template['MINOPY.stack.textCmd'] + pathObj.wrappercommandstripmap + configName + '\n')
 
     def finalize(self):
         self.runf.close()

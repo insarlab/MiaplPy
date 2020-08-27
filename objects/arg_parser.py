@@ -43,6 +43,8 @@ class MinoPyParser:
             self.parser = self.patch_inversion_parser()
         elif self.script == 'generate_interferograms':
             self.parser = self.generate_interferograms_parser()
+        elif self.script == 'unwrap_minopy':
+            self.parser = self.unwrap_parser()
         elif self.script == 'minopy_wrapper':
             self.parser, self.STEP_LIST = self.minopy_wrapper_parser()
 
@@ -121,9 +123,10 @@ class MinoPyParser:
         for key in ['startStep', 'endStep', 'doStep']:
             value = vars(inps)[key]
             if value and value not in STEP_LIST:
-                msg = 'Input step not found: {}'.format(value)
-                msg += '\nAvailable steps: {}'.format(STEP_LIST)
-                raise ValueError(msg)
+                if not value == 'multilook':
+                    msg = 'Input step not found: {}'.format(value)
+                    msg += '\nAvailable steps: {}'.format(STEP_LIST)
+                    raise ValueError(msg)
 
         # ignore --start/end input if --dostep is specified
         if inps.doStep:
@@ -131,12 +134,16 @@ class MinoPyParser:
             inps.endStep = inps.doStep
 
         # get list of steps to run
-        idx0 = STEP_LIST.index(inps.startStep)
-        idx1 = STEP_LIST.index(inps.endStep)
-        if idx0 > idx1:
-            msg = 'input start step "{}" is AFTER input end step "{}"'.format(inps.startStep, inps.endStep)
-            raise ValueError(msg)
-        inps.runSteps = STEP_LIST[idx0:idx1 + 1]
+        if not inps.startStep == 'multilook':
+            idx0 = STEP_LIST.index(inps.startStep)
+            idx1 = STEP_LIST.index(inps.endStep)
+            if idx0 > idx1:
+                msg = 'input start step "{}" is AFTER input end step "{}"'.format(inps.startStep, inps.endStep)
+                raise ValueError(msg)
+            inps.runSteps = STEP_LIST[idx0:idx1 + 1]
+        else:
+            inps.runSteps = ['multilook']
+            idx0 = STEP_LIST.index('ifgrams')
 
         # empty the step list for -g option
         if inps.generate_template:
@@ -194,7 +201,7 @@ class MinoPyParser:
         MINOPY.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
         MINOPY.load.compression    = auto  #[gzip / lzf / no], auto for no.
         ##---------for ISCE only:
-        MINOPY.load.metaFile       = auto  #[path2metadata_file], i.e.: ./master/IW1.xml, ./masterShelve/data.dat
+        MINOPY.load.metaFile       = auto  #[path2metadata_file], i.e.: ./reference/IW1.xml, ./referenceShelve/data.dat
         MINOPY.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
         ##---------slc datasets:
         MINOPY.load.slcFile        = auto  #[path2slc]
@@ -290,21 +297,37 @@ class MinoPyParser:
         return parser
 
     @staticmethod
+    def unwrap_parser():
+        parser = argparse.ArgumentParser(description='Unwrap using snaphu')
+        parser.add_argument('-f', '--ifg', dest='input_ifg', type=str, required=True,
+                            help='input wrapped interferogram')
+        parser.add_argument('-c', '--cor', dest='input_cor', type=str, required=True,
+                            help='input correlation file')
+        parser.add_argument('-u', '--unw', dest='unwrapped_ifg', type=str, required=True,
+                            help='output unwrapped interferogram')
+        parser.add_argument('-s', '--reference', dest='reference', type=str, default='reference',
+                            help='Reference .h5 file to get metadata')
+        parser.add_argument('-d', '--defoMax', dest='defo_max', type=float, default=1.2,
+                            help='Maximum abrupt phase discontinuity (cycles)')
+        return parser
+
+    @staticmethod
     def generate_interferograms_parser():
 
-        parser = argparse.ArgumentParser(description='Generate interferogram, spatial and temporal coherence from '
-                                                     'inversion outputs')
-        parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-        parser.add_argument('-s', '--slcFile', dest='slc_file', type=str, required=True,
-                            help='Inverted interferograms')
-        parser.add_argument('-o', '--outDir', dest='ifg_dir', type=str, required=True,
-                            help='interferogram directory')
-        parser.add_argument('-b1', '--band_master', dest='band_master', type=int, default=1
-                            , help='master band in rslc_ref file. -- default = 1')
-        parser.add_argument('-b2', '--band_slave', dest='band_slave', type=int, default=None
-                            , help='master band in rslc_ref file. -- default = None')
+        parser = argparse.ArgumentParser(description='Generate interferogram')
+        parser.add_argument('-m', '--reference', type=str, dest='reference', required=True,
+                            help='Reference image')
+        parser.add_argument('-s', '--secondary', type=str, dest='secondary', required=True,
+                            help='Secondary image')
+        parser.add_argument('-o', '--outdir', type=str, dest='out_dir', default='interferograms',
+                            help='Prefix of output int and amp files')
+        parser.add_argument('-a', '--alks', type=int, dest='azlooks', default=1,
+                            help='Azimuth looks')
+        parser.add_argument('-r', '--rlks', type=int, dest='rglooks', default=1,
+                            help='Range looks')
         parser.add_argument('-p', '--prefix', dest='prefix', type=str, default='tops'
                             , help='ISCE stack processor: options= tops, stripmap -- default = tops')
+
         return parser
 
     @staticmethod

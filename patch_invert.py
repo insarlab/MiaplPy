@@ -32,9 +32,9 @@ def main(iargs=None):
     with open(inps.data_kwargs, 'rb') as handle:
         data_kwargs = pickle.load(handle)
 
-    #inps.cluster = 'no'
+    inps.cluster = 'no'
     if inps.cluster == 'no':
-        iut.inversion(**data_kwargs)
+        iut.parallel_invertion(**data_kwargs)
     else:
         # parallel
         print('\n\n------- start parallel processing using Dask -------')
@@ -43,7 +43,7 @@ def main(iargs=None):
         cluster_obj = cluster_minopy.MDaskCluster(inps.cluster, inps.numWorker, config_name=inps.config)
         cluster_obj.open()
 
-        cluster_obj.run(iut.inversion, func_data=data_kwargs)
+        cluster_obj.run(iut.parallel_invertion, func_data=data_kwargs)
 
         # close dask cluster and client
         cluster_obj.close()

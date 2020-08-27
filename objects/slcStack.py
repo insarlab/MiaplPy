@@ -96,7 +96,7 @@ class slcStackDict:
 
         /                  Root level
         Attributes         Dictionary for metadata
-        /date              2D array of string  in size of (m, 2   ) in YYYYMMDD format for master and slave date
+        /date              2D array of string  in size of (m, 2   ) in YYYYMMDD format for reference and secondary date
         /bperp             1D array of float32 in size of (m,     ) in meter.
 
         Parameters: outputFile : str, Name of the HDF5 file for the SLC stack
@@ -156,7 +156,7 @@ class slcStackDict:
                     if not box:
                         box = (0, 0, self.width, self.length)
                     dsSlc = gdal.Open(fname + '.vrt', gdal.GA_ReadOnly)
-                    ds[i, :, :] = dsSlc.GetRasterBand(1).ReadAsArray(box[0], box[1], self.width, self.length)
+                    ds[i, :, :] = dsSlc.GetRasterBand(1).ReadAsArray(int(box[0]), int(box[1]), int(self.width), int(self.length))
 
                     self.bperp[i] = slcObj.get_perp_baseline()
                     prog_bar.update(i+1, suffix='{}'.format(self.dates[i][0]))
@@ -165,7 +165,7 @@ class slcStackDict:
             ds.attrs['MODIFICATION_TIME'] = str(time.time())
 
         ###############################
-        # 2D dataset containing master and slave dates of all pairs
+        # 2D dataset containing reference and secondary dates of all pairs
         dsName = 'dates'
         dsDataType = np.string_
         dsShape = (self.numSlc, 2)

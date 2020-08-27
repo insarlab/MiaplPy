@@ -37,12 +37,12 @@ class geometryDict:
     Example:
         from mintpy.utils import readfile
         from mintpy.utils.insarobj import geometryDict
-        datasetDict = {'height'        :'$PROJECT_DIR/merged/geom_master/hgt.rdr',
-                       'latitude'      :'$PROJECT_DIR/merged/geom_master/lat.rdr',
-                       'longitude'     :'$PROJECT_DIR/merged/geom_master/lon.rdr',
-                       'incidenceAngle':'$PROJECT_DIR/merged/geom_master/los.rdr',
-                       'heandingAngle' :'$PROJECT_DIR/merged/geom_master/los.rdr',
-                       'shadowMask'    :'$PROJECT_DIR/merged/geom_master/shadowMask.rdr',
+        datasetDict = {'height'        :'$PROJECT_DIR/merged/geom_reference/hgt.rdr',
+                       'latitude'      :'$PROJECT_DIR/merged/geom_reference/lat.rdr',
+                       'longitude'     :'$PROJECT_DIR/merged/geom_reference/lon.rdr',
+                       'incidenceAngle':'$PROJECT_DIR/merged/geom_reference/los.rdr',
+                       'heandingAngle' :'$PROJECT_DIR/merged/geom_reference/los.rdr',
+                       'shadowMask'    :'$PROJECT_DIR/merged/geom_reference/shadowMask.rdr',
                        'bperp'         :bperpDict
                        ...
                       }

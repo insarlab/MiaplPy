@@ -120,11 +120,7 @@ class MDaskCluster(cluster.DaskCluster):
         num_split_y = int(np.sqrt(num_split))
 
         sub_boxes = []
-        #if (length // num_split_y) < (2 * azimuth_window):
-        #    num_split_y = length // (2 * azimuth_window)
-        #if (width // num_split_x) < (2 * range_window):
-        #    num_split_x = width // (2 * range_window)
-
+    
         if (length // num_split_y) < 10:
             num_split_y = length // 10
         if (width // num_split_x) < 10:

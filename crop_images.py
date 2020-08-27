@@ -90,10 +90,10 @@ def main(iargs=None):
                               box=boxGeo,
                               compression='lzf')
 
-    master_dir = os.path.dirname(inpsDict['MINOPY.load.metaFile'])
-    out_master = inps.out_dir + '/master'
-    if not os.path.exists(out_master):
-        shutil.copytree(master_dir, out_master)
+    reference_dir = os.path.dirname(inpsDict['MINOPY.load.metaFile'])
+    out_reference = inps.out_dir + '/reference'
+    if not os.path.exists(out_reference):
+        shutil.copytree(reference_dir, out_reference)
 
     return inps.out_file
 
@@ -326,7 +326,7 @@ def read_inps_dict2slc_stack_dict_object(inpsDict):
         # A dictionary of data files for a given pair.
         # One pair may have several types of dataset.
         # example slcPathDict = {'slc': /pathToFile/*.slc.full}
-        # All path of data file must contain the master and slave date, either in file name or folder name.
+        # All path of data file must contain the reference and secondary date, either in file name or folder name.
         slcPathDict = {}
         for i in range(len(dsNameList)):
             dsName = dsNameList[i]

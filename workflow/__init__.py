@@ -28,6 +28,7 @@ __all__ = [
     'phase_inversion',
     'patch_invert',
     'load_int',
+    'unwrap_minopy',
     'version',
 ]
 
