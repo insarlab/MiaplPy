@@ -55,18 +55,26 @@ def main(iargs=None):
     Parser = MinoPyParser(iargs, script='minopy_wrapper')
     inps = Parser.parse()
 
-    job_file_name = 'minopy_wrapper'
-    job_name = job_file_name
-
-    if inps.wall_time == 'None':
-        inps.wall_time = '24:00'
+    if not iargs is None:
+        input_arguments = iargs
+    else:
+        input_arguments = sys.argv[1::]
 
     #########################################
     # Submit job
     #########################################
+    inps.out_dir = inps.workDir
+    inps.work_dir = inps.workDir
+    inps.custom_template_file = inps.customTemplateFile
+    job_obj = JOB_SUBMIT(inps)
 
-    #if inps.submit_flag:
-    #    js.submit_script(job_name, job_file_name, sys.argv[:], inps.workDir, inps.wall_time, queue_name=inps.queue_name)
+    if inps.submit_flag:
+        job_name = inps.project_name
+        job_file_name = 'minopy_wrapper'
+        if '--submit' in input_arguments:
+            input_arguments.remove('--submit')
+        command = [os.path.abspath(__file__)] + input_arguments
+        job_obj.submit_script(job_name, job_file_name, command)
 
     if not iargs is None:
         mut.log_message(inps.workDir, os.path.basename(__file__) + ' ' + ' '.join(iargs[:]))
@@ -123,6 +131,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.plot_sh_cmd = ''
 
         self.status = False
+        self.azimuth_look = 1
+        self.range_look = 1
 
     @property
     def startup(self):
@@ -164,6 +174,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             shutil.copy2(sh_file, self.workDir)
 
         self.plot_sh_cmd = './' + os.path.basename(sh_file)
+
+        self.range_look = int(self.template['MINOPY.interferograms.range_look'])
+        self.azimuth_look = int(self.template['MINOPY.interferograms.azimuth_look'])
 
         return
 
@@ -254,46 +267,64 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             minopy.crop_images.main(scp_args.split())
         return
 
-    def update_inversion_test(self):
-
-        slcStackObj = slcStack(self.workDir + '/inputs/slcStack.h5')
-        inverted_date_list = self.workDir + '/inverted/inverted_date_list.txt'
-
-        if not os.path.exists(inverted_date_list):
-            self.status = True
-            updated_index = 0
-        else:
-            self.status, updated_index = mut.update_or_skip_inversion(inverted_date_list, slcStackObj)
-        return updated_index
-
     def run_phase_inversion(self, sname):
         """ Non-Linear phase inversion.
         """
-
-        updated_index = self.update_inversion_test()
-
-        scp_args = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5} -s {a6} -i {a7} -c {a8} ' \
-                   '--num-worker {a9} \n'.format(a0=self.workDir, a1=self.template['MINOPY.inversion.range_window'],
+        if self.template['mintpy.compute.cluster'] is False:
+            self.template['mintpy.compute.cluster'] = 'no'
+        scp_args = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5} -s {a6} -c {a7} ' \
+                   '--num-worker {a8} '.format(a0=self.workDir, a1=self.template['MINOPY.inversion.range_window'],
                                                  a2=self.template['MINOPY.inversion.azimuth_window'],
                                                  a3=self.template['MINOPY.inversion.plmethod'],
                                                  a4=self.template['MINOPY.inversion.shp_test'],
                                                  a5=self.template['MINOPY.inversion.patch_size'],
                                                  a6=os.path.join(self.workDir, 'inputs/slcStack.h5'),
-                                                 a7=updated_index,
-                                                 a8=self.template['mintpy.compute.cluster'],
-                                                 a9=self.template['mintpy.compute.numWorker'])
+                                                 a7=self.template['mintpy.compute.cluster'],
+                                                 a8=self.template['mintpy.compute.numWorker'])
+
+        if not self.inps.wall_time in ['None', None]:
+            scp_args += '--walltime {} '.format(self.inps.wall_time)
+        if self.inps.queue:
+            scp_args += '--queue {}'.format(self.inps.queue)
 
         print('phase_inversion.py ', scp_args)
-        if self.status:
-            minopy.phase_inversion.main(scp_args.split())
+        minopy.phase_inversion.main(scp_args.split())
+
         return
 
+    def run_multilook(self, sname):
+
+        wrapped_phase_dir = os.path.join(self.workDir, 'inverted', 'wrapped_phase')
+        if self.range_look * self.azimuth_look > 1:
+
+            geom_file = os.path.join(self.workDir, 'inputs/geometryRadar.h5')
+            geom_file_full = os.path.dirname(geom_file) + '/full_' + os.path.basename(geom_file)
+            if not os.path.exists(geom_file_full):
+                os.system('mv {} {}'.format(geom_file, geom_file_full))
+            os.system('multilook.py {inp} -r {rl} -a {al} -o {out}'.format(inp=geom_file_full,
+                                                                           rl=self.range_look,
+                                                                           al=self.azimuth_look,
+                                                                           out=geom_file))
+            slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
+            slcObj = slcStack(slc_file)
+            slcObj.open(print_msg=False)
+            date_list = slcObj.get_date_list()
+            for image in date_list:
+                input_image = os.path.join(wrapped_phase_dir, image, '{}.slc'.format(image))
+                output_ml_image = os.path.join(wrapped_phase_dir, image, '{}.ml.slc'.format(image))
+                mut.multilook(input_image, output_ml_image, self.range_look, self.azimuth_look, multilook_tool='gdal')
+
+            quality_file = os.path.join(self.workDir, 'inverted/quality')
+            quality_file_ml = os.path.join(self.workDir, 'inverted/quality_ml')
+            mut.multilook(quality_file, quality_file_ml, self.range_look, self.azimuth_look, multilook_tool='gdal')
+
+
     def run_interferogram(self, sname):
-        """ Export single master interferograms
+        """ Export single reference interferograms
         """
 
-        inverted_slc = os.path.join(self.workDir, 'inverted/rslc_ref')
         ifgram_dir = os.path.join(self.workDir, 'inverted/interferograms')
+        ifgram_dir = ifgram_dir + '_{}'.format(self.template['MINOPY.interferograms.type'])
         os.makedirs(ifgram_dir, exist_ok='True')
 
         slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
@@ -306,99 +337,125 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         else:
             sensor_type = 'tops'
 
-        if self.template['MINOPY.interferograms.masterDate']:
-            master_date = self.template['MINOPY.interferograms.masterDate']
+        if self.template['MINOPY.interferograms.referenceDate']:
+            reference_date = self.template['MINOPY.interferograms.referenceDate']
         else:
-            master_date = date_list[0]
+            reference_date = date_list[0]
 
         if self.template['MINOPY.interferograms.type'] == 'sequential':
-            master_ind = None
+            reference_ind = None
         else:
-            master_ind = date_list.index(master_date)
+            reference_ind = date_list.index(reference_date)
 
         pairs = []
         for i in range(0, len(date_list)):
-            if not master_ind is None:
-                if not master_ind == i:
-                    pairs.append((date_list[master_ind], date_list[i]))
+            if not reference_ind is None:
+                if not reference_ind == i:
+                    pairs.append((date_list[reference_ind], date_list[i]))
             else:
                 if not i == 0:
                     pairs.append((date_list[i - 1], date_list[i]))
 
-        # if master_ind is False:
-        #    pairs.append((date_list[0], date_list[-1]))
-
-        for pair in pairs:
-            out_dir = os.path.join(ifgram_dir, pair[0] + '_' + pair[1])
-            os.makedirs(out_dir, exist_ok='True')
-            scp_args = '-s {a1} -o {a2} -b1 {a3} -b2 {a4} -p {a5}\n'.format(a1=inverted_slc, a2=out_dir,
-                                                                           a3=date_list.index(pair[0]),
-                                                                           a4=date_list.index(pair[1]),
-                                                                           a5=sensor_type)
-            print('generate_interferograms.py ', scp_args)
-            minopy.generate_interferograms.main(scp_args.split())
-
-        return
-
-    def run_unwrap(self, sname):
-        """ Unwrapps single master interferograms
-        """
-
-        run_file_unwrap = os.path.join(self.run_dir, 'run_minopy_unwrap')
-
-        slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
-        slcObj = slcStack(slc_file)
-        slcObj.open(print_msg=False)
-        date_list = slcObj.get_date_list()
-        metadata = slcObj.get_metadata()
-        if 'sensor_type' in metadata:
-            sensor_type = metadata['sensor_type']
-        else:
-            sensor_type = 'tops'
-
-        if self.template['MINOPY.interferograms.masterDate']:
-            master_date = self.template['MINOPY.interferograms.masterDate']
-        else:
-            master_date = date_list[0]
-
-        if self.template['MINOPY.interferograms.type'] == 'sequential':
-            master_ind = None
-        else:
-            master_ind = date_list.index(master_date)
-
-        pairs = []
-        for i in range(0, len(date_list)):
-            if not master_ind is None:
-                if not master_ind == i:
-                    pairs.append((date_list[master_ind], date_list[i]))
-            else:
-                if not i == 0:
-                    pairs.append((date_list[i - 1], date_list[i]))
-
-        # if master_ind is False:
+        # if reference_ind is False:
         #    pairs.append((date_list[0], date_list[-1]))
 
         inps = self.inps
         inps.run_dir = self.run_dir
+        os.makedirs(self.run_dir, exist_ok=True)
         inps.ifgram_dir = self.ifgram_dir
         inps.template = self.template
+        run_ifgs = os.path.join(inps.run_dir, 'run_minopy_igram')
+        run_commands = []
+        wrapped_phase_dir = os.path.join(self.workDir, 'inverted', 'wrapped_phase')
 
-        runObj = MinopyRun()
-        runObj.configure(inps, 'run_minopy_unwrap')
-        if sensor_type == 'stripmap':
-            runObj.unwrap_stripmap(inps, pairs)
-        else:
-            runObj.unwrap_tops(inps, pairs)
+        for pair in pairs:
+            out_dir = os.path.join(ifgram_dir, pair[0] + '_' + pair[1])
+            os.makedirs(out_dir, exist_ok='True')
 
-        runObj.finalize()
+            scp_args = '--reference {a1} --secondary {a2} --outdir {a3} --alks {a4} --rlks {a5} ' \
+                       '--prefix {a6}\n'.format(a1=os.path.join(wrapped_phase_dir, pair[0]),
+                                                a2=os.path.join(wrapped_phase_dir, pair[1]),
+                                                a3=out_dir, a4=self.azimuth_look,
+                                                a5=self.range_look, a6=sensor_type)
 
-        os.system('chmod +x {}'.format(self.workDir + '/configs/*'))
+            cmd = 'generate_interferograms.py ' + scp_args
+            # print(cmd)
+            run_commands.append(cmd)
+
+        with open(run_ifgs, 'w+') as frun:
+            frun.writelines(run_commands)
 
         inps.work_dir = inps.run_dir
         inps.out_dir = inps.run_dir
-        inps.memory = '5000'
-        inps.wall_time = '4:00'
+        inps.memory = 5000
+        inps.wall_time = '00:10'
         job_obj = JOB_SUBMIT(inps)
+        job_obj.write_batch_jobs(batch_file=run_ifgs)
+        job_status = job_obj.submit_batch_jobs(batch_file=run_ifgs)
+
+        return
+
+    def run_unwrap(self, sname):
+        """ Unwrapps single reference interferograms
+        """
+        slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
+        slcObj = slcStack(slc_file)
+        slcObj.open(print_msg=False)
+        date_list = slcObj.get_date_list()
+
+        if self.template['MINOPY.interferograms.referenceDate']:
+            reference_date = self.template['MINOPY.interferograms.referenceDate']
+        else:
+            reference_date = date_list[0]
+
+        if self.template['MINOPY.interferograms.type'] == 'sequential':
+            reference_ind = None
+        else:
+            reference_ind = date_list.index(reference_date)
+
+        pairs = []
+        for i in range(0, len(date_list)):
+            if not reference_ind is None:
+                if not reference_ind == i:
+                    pairs.append((date_list[reference_ind], date_list[i]))
+            else:
+                if not i == 0:
+                    pairs.append((date_list[i - 1], date_list[i]))
+
+        # if reference_ind is False:
+        #    pairs.append((date_list[0], date_list[-1]))
+
+        inps = self.inps
+        inps.run_dir = self.run_dir
+        os.makedirs(self.run_dir, exist_ok=True)
+        inps.ifgram_dir = self.ifgram_dir
+        inps.ifgram_dir = inps.ifgram_dir + '_{}'.format(self.template['MINOPY.interferograms.type'])
+        inps.template = self.template
+        run_file_unwrap = os.path.join(self.run_dir, 'run_minopy_unwrap')
+        run_commands = []
+        for pair in pairs:
+            out_dir = os.path.join(inps.ifgram_dir, pair[0] + '_' + pair[1])
+            os.makedirs(out_dir, exist_ok='True')
+
+            scp_args = '--ifg {a1} --cor {a2} --unw {a3} --defoMax {a4}' \
+                       '--reference {a5}\n'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
+                                                   a2=os.path.join(out_dir, 'filt_fine.cor'),
+                                                   a3=os.path.join(out_dir, 'filt_fine.unw'),
+                                                   a4=self.template['MINOPY.unwrap.defomax'],
+                                                   a5=slc_file)
+            cmd = 'unwrap_minopy.py ' + scp_args
+            # print(cmd)
+            run_commands.append(cmd)
+
+        with open(run_file_unwrap, 'w+') as frun:
+            frun.writelines(run_commands)
+
+        inps.work_dir = inps.run_dir
+        inps.out_dir = inps.run_dir
+        inps.memory = 20000
+        inps.wall_time = '02:00'
+        job_obj = JOB_SUBMIT(inps)
+        job_obj.write_batch_jobs(batch_file=run_file_unwrap)
         job_status = job_obj.submit_batch_jobs(batch_file=run_file_unwrap)
 
         return
@@ -455,7 +512,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             raise RuntimeError(msg)
         return
 
-
     def run_reference_point(self, step_name):
         """Select reference point.
         It 1) generate mask file from common conn comp
@@ -476,7 +532,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         return
 
     def write_to_timeseries(self, sname):
-
+        if self.azimuth_look * self.range_look > 1:
+            self.template['quality_file'] = os.path.join(self.workDir, 'inverted/quality_ml')
+        else:
+            self.template['quality_file'] = os.path.join(self.workDir, 'inverted/quality')
         mut.invert_ifgrams_to_timeseries(self.template, self.inps, self.workDir, writefile)
         functions = [mintpy.generate_mask, readfile, ut.run_or_skip, ut.add_attribute]
         mut.get_phase_linking_coherence_mask(self.template, self.workDir, functions)
@@ -492,6 +551,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
             elif sname == 'inversion':
                 self.run_phase_inversion(sname)
+
+            elif sname == 'multilook':
+                self.run_multilook(sname)
 
             elif sname == 'ifgrams':
                 self.run_interferogram(sname)

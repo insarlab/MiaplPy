@@ -14,6 +14,7 @@ from scipy.optimize import minimize
 from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 import gdal
 import isceobj
+from mroipac.looks.Looks import Looks
 import glob
 import shutil
 import warnings
@@ -35,14 +36,14 @@ def log_message(logdir, msg):
 ################################################################################
 
 
-def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
+def convert_geo2image_coord(geo_reference_dir, lat_south, lat_north, lon_west, lon_east):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
-    ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
+    ds = gdal.Open(geo_reference_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
     lat_lut = ds.GetRasterBand(1).ReadAsArray()
     del ds
 
-    ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
+    ds = gdal.Open(geo_reference_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
     lon_lut = ds.GetRasterBand(1).ReadAsArray()
     del ds
 
@@ -91,7 +92,7 @@ def patch_slice(lines, samples, azimuth_window, range_window, patch_size=200):
 
 def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
     """ Read SLC file and return crop. """
-
+    import isceobj
     obj_slc = isceobj.createSlcImage()
     obj_slc.load(slc_file + '.xml')
     ds = gdal.Open(slc_file + '.vrt', gdal.GA_ReadOnly)
@@ -104,6 +105,7 @@ def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
 
 
 def write_SLC(date_list, slc_dir, patch_dir, range_win, azimuth_win):
+    import isceobj
     merge_dir = slc_dir.split('minopy')[0] + '/merged/SLC'
     if not os.path.exists(slc_dir):
         os.mkdir(slc_dir)
@@ -171,8 +173,8 @@ def write_SLC(date_list, slc_dir, patch_dir, range_win, azimuth_win):
         obj_slc.dataType = 'CFLOAT'
         obj_slc.setAccessMode('read')
         obj_slc.renderHdr()
-        shutil.copytree(os.path.join(merge_dir, date, 'masterShelve'), os.path.join(date_dir, 'masterShelve'))
-        shutil.copytree(os.path.join(merge_dir, date, 'slaveShelve'), os.path.join(date_dir, 'slaveShelve'))
+        shutil.copytree(os.path.join(merge_dir, date, 'referenceShelve'), os.path.join(date_dir, 'referenceShelve'))
+        shutil.copytree(os.path.join(merge_dir, date, 'secondaryShelve'), os.path.join(date_dir, 'secondaryShelve'))
 
     return
 
@@ -293,8 +295,7 @@ def optphase(x0, inverse_gam):
     x = np.matrix(x)
     y = np.matmul(x.getH(), inverse_gam)
     y = np.matmul(y, x)
-    f = np.abs(np.log(y))
-
+    f = float(np.abs(np.log(y)))
     return f
 
 ###############################################################################
@@ -302,8 +303,7 @@ def optphase(x0, inverse_gam):
 
 def PTA_L_BFGS(coh0):
     """ Uses L-BFGS method to optimize PTA function and estimate phase values. """
-
-    n = coh0.shape[0]
+    n_image = coh0.shape[0]
     x0 = np.angle(EMI_phase_estimation(coh0))
     x0 = x0 - x0[0]
     abs_coh = regularize_matrix(np.abs(coh0))
@@ -311,8 +311,8 @@ def PTA_L_BFGS(coh0):
         inverse_gam = np.matrix(np.multiply(LA.pinv(abs_coh), coh0))
         res = minimize(optphase, x0, args=inverse_gam, method='L-BFGS-B',
                        tol=None, options={'gtol': 1e-6, 'disp': False})
-        out = res.x.reshape(n, 1)
-        vec = np.multiply(np.abs(x0), np.exp(1j * out)).reshape(n, 1)
+        out = res.x.reshape(n_image, 1)
+        vec = np.multiply(np.abs(x0), np.exp(1j * out)).reshape(n_image, 1)
 
         x0 = np.exp(1j * np.angle(vec[0]))
         vec = np.multiply(vec, np.conj(x0))
@@ -855,18 +855,18 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
     date12_list = stack_obj.get_date12_list(dropIfgram=True)
     date_list = stack_obj.get_date_list(dropIfgram=False)
 
-    if template['MINOPY.interferograms.masterDate']:
-        master_date = template['MINOPY.interferograms.masterDate']
+    if template['MINOPY.interferograms.referenceDate']:
+        reference_date = template['MINOPY.interferograms.referenceDate']
     else:
-        master_date = date_list[0]
+        reference_date = date_list[0]
 
     if template['MINOPY.interferograms.type'] == 'sequential':
-        master_ind = False
+        reference_ind = False
     else:
-        master_ind = date_list.index(master_date)
+        reference_ind = date_list.index(reference_date)
 
     # 1.2 design matrix
-    A = stack_obj.get_design_matrix4timeseries(date12_list=date12_list, refDate=master_date)[0]
+    A = stack_obj.get_design_matrix4timeseries(date12_list=date12_list, refDate=reference_date)[0]
     num_ifgram, num_date = A.shape[0], A.shape[1] + 1
     inps.numIfgram = num_ifgram
     length, width = stack_obj.length, stack_obj.width
@@ -925,7 +925,7 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
 
     phase2range = -1 * float(metadata['WAVELENGTH']) / (4. * np.pi)
 
-    quality_name = os.path.join(work_dir, 'inverted/quality')
+    quality_name = template['quality_file']
     quality = np.memmap(quality_name, mode='r', dtype='float32', shape=(length, width))
 
     for i in range(num_box):
@@ -987,8 +987,8 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
             if np.sum(mask_all_net) > 0:
                 tsi = LA.lstsq(A, pha_data[:, mask_all_net], cond=1e-5)[0]
 
-            ts[0:master_ind, idx_pixel2inv] = tsi[0:master_ind, :]
-            ts[master_ind + 1::, idx_pixel2inv] = tsi[master_ind::, :]
+            ts[0:reference_ind, idx_pixel2inv] = tsi[0:reference_ind, :]
+            ts[reference_ind + 1::, idx_pixel2inv] = tsi[reference_ind::, :]
             ts = ts.reshape(num_date, num_row, num_col)
 
         print('converting phase to range')
@@ -1053,6 +1053,8 @@ def get_latest_template(work_dir):
             for key, value in orig_dict.items():
                 if key in cdict.keys() and cdict[key] != value:
                     update = True
+                else:
+                    update = False
             if not update:
                 print('No new option value found, skip updating ' + cfile)
                 return cfile
@@ -1136,26 +1138,64 @@ def get_phase_linking_coherence_mask(template, work_dir, functions):
 ################################################################
 
 
-def update_or_skip_inversion(inverted_date_list, slcStackObj):
+def update_or_skip_inversion(inverted_date_list, slc_dates):
 
     with open(inverted_date_list, 'r') as f:
         inverted_dates = f.readlines()
 
     inverted_dates = [date.split('\n')[0] for date in inverted_dates]
+    new_slc_dates = list(set(slc_dates) - set(inverted_dates))
+    all_date_list = new_slc_dates + inverted_dates
 
-    slc_dates = slcStackObj.get_date_list()
-
-    update_flag = True
     updated_index = None
     if inverted_dates == slc_dates:
         print(('All date exists in file {} with same size as required,'
                ' no need to update inversion.'.format(os.path.basename(inverted_date_list))))
-        update_flag = False
     elif len(slc_dates) < 10 + len(inverted_dates):
-        update_flag = False
         print('Number of new images is less than 10 --> wait until at least 10 images are acquired')
 
     else:
         updated_index = len(inverted_dates)
 
-    return update_flag, updated_index
+    return updated_index, all_date_list
+
+#########################################################
+
+
+def multilook(infile, outfile, rlks, alks, multilook_tool='gdal'):
+
+    if multilook_tool == "gdal":
+
+        print(infile)
+        ds = gdal.Open(infile + ".vrt", gdal.GA_ReadOnly)
+
+        xSize = ds.RasterXSize
+        ySize = ds.RasterYSize
+
+        outXSize = xSize / int(rlks)
+        outYSize = ySize / int(alks)
+
+        gdalTranslateOpts = gdal.TranslateOptions(format="ENVI", width=outXSize, height=outYSize)
+
+        gdal.Translate(outfile, ds, options=gdalTranslateOpts)
+        ds = None
+
+        ds = gdal.Open(outfile, gdal.GA_ReadOnly)
+        gdal.Translate(outfile + ".vrt", ds, options=gdal.TranslateOptions(format="VRT"))
+        ds = None
+
+    else:
+
+        print('Multilooking {0} ...'.format(infile))
+
+        inimg = isceobj.createImage()
+        inimg.load(infile + '.xml')
+
+        lkObj = Looks()
+        lkObj.setDownLooks(alks)
+        lkObj.setAcrossLooks(rlks)
+        lkObj.setInputImage(inimg)
+        lkObj.setOutputFilename(outfile)
+        lkObj.looks()
+
+    return outfile

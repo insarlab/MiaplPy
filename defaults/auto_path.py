@@ -22,44 +22,44 @@ autoPath = True
 # Default path of data files from different InSAR processors to be loaded into MintPy
 isceTopsAutoPath = '''##----------Default file path of ISCE/topsStack products
 MINOPY.load.processor      = isce
-MINOPY.load.metaFile       = ${PROJECT_DIR}/master/IW*.xml
+MINOPY.load.metaFile       = ${PROJECT_DIR}/reference/IW*.xml
 MINOPY.load.baselineDir    = ${PROJECT_DIR}/baselines
 
 MINOPY.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc.full
-MINOPY.load.unwFile        = ${PROJECT_DIR}/minopy/inverted/interferograms/*/fine*.unw
-MINOPY.load.corFile        = ${PROJECT_DIR}/minopy/inverted/interferograms/*/fine*.cor
-MINOPY.load.connCompFile   = ${PROJECT_DIR}/minopy/inverted/interferograms/*/*.unw.conncomp
+MINOPY.load.unwFile        = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*fine*.unw
+MINOPY.load.corFile        = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*fine*.cor
+MINOPY.load.connCompFile   = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*.unw.conncomp
 MINOPY.load.ionoFile       = None
 MINOPY.load.intFile        = None
 
-MINOPY.load.demFile        = ${PROJECT_DIR}/merged/geom_master/hgt.rdr.full
-MINOPY.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_master/lat.rdr.full
-MINOPY.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_master/lon.rdr.full
-MINOPY.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_master/los.rdr.full
-MINOPY.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_master/los.rdr.full
-MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_master/shadowMask.rdr.full
+MINOPY.load.demFile        = ${PROJECT_DIR}/merged/geom_reference/hgt.rdr.full
+MINOPY.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_reference/lat.rdr.full
+MINOPY.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_reference/lon.rdr.full
+MINOPY.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_reference/los.rdr.full
+MINOPY.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_reference/los.rdr.full
+MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_reference/shadowMask.rdr.full
 MINOPY.load.bperpFile      = None
 
 '''
 
 isceStripmapAutoPath = '''##----------Default file path of ISCE/stripmapStack products
 MINOPY.load.processor      = isce
-MINOPY.load.metaFile       = ${masterShelve}/masterShelve/data.dat
+MINOPY.load.metaFile       = ${referenceShelve}/referenceShelve/data.dat
 MINOPY.load.baselineDir    = ${PROJECT_DIR}/baselines
 
 MINOPY.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc
-MINOPY.load.unwFile        = ${PROJECT_DIR}/minopy/inverted/interferograms/*/fine*.unw
-MINOPY.load.corFile        = ${PROJECT_DIR}/minopy/inverted/interferograms/*/fine*.cor
-MINOPY.load.connCompFile   = ${PROJECT_DIR}/minopy/inverted/interferograms/*/*.unw.conncomp
+MINOPY.load.unwFile        = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*fine*.unw
+MINOPY.load.corFile        = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*fine*.cor
+MINOPY.load.connCompFile   = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*.conncomp
 MINOPY.load.ionoFile       = None
 MINOPY.load.intFile        = None
 
-MINOPY.load.demFile        = ${PROJECT_DIR}/merged/geom_master/hgt.rdr.full
-MINOPY.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_master/lat.rdr.full
-MINOPY.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_master/lon.rdr.full
-MINOPY.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_master/los.rdr.full
-MINOPY.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_master/los.rdr.full
-MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_master/shadowMask.rdr.full
+MINOPY.load.demFile        = ${PROJECT_DIR}/merged/geom_reference/hgt.rdr
+MINOPY.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_reference/lat.rdr
+MINOPY.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_reference/lon.rdr
+MINOPY.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_reference/los.rdr
+MINOPY.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_reference/los.rdr
+MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_reference/shadowMask.rdr
 MINOPY.load.bperpFile      = None
 
 '''
@@ -110,7 +110,7 @@ class PathFind:
     def __init__(self):
         self.scratchdir = os.getenv('SCRATCHDIR')
         self.defaultdir = os.path.expandvars('${MINOPY_HOME}/minopy/defaults')
-        self.geomasterdir = 'subset/geom_master'
+        self.georeferencedir = 'subset/geom_reference'
         #self.patchdir = 'patches'
         self.minopydir = 'minopy'
         self.rundir = 'run_files'
@@ -148,15 +148,15 @@ def read_str2dict(inString, delimiter='=', print_msg=False):
     return strDict
 
 
-def get_master_date12(project_dir, processor='roipac'):
+def get_reference_date12(project_dir, processor='roipac'):
     """
     date12 of reference interferogram in YYMMDD-YYMMDD format
     """
 
     m_date12 = None
 
-    # opt 1 - master_ifgram.txt
-    m_ifg_file = os.path.join(project_dir, 'PROCESS', 'master_ifgram.txt')
+    # opt 1 - reference_ifgram.txt
+    m_ifg_file = os.path.join(project_dir, 'PROCESS', 'reference_ifgram.txt')
     if os.path.isfile(m_ifg_file):
         m_date12 = str(np.loadtxt(m_ifg_file, dtype=bytes).astype(str))
         return m_date12
@@ -167,14 +167,14 @@ def get_master_date12(project_dir, processor='roipac'):
             lookup_file = glob.glob(os.path.join(project_dir, 'PROCESS/GEO/geo_*/geomap*.trans'))[0]
             m_date12 = re.findall('\d{6}-\d{6}', lookup_file)[0]
         except:
-            print("No master interferogram found! Check the PROCESS/GEO/geo_* folder")
+            print("No reference interferogram found! Check the PROCESS/GEO/geo_* folder")
 
     elif processor == 'gamma':
         geom_dir = os.path.join(project_dir, 'PROCESS/SIM')
         try:
             m_date12 = os.walk(geom_dir).next()[1][0].split('sim_')[1]
         except:
-            print("No master interferogram found! Check the PROCESS/SIM/sim_* folder")
+            print("No reference interferogram found! Check the PROCESS/SIM/sim_* folder")
     return m_date12
 
 
@@ -188,7 +188,7 @@ def get_auto_path(processor, work_dir, template=dict()):
     project_dir = os.path.dirname(work_dir)
     # read auto_path_dict
     if processor == 'isce':
-        if os.path.exists(project_dir + '/master'):
+        if os.path.exists(project_dir + '/reference'):
             processor = 'isceTops'
             template['sensor_type'] = 'tops'
         else:
@@ -200,7 +200,7 @@ def get_auto_path(processor, work_dir, template=dict()):
 
     m_date12 = None
     if processor in ['roipac', 'gamma']:
-        m_date12 = get_master_date12(project_dir, processor=processor)
+        m_date12 = get_reference_date12(project_dir, processor=processor)
         if m_date12 and processor == 'roipac':
             # determine nlooks in case both radar_2rlks.hgt and radar_8rlks.hgt exist.
             lookup_file = os.path.join(project_dir, 'PROCESS/GEO/geo_{}/geomap*.trans'.format(m_date12))
@@ -212,10 +212,11 @@ def get_auto_path(processor, work_dir, template=dict()):
     var_dict['${PROJECT_DIR}'] = project_dir
     if m_date12:
         var_dict['${m_date12}'] = m_date12
-    
+
+    var_dict['${int_type}'] = template['MINOPY.interferograms.type']
     if processor == 'isceStripmap':
         if template['MINOPY.load.metaFile'] == 'auto':
-            var_dict['${masterShelve}'] = os.path.join(project_dir, 'merged/SLC', os.listdir(os.path.join(project_dir, 'merged/SLC'))[0])
+            var_dict['${referenceShelve}'] = os.path.join(project_dir, 'merged/SLC', os.listdir(os.path.join(project_dir, 'merged/SLC'))[0])
 
     # update auto_path_dict
     for key, value in auto_path_dict.items():

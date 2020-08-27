@@ -65,7 +65,7 @@ MINOPY.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isce
 MINOPY.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
 MINOPY.load.compression    = auto  #[gzip / lzf / no], auto for no.
 ##---------for ISCE only:
-MINOPY.load.metaFile       = auto  #[path2metadata_file], i.e.: ./master/IW1.xml, ./masterShelve/data.dat
+MINOPY.load.metaFile       = auto  #[path2metadata_file], i.e.: ./reference/IW1.xml, ./referenceShelve/data.dat
 MINOPY.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
 ##---------interferogram datasets:
 MINOPY.load.unwFile        = auto  #[path2unw_file]
@@ -91,7 +91,7 @@ mintpy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
 NOTE = """NOTE:
   unwrapPhase is required, the other dataset are optional, including coherence, connectComponent, wrapPhase, etc.
   The unwrapPhase metadata file requires DATE12 attribute in YYMMDD-YYMMDD format.
-  All path of data file must contain the master and slave date, either in file name or folder name.
+  All path of data file must contain the reference and secondary date, either in file name or folder name.
 """
 
 EXAMPLE = """example:
@@ -248,8 +248,9 @@ def read_subset_box(inpsDict):
 
     # geo_box --> pix_box
     coord = ut.coordinate(atr, lookup_file=lookupFile)
+
     if geo_box is not None:
-        pix_box = coord.bbox_geo2radar(geo_box)
+        pix_box = (0, 0, int(atr['width']), int(atr['length']))    # coord.bbox_geo2radar(geo_box)
         pix_box = coord.check_box_within_data_coverage(pix_box)
         print('input bounding box of interest in lalo: {}'.format(geo_box))
     print('box to read for datasets in y/x: {}'.format(pix_box))
@@ -376,11 +377,15 @@ def read_inps_dict2ifgram_stack_dict_object(inpsDict):
                                                    width=maxDigit,
                                                    path=inpsDict[key]))
 
+
     # Check 1: required dataset
-    dsName0 = 'unwrapPhase'
-    if dsName0 not in dsPathDict.keys():
+    dsName0s = ['unwrapPhase']
+    dsName0 = [i for i in dsName0s if i in dsPathDict.keys()]
+    if len(dsName0) == 0:
         print('WARNING: No reqired {} data files found!'.format(dsName0))
         return None
+    else:
+        dsName0 = dsName0[0]
 
     # Check 2: data dimension for unwrapPhase files
     dsPathDict = skip_files_with_inconsistent_size(dsPathDict,
@@ -406,29 +411,34 @@ def read_inps_dict2ifgram_stack_dict_object(inpsDict):
     dsNameList = list(dsPathDict.keys())
     pairsDict = {}
     for dsPath in dsPathDict[dsName0]:
-        dates = ptime.yyyymmdd(readfile.read_attribute(dsPath)['DATE12'].split('-'))
+        date12 = readfile.read_attribute(dsPath)['DATE12'].replace('_', '-')
+        dates = ptime.yyyymmdd(date12.split('-'))
 
         #####################################
         # A dictionary of data files for a given pair.
         # One pair may have several types of dataset.
         # example ifgramPathDict = {'unwrapPhase': /pathToFile/filt.unw, 'iono':/PathToFile/iono.bil}
-        # All path of data file must contain the master and slave date, either in file name or folder name.
+        # All path of data file must contain the reference and secondary date, either in file name or folder name.
 
         ifgramPathDict = {}
         for i in range(len(dsNameList)):
             dsName = dsNameList[i]
             dsPath1 = dsPathDict[dsName][0]
+
             if all(d[2:8] in dsPath1 for d in dates):
                 ifgramPathDict[dsName] = dsPath1
+
             else:
                 dsPath2 = [i for i in dsPathDict[dsName]
                            if all(d[2:8] in i for d in dates)]
+
                 if len(dsPath2) > 0:
                     ifgramPathDict[dsName] = dsPath2[0]
                 else:
                     print('WARNING: {} file missing for pair {}'.format(dsName, dates))
-        ifgramObj = ifgramDict(dates=tuple(dates),
-                               datasetDict=ifgramPathDict)
+
+        ifgramObj = ifgramDict(datasetDict=ifgramPathDict)
+
         pairsDict[tuple(dates)] = ifgramObj
 
     if len(pairsDict) > 0:

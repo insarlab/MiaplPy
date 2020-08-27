@@ -27,7 +27,7 @@ class MinoPyParser:
         commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
         commonp.add_argument('--walltime', dest='wall_time', default='None',
                              help='walltime for submitting the script as a job')
-        commonp.add_argument('--queue', dest='queue_name', default=None, help='Queue name')
+        commonp.add_argument('--queue', dest='queue', default=None, help='Queue name')
 
     def parse(self):
 
@@ -39,12 +39,14 @@ class MinoPyParser:
             self.parser = self.patch_inversion_parser()
         elif self.script == 'phase_inversion':
             self.parser = self.phase_inversion_parser()
-        elif self.script == 'generate_ifgram':
-            self.parser = self.generate_ifgrams_parser()
+        elif self.script == 'patch_invert':
+            self.parser = self.patch_inversion_parser()
         elif self.script == 'generate_interferograms':
             self.parser = self.generate_interferograms_parser()
+        elif self.script == 'unwrap_minopy':
+            self.parser = self.unwrap_parser()
         elif self.script == 'minopy_wrapper':
-            self.parser = self.minopy_wrapper_parser()
+            self.parser, self.STEP_LIST = self.minopy_wrapper_parser()
 
         inps = self.parser.parse_args(args=self.iargs)
 
@@ -80,8 +82,8 @@ class MinoPyParser:
             print('{} -H to show the example template file'.format(os.path.basename(__file__)))
             sys.exit(1)
 
-        inps.outfile = [os.path.abspath(i) for i in inps.outfile]
-        inps.outdir = os.path.dirname(inps.outfile[0])
+        inps.out_file = [os.path.abspath(i) for i in inps.out_file]
+        inps.out_dir = os.path.dirname(inps.out_file[0])
         return inps
 
     def out_minopy_wrapper(self, sinps):
@@ -113,17 +115,18 @@ class MinoPyParser:
             inps.customTemplateFile = os.path.abspath(inps.customTemplateFile)
             if not os.path.isfile(inps.customTemplateFile):
                 raise FileNotFoundError(inps.customTemplateFile)
-            elif os.path.basename(inps.customTemplateFile) == os.path.basename(template_file):
-                # ignore if smallbaselineApp.cfg is input as custom template
-                inps.customTemplateFile = None
+            #elif os.path.basename(inps.customTemplateFile) == os.path.basename(template_file):
+            #    # ignore if minopy_template.cfg is input as custom template
+            #    inps.customTemplateFile = None
 
         # check input --start/end/dostep
         for key in ['startStep', 'endStep', 'doStep']:
             value = vars(inps)[key]
             if value and value not in STEP_LIST:
-                msg = 'Input step not found: {}'.format(value)
-                msg += '\nAvailable steps: {}'.format(STEP_LIST)
-                raise ValueError(msg)
+                if not value == 'multilook':
+                    msg = 'Input step not found: {}'.format(value)
+                    msg += '\nAvailable steps: {}'.format(STEP_LIST)
+                    raise ValueError(msg)
 
         # ignore --start/end input if --dostep is specified
         if inps.doStep:
@@ -131,12 +134,16 @@ class MinoPyParser:
             inps.endStep = inps.doStep
 
         # get list of steps to run
-        idx0 = STEP_LIST.index(inps.startStep)
-        idx1 = STEP_LIST.index(inps.endStep)
-        if idx0 > idx1:
-            msg = 'input start step "{}" is AFTER input end step "{}"'.format(inps.startStep, inps.endStep)
-            raise ValueError(msg)
-        inps.runSteps = STEP_LIST[idx0:idx1 + 1]
+        if not inps.startStep == 'multilook':
+            idx0 = STEP_LIST.index(inps.startStep)
+            idx1 = STEP_LIST.index(inps.endStep)
+            if idx0 > idx1:
+                msg = 'input start step "{}" is AFTER input end step "{}"'.format(inps.startStep, inps.endStep)
+                raise ValueError(msg)
+            inps.runSteps = STEP_LIST[idx0:idx1 + 1]
+        else:
+            inps.runSteps = ['multilook']
+            idx0 = STEP_LIST.index('ifgrams')
 
         # empty the step list for -g option
         if inps.generate_template:
@@ -194,7 +201,7 @@ class MinoPyParser:
         MINOPY.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
         MINOPY.load.compression    = auto  #[gzip / lzf / no], auto for no.
         ##---------for ISCE only:
-        MINOPY.load.metaFile       = auto  #[path2metadata_file], i.e.: ./master/IW1.xml, ./masterShelve/data.dat
+        MINOPY.load.metaFile       = auto  #[path2metadata_file], i.e.: ./reference/IW1.xml, ./referenceShelve/data.dat
         MINOPY.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
         ##---------slc datasets:
         MINOPY.load.slcFile        = auto  #[path2slc]
@@ -239,7 +246,7 @@ class MinoPyParser:
         parser.add_argument('--compression', choices={'gzip', 'lzf', None}, default=None,
                             help='compress loaded geometry while writing HDF5 file, default: None.')
 
-        parser.add_argument('-o', '--output', type=str, nargs=3, dest='outfile',
+        parser.add_argument('-o', '--output', type=str, nargs=3, dest='out_file',
                             default=['./inputs/slcStack.h5',
                                      './inputs/geometryRadar.h5',
                                      './inputs/geometryGeo.h5'],
@@ -261,9 +268,7 @@ class MinoPyParser:
         patch.add_argument('-p', '--patchSize', type=int, dest='patch_size', default=200,
                            help='azimuth window size for shp finding')
         patch.add_argument('-s', '--slcStack', type=str, dest='slc_stack', help='SLC stack file')
-        patch.add_argument('-i', '--index', type=int, dest='index_inversion', default=0,
-                           help='The index of the first image in the ministack')
-
+       
         par = parser.add_argument_group('parallel', 'parallel processing using dask')
         par.add_argument('-c', '--cluster', '--cluster-type', dest='cluster', type=str,
                          default='local', choices=CLUSTER_LIST + ['no'],
@@ -275,40 +280,58 @@ class MinoPyParser:
         return parser
 
     @staticmethod
-    def generate_ifgrams_parser():
+    def patch_inversion_parser():
 
-        parser = argparse.ArgumentParser(description='Generate interferogram, spatial and temporal coherence from '
-                                                     'inversion outputs')
-        parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-        parser.add_argument('-w', '--workDir', dest='work_dir', type=str, required=True,
-                            help='minopy directory (inversion results)')
-        parser.add_argument('-i', '--ifgDir', dest='ifg_dir', type=str, required=True,
-                            help='interferogram directory')
-        parser.add_argument('-r', '--rangeWindow', dest='range_win', type=str, default='15'
-                            , help='SHP searching window size in range direction. -- Default : 15')
-        parser.add_argument('-a', '--azimuthWindow', dest='azimuth_win', type=str, default='15'
-                            , help='SHP searching window size in azimuth direction. -- Default : 15')
+        parser = argparse.ArgumentParser(description='patch inversion options')
+        parser.add_argument('-d', '--dataArg', dest='data_kwargs', type=str, required=True,
+                            help='dictionary of input arguments')
+        par = parser.add_argument_group('parallel', 'parallel processing using dask')
+        par.add_argument('-c', '--cluster', '--cluster-type', dest='cluster', type=str,
+                         default='local', choices=CLUSTER_LIST + ['no'],
+                         help='Cluster to use for parallel computing, no to turn OFF. (default: %(default)s).')
+        par.add_argument('--num-worker', dest='numWorker', type=str, default='4',
+                         help='Number of workers to use (default: %(default)s).')
+        par.add_argument('--config', '--config-name', dest='config', type=str, default=None,
+                         help='Configuration name to use in dask.yaml (default: %(default)s).')
+
+        return parser
+
+    @staticmethod
+    def unwrap_parser():
+        parser = argparse.ArgumentParser(description='Unwrap using snaphu')
+        parser.add_argument('-f', '--ifg', dest='input_ifg', type=str, required=True,
+                            help='input wrapped interferogram')
+        parser.add_argument('-c', '--cor', dest='input_cor', type=str, required=True,
+                            help='input correlation file')
+        parser.add_argument('-u', '--unw', dest='unwrapped_ifg', type=str, required=True,
+                            help='output unwrapped interferogram')
+        parser.add_argument('-s', '--reference', dest='reference', type=str, default='reference',
+                            help='Reference .h5 file to get metadata')
+        parser.add_argument('-d', '--defoMax', dest='defo_max', type=float, default=1.2,
+                            help='Maximum abrupt phase discontinuity (cycles)')
         return parser
 
     @staticmethod
     def generate_interferograms_parser():
 
-        parser = argparse.ArgumentParser(description='Generate interferogram, spatial and temporal coherence from '
-                                                     'inversion outputs')
-        parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-        parser.add_argument('-s', '--slcFile', dest='slc_file', type=str, required=True,
-                            help='Inverted interferograms')
-        parser.add_argument('-o', '--outDir', dest='ifg_dir', type=str, required=True,
-                            help='interferogram directory')
-        parser.add_argument('-b1', '--band_master', dest='band_master', type=int, default=1
-                            , help='master band in rslc_ref file. -- default = 1')
-        parser.add_argument('-b2', '--band_slave', dest='band_slave', type=int, default=None
-                            , help='master band in rslc_ref file. -- default = None')
+        parser = argparse.ArgumentParser(description='Generate interferogram')
+        parser.add_argument('-m', '--reference', type=str, dest='reference', required=True,
+                            help='Reference image')
+        parser.add_argument('-s', '--secondary', type=str, dest='secondary', required=True,
+                            help='Secondary image')
+        parser.add_argument('-o', '--outdir', type=str, dest='out_dir', default='interferograms',
+                            help='Prefix of output int and amp files')
+        parser.add_argument('-a', '--alks', type=int, dest='azlooks', default=1,
+                            help='Azimuth looks')
+        parser.add_argument('-r', '--rlks', type=int, dest='rglooks', default=1,
+                            help='Range looks')
         parser.add_argument('-p', '--prefix', dest='prefix', type=str, default='tops'
                             , help='ISCE stack processor: options= tops, stripmap -- default = tops')
+
         return parser
 
-    def minopy_wrapper_parser(self):
+    @staticmethod
+    def minopy_wrapper_parser():
 
         STEP_LIST = [
             'crop',
@@ -351,7 +374,6 @@ class MinoPyParser:
               minopy_wrapper.py GalapagosSenDT128.template --start crop         # start from the step 'download' 
               minopy_wrapper.py GalapagosSenDT128.template --stop  unwrap       # end after step 'interferogram'
               """
-
         parser = argparse.ArgumentParser(description='Routine Time Series Analysis for Small Baseline InSAR Stack',
                                          formatter_class=argparse.RawTextHelpFormatter,
                                          epilog=EXAMPLE)
@@ -379,7 +401,7 @@ class MinoPyParser:
         parser.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
         parser.add_argument('--walltime', dest='wall_time', default='None',
                             help='walltime for submitting the script as a job')
-        parser.add_argument('--queue', dest='queue_name', default=None, help='Queue name')
+        parser.add_argument('--queue', dest='queue', default=None, help='Queue name')
 
         step = parser.add_argument_group('steps processing (start/end/dostep)', STEP_HELP)
         step.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
@@ -389,9 +411,7 @@ class MinoPyParser:
         step.add_argument('--dostep', dest='doStep', metavar='STEP',
                           help='run processing at the named step only')
 
-        self.STEP_LIST = STEP_LIST
-
-        return parser
+        return parser, STEP_LIST
 
 
 

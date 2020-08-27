@@ -24,8 +24,8 @@ from mintpy.utils import isce_utils, ptime, readfile, writefile, utils as ut
 
 
 EXAMPLE = """example:
-  prep_slc_isce.py -s ./merged/SLC -m ./master/IW1.xml -b ./baselines -g ./merged/geom_master  #for topsStack
-  prep_slc_isce.py -s ./merged/SLC -m .merged/SLC/20190510/masterShelve/data.dat -b ./baselines -g ./merged/geom_master  #for stripmapStack
+  prep_slc_isce.py -s ./merged/SLC -m ./reference/IW1.xml -b ./baselines -g ./merged/geom_reference  #for topsStack
+  prep_slc_isce.py -s ./merged/SLC -m .merged/SLC/20190510/referenceShelve/data.dat -b ./baselines -g ./merged/geom_reference  #for stripmapStack
   """
 
 
@@ -43,7 +43,7 @@ def create_parser():
                              'e.g.: 20180705.slc.full')
     parser.add_argument('-m', '--meta-file', dest='metaFile', type=str, default=None,
                         help='Metadata file to extract common metada for the stack:\n'
-                             'e.g.: for ISCE/topsStack: master/IW3.xml')
+                             'e.g.: for ISCE/topsStack: reference/IW3.xml')
     parser.add_argument('-b', '--baseline-dir', dest='baselineDir', type=str, default=None,
                         help=' directory with baselines ')
     parser.add_argument('-g', '--geometry-dir', dest='geometryDir', type=str, default=None,
@@ -74,7 +74,7 @@ def load_product(xmlname):
 
 def extract_tops_metadata(xml_file):
     """Read metadata from xml file for Sentinel-1/TOPS
-    Parameters: xml_file : str, path of the .xml file, i.e. master/IW1.xml
+    Parameters: xml_file : str, path of the .xml file, i.e. reference/IW1.xml
     Returns:    meta     : dict, metadata
     """
     import isce
@@ -139,7 +139,7 @@ def extract_tops_metadata(xml_file):
 
 def extract_stripmap_metadata(meta_file):
     """Read metadata from shelve file for StripMap stack from ISCE
-    Parameters: meta_file : str, path of the shelve file, i.e. masterShelve/data.dat
+    Parameters: meta_file : str, path of the shelve file, i.e. referenceShelve/data.dat
     Returns:    meta      : dict, metadata
     """
 
@@ -212,7 +212,7 @@ def extract_multilook_number(geom_dir, metadata=dict()):
 
 def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=True):
     """Extract metadata from ISCE stack products
-    Parameters: meta_file : str, path of metadata file, master/IW1.xml or masterShelve/data.dat
+    Parameters: meta_file : str, path of metadata file, reference/IW1.xml or referenceShelve/data.dat
                 geom_dir  : str, path of geometry directory.
                 rsc_file  : str, output file name of ROIPAC format rsc file
     Returns:    metadata  : dict
@@ -231,10 +231,12 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
         print('extract metadata from ISCE/topsStack xml file:', meta_file)
         #metadata = extract_tops_metadata(meta_file)[0]
         metadata = isce_utils.extract_tops_metadata(meta_file)[0]
+        metadata['sensor_type'] = 'tops'
     elif fbase.startswith("data"):
         print('extract metadata from ISCE/stripmapStack shelve file:', meta_file)
         #metadata = extract_stripmap_metadata(meta_file)[0]
         metadata = isce_utils.extract_stripmap_metadata(meta_file)[0]
+        metadata['sensor_type'] = 'stripmap'
     elif fbase.endswith(".xml"):
         #metadata = extract_stripmap_metadata(meta_file)[0]
         metadata = isce_utils.extract_stripmap_metadata(meta_file)[0]

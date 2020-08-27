@@ -26,7 +26,9 @@ __all__ = [
     'crop_images',
     'generate_interferograms',
     'phase_inversion',
+    'patch_invert',
     'load_int',
+    'unwrap_minopy',
     'version',
 ]
 
