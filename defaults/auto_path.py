@@ -211,6 +211,7 @@ def get_auto_path(processor, work_dir, template=dict()):
             processor = 'isceStripmap'
             template['sensor_type'] = 'stripmap'
 
+
     auto_path_dict = read_str2dict(autoPathDict[processor], print_msg=False)
     # grab variable value: SCRATCHDIR, m_date12
 
