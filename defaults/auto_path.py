@@ -12,6 +12,7 @@ import re
 import glob
 import numpy as np
 import h5py
+
 # Auto setting for file structure of Univ. of Miami, as shown below.
 # It required 3 conditions: 1) autoPath = True
 #                           2) $SCRATCHDIR is defined in environmental variable
@@ -187,6 +188,7 @@ def get_auto_path(processor, work_dir, template=dict()):
     Returns:    template : dict,
     """
     project_dir = os.path.dirname(work_dir)
+
     input_h5 = glob.glob(os.path.join(work_dir, 'inputs/*.h5'))
     var_dict = {}
 
@@ -209,6 +211,7 @@ def get_auto_path(processor, work_dir, template=dict()):
             processor = 'isceStripmap'
             template['sensor_type'] = 'stripmap'
 
+
     auto_path_dict = read_str2dict(autoPathDict[processor], print_msg=False)
     # grab variable value: SCRATCHDIR, m_date12
 
@@ -229,6 +232,7 @@ def get_auto_path(processor, work_dir, template=dict()):
     var_dict['${int_type}'] = template['MINOPY.interferograms.type']
     if processor == 'isceStripmap':
         if template['MINOPY.load.metaFile'] == 'auto':
+
             try:
                 var_dict['${referenceShelve}'] = os.path.join(project_dir, 'merged/SLC',
                                                               os.listdir(os.path.join(project_dir, 'merged/SLC'))[0])

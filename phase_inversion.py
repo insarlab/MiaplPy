@@ -240,6 +240,7 @@ class PhaseLink:
                           box_list=self.box_list, date_list=self.all_date_list)
 
         print('Stitching temporal coherence to quality...')
+
         # Save wrapped phase time series to .h5 and quality
         quality_file = self.out_dir + '/quality'
         if not os.path.exists(quality_file):
