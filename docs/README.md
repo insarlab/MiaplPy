@@ -49,6 +49,7 @@ minopy_wrapper.py PichinchaSenAT18.template
 
 
 ### 3. Contribution ###
+Please follow the [guidlines](./CONTRIBUTING.md) for contributing to the code
 
 ### 4. Citation ###
 
