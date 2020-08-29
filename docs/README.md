@@ -1,10 +1,14 @@
 [![Language](https://img.shields.io/badge/python-3.5%2B-blue.svg)](https://www.python.org/)
 
 ## MiNoPy ##
+*Miami Non linear Phase inversion in python*
 
-A python package of InSAR processing with Non Linear inversion method working with ISCE and MintPy.
-This package depends on MintPy for time series corrections and MinSAR for job submission.
-It works with all data based on ISCE outputs format.
+An open source python package of InSAR processing with Non Linear phase inversion. It reads a stack of coregistered SLCs and
+produces time series of surface deformation. This package depends on MintPy for time series corrections and MinSAR for job submission.
+It works with all data based on ISCE outputs format. The inversion is based on wrapped phase time series and it includes PTA, EMI and EVD techniques.
+It also supports sequential inversion.
+
+THIS IS RESEARCH CODE PROVIDED TO YOU "AS IS" WITH NO WARRANTIES OF CORRECTNESS. USE AT YOUR OWN RISK.
 
 
 ### 1. [Installation](./installation.md) ###
