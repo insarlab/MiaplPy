@@ -35,7 +35,7 @@ Use 'minopy_wrapper.py -h' for a help on the steps you need to run
 Inversion step may take long time depending on the number of pixels in the subset area you are processing and number of images. 
 
 
-Here is an example of SAR stack pre-processed using ISCE:
+**Example:** Here is an example of SAR stack pre-processed using ISCE:
 
 Area: Pichincha volcano, Ecuador\
 Dataset: Sentinel-1 Ascending Track 18, 23 acquisitions, 2019.01.01 - 2019.06.12\
