@@ -4,11 +4,9 @@
 ############################################################
 
 import os
-import sys
 import time
 import numpy as np
 import h5py
-import shutil
 import pickle
 
 import minopy_utilities as mut
@@ -233,12 +231,15 @@ class PhaseLink:
 
         print('All patches are done, stitching ...')
 
-        merge_patches(width=self.width, length=self.length, inverted_dir=self.out_dir,
-                          box_list=self.box_list, date_list=self.all_date_list)
-
         with open(self.out_dir + '/inverted_date_list.txt', 'w+') as f:
             dates = [date + '\n' for date in self.all_date_list]
             f.writelines(dates)
+
+        print('Stitching wrapped phase time series...')
+        merge_patches(width=self.width, length=self.length, inverted_dir=self.out_dir,
+                          box_list=self.box_list, date_list=self.all_date_list)
+
+        print('Stitching temporal coherence to quality...')
 
         # Save wrapped phase time series to .h5 and quality
         quality_file = self.out_dir + '/quality'
@@ -248,6 +249,7 @@ class PhaseLink:
         else:
             quality_memmap = np.memmap(quality_file, mode='r+', dtype='float32', shape=(self.length, self.width))
 
+        print('Export wrapped phase time series to rslc_ref.h5 ...')
         RSLCfile = self.out_dir + '/rslc_ref.h5'
         RSLC = h5py.File(RSLCfile, 'a')
         if 'slc' in RSLC.keys():
@@ -294,18 +296,21 @@ class PhaseLink:
         # Save squeezed images and datum shift to .h5
         if 'sequential' in self.phase_linking_method:
 
+            print('Export Squeezed images and Datum shifts to datum.h5 ...')
             datum_file = os.path.join(self.out_dir, 'datum.h5')
+            if self.total_num_mini_stacks is None:
+                self.total_num_mini_stacks = self.n_image//self.mini_stack_default_size
 
             with h5py.File(datum_file, 'a') as ds:
-                if 'squeezed_images' in ds.keys():
+                if not 'squeezed_images' in ds.keys():
 
                     ds.create_dataset('squeezed_images',
-                                      shape=(len(self.total_num_mini_stacks), self.length, self.width),
+                                      shape=(self.total_num_mini_stacks, self.length, self.width),
                                       maxshape=(None, self.length, self.width),
                                       chunks=True,
                                       dtype='complex64')
                     ds.create_dataset('datum_shift',
-                                      shape=(len(self.total_num_mini_stacks), self.length, self.width),
+                                      shape=(self.total_num_mini_stacks, self.length, self.width),
                                       maxshape=(None, self.length, self.width),
                                       chunks=True,
                                       dtype='float32')
@@ -360,67 +365,6 @@ def merge_patches(width, length, inverted_dir, box_list, date_list):
                 patch_name = 'PATCH_{}'.format(t)
                 out_rslc[box[1]:box[3], box[0]:box[2]] = patches[patch_name][d, :, :]
             IML.renderISCEXML(out_name, bands=1, nyy=length, nxx=width, datatype='complex64', scheme='BSQ')
-
-
-    ''' 
-    for d, date in enumerate(date_list):
-        wrap_date = os.path.join(out_dir, date)
-        os.makedirs(wrap_date, exist_ok=True)
-        out_name = os.path.join(wrap_date, date + '.slc')
-        out_rslc = np.memmap(out_name, dtype='complex64', mode='w+', shape=(length, width))
-
-        for t, box in enumerate(box_list):
-            patch_dir = os.path.join(inverted_dir, 'PATCH_{}'.format(t))
-            patch_file = os.path.join(patch_dir, 'rslc_ref')
-            patch_width = box[2] - box[0]
-            patch_length = box[3] - box[1]
-            patch_rslc = np.memmap(patch_file, dtype='complex64', mode='r', shape=(len(date_list),
-                                                                                   patch_length, patch_width))
-            out_rslc[box[1]:box[3], box[0]:box[2]] = patch_rslc[d, :, :]
-
-        IML.renderISCEXML(out_name, bands=1, nyy=length, nxx=width, datatype='complex64', scheme='BSQ')
-        
-    '''
-    return
-
-
-def merge_patches_vrt(width, length, inverted_dir, box_list, date_list):
-
-    out_dir = os.path.join(inverted_dir, 'wrapped_phase')
-    os.makedirs(out_dir, exist_ok=True)
-
-    header_tmpl = '''<VRTDataset rasterXSize="{width}" rasterYSize="{length}">  <VRTRasterBand dataType="CFloat32" band="1">
-        <NoDataValue>0.0</NoDataValue>
-    '''.format(width=width, length=length)
-
-    last_line = '''
-    </VRTRasterBand></VRTDataset>
-    '''
-
-    patch_tmpl = '''    <SimpleSource>
-            <SourceFilename relativeToVRT="1">{src_path}</SourceFilename>
-            <SourceBand>{src_band}</SourceBand>
-            <SourceProperties RasterXSize="{patch_width}" RasterYSize="{patch_length}" DataType="CFloat32"/>
-            <SrcRect xOff="{src_xOff}" yOff="{src_yOff}" xSize="{patch_width}" ySize="{patch_length}"/>
-            <DstRect xOff="{dst_xOff}" yOff="{dst_yOff}" xSize="{patch_width}" ySize="{patch_length}"/>
-        </SimpleSource>
-    '''
-
-    for d, date in enumerate(date_list):
-        wrap_date = os.path.join(out_dir, date)
-        os.makedirs(wrap_date, exist_ok=True)
-        out_name = os.path.join(wrap_date, date + '.slc.vrt')
-        with open(out_name, 'w+') as vrtfile:
-            vrtfile.write(header_tmpl)
-            for t, box in enumerate(box_list):
-                patch_dir = os.path.join(inverted_dir, 'PATCH_{}'.format(t))
-                patch_vrt = os.path.join(patch_dir, 'rslc_ref.vrt')
-                patch_width = box[2] - box[0]
-                patch_length = box[3] - box[1]
-                vrtfile.write(patch_tmpl.format(src_path=patch_vrt, src_band=d + 1, patch_width=patch_width,
-                                                patch_length=patch_length, src_xOff=0, src_yOff=0,
-                                                dst_xOff=box[0], dst_yOff=box[1]))
-            vrtfile.write(last_line)
 
     return
 

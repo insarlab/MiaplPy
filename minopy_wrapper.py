@@ -437,7 +437,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             out_dir = os.path.join(inps.ifgram_dir, pair[0] + '_' + pair[1])
             os.makedirs(out_dir, exist_ok='True')
 
-            scp_args = '--ifg {a1} --cor {a2} --unw {a3} --defoMax {a4}' \
+            scp_args = '--ifg {a1} --cor {a2} --unw {a3} --defoMax {a4} ' \
                        '--reference {a5}\n'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
                                                    a2=os.path.join(out_dir, 'filt_fine.cor'),
                                                    a3=os.path.join(out_dir, 'filt_fine.unw'),
