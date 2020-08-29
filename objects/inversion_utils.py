@@ -193,6 +193,7 @@ def initiate_stacks(slc_stack, patch_dir, box, mini_stack_default_size, phase_li
         rslc = np.memmap(rslc_file, dtype='complex64', mode='w+', shape=(numSlc, big_length, big_width))
         rslc[:, :, :] = rslc_stack[:, big_box[1]: big_box[3], big_box[0]:big_box[2]]
         RSLC.close()
+        IML.renderISCEXML(rslc_file, bands=numSlc, nyy=length, nxx=width, datatype='complex64', scheme='BSQ')
 
     # initiate refined slc file for the patch
     if not os.path.exists(rslc_ref_file):
@@ -289,15 +290,7 @@ def parallel_invertion(distance_thresh=None, azimuth_window=None, range_window=N
                                   reference_row, reference_col, azimuth_window, range_window)
 
             SHP[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = shp.reshape(azimuth_window * range_window, 1, 1)
-            '''
-            if not SHP[:, coord[0], coord[1]].any():
-               shp = get_shp_row_col(data, slc_images, distance_thresh, sample_rows, sample_cols,
-                                     reference_row, reference_col, azimuth_window, range_window)
 
-               SHP[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = shp.reshape(azimuth_window * range_window, 1, 1)
-            else:
-               shp = SHP[:, coord[0], coord[1]].reshape(azimuth_window, range_window)
-            '''
             num_shp = len(shp[shp > 0])
             shp_rows, shp_cols = np.where(shp == 1)
             rowcol_set = [(r, c) for r, c in zip(shp_rows, shp_cols)]

@@ -11,6 +11,7 @@ import os
 import re
 import glob
 import numpy as np
+import h5py
 # Auto setting for file structure of Univ. of Miami, as shown below.
 # It required 3 conditions: 1) autoPath = True
 #                           2) $SCRATCHDIR is defined in environmental variable
@@ -186,9 +187,22 @@ def get_auto_path(processor, work_dir, template=dict()):
     Returns:    template : dict,
     """
     project_dir = os.path.dirname(work_dir)
+    input_h5 = glob.glob(os.path.join(work_dir, 'inputs/*.h5'))
+    var_dict = {}
+
     # read auto_path_dict
     if processor == 'isce':
-        if os.path.exists(project_dir + '/reference'):
+        if len(input_h5) > 0:
+            with h5py.File(input_h5[0]) as f:
+                metadata = dict(f.attrs)
+            if metadata['beam_mode'] == 'SM':
+                processor = 'isceStripmap'
+                template['sensor_type'] = 'stripmap'
+            elif metadata['beam_mode'] == 'IW':
+                processor = 'isceTops'
+                template['sensor_type'] = 'tops'
+
+        elif os.path.exists(project_dir + '/reference'):
             processor = 'isceTops'
             template['sensor_type'] = 'tops'
         else:
@@ -208,7 +222,6 @@ def get_auto_path(processor, work_dir, template=dict()):
             dem_file = os.path.join('${PROJECT_DIR}/PROCESS/DONE/*${m_date12}*', 'radar{}.hgt'.format(lks))
             auto_path_dict[prefix+'demFile'] = dem_file
 
-    var_dict = {}
     var_dict['${PROJECT_DIR}'] = project_dir
     if m_date12:
         var_dict['${m_date12}'] = m_date12
@@ -216,7 +229,11 @@ def get_auto_path(processor, work_dir, template=dict()):
     var_dict['${int_type}'] = template['MINOPY.interferograms.type']
     if processor == 'isceStripmap':
         if template['MINOPY.load.metaFile'] == 'auto':
-            var_dict['${referenceShelve}'] = os.path.join(project_dir, 'merged/SLC', os.listdir(os.path.join(project_dir, 'merged/SLC'))[0])
+            try:
+                var_dict['${referenceShelve}'] = os.path.join(project_dir, 'merged/SLC',
+                                                              os.listdir(os.path.join(project_dir, 'merged/SLC'))[0])
+            except:
+                var_dict['${referenceShelve}'] = os.path.join(work_dir, 'inputs/reference')
 
     # update auto_path_dict
     for key, value in auto_path_dict.items():
@@ -229,6 +246,13 @@ def get_auto_path(processor, work_dir, template=dict()):
     for key, value in auto_path_dict.items():
         if value and template[key] == 'auto':
             template[key] = value
-    return template
 
+    if len(input_h5) > 0:
+        template['MINOPY.load.metaFile'] = os.path.join(work_dir, 'inputs/reference',
+                                                        os.path.basename(template['MINOPY.load.metaFile']))
+
+    if not os.path.exists(template['MINOPY.load.baselineDir']):
+        template['MINOPY.load.baselineDir'] = os.path.join(work_dir, 'inputs/baselines')
+
+    return template
 
