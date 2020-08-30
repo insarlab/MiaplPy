@@ -17,19 +17,19 @@ THIS IS RESEARCH CODE PROVIDED TO YOU "AS IS" WITH NO WARRANTIES OF CORRECTNESS.
 
 The workflow starts with reading coregistered SLCs, then performs an inversion to get wrapped phase time series.
 Interferograms are then unwrapped and different corrections are applied on the final time series.
-Everything is followed by defined steps in the `minopy_wrapper.py` and the input is a text file containing adjustable options (template_file)
+Everything is followed by defined steps in the `minopyApp.py` and the input is a text file containing adjustable options (template_file)
 
 examples:
 
-- minopy_wrapper.py template_file
-- minopy_wrapper.py template_file --submit
-- minopy_wrapper.py template_file --start crop --stop unwrap
-- minopy_wrapper.py template_file --dostep ifgrams
+- minopyApp.py template_file
+- minopyApp.py template_file --submit
+- minopyApp.py template_file --start crop --stop unwrap
+- minopyApp.py template_file --dostep ifgrams
 
 
-Use 'minopy_wrapper.py -H' for a complete list of required options.
+Use 'minopyApp.py -H' for a complete list of required options.
 
-Use 'minopy_wrapper.py -h' for a help on the steps you need to run 
+Use 'minopyApp.py -h' for a help on the steps you need to run 
 
 -- Note:
 Inversion step may take long time depending on the number of pixels in the subset area you are processing and number of images. 
@@ -44,12 +44,12 @@ Size: ~340 Mb\
 wget https://zenodo.org/record/4007068/files/PichinchaSenAT18.zip
 tar -xvJf PichinchaSenAT18.zip
 cd PichinchaSenAT18
-minopy_wrapper.py PichinchaSenAT18.template 
+minopyApp.py PichinchaSenAT18.template 
 ```
 
 
 ### 3. Contribution ###
-Please follow the [guidlines](./CONTRIBUTING.md) for contributing to the code
+Please follow the [guidelines](./CONTRIBUTING.md) for contributing to the code
 
 ### 4. Citation ###
 
