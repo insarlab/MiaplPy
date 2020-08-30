@@ -42,7 +42,7 @@ Dataset: Sentinel-1 Ascending Track 18, 23 acquisitions, 2019.01.01 - 2019.06.12
 Size: ~340 Mb\
 ```
 wget https://zenodo.org/record/4007068/files/PichinchaSenAT18.zip
-tar -xvJf PichinchaSenAT18.zip
+unzip PichinchaSenAT18.zip
 cd PichinchaSenAT18
 minopyApp.py PichinchaSenAT18.template 
 ```
