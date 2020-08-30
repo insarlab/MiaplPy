@@ -7,7 +7,6 @@
 ############################################################
 
 import os
-import gdal
 import h5py
 import multiprocessing
 from isceobj.Util.ImageUtil import ImageLib as IML
@@ -27,15 +26,16 @@ def main(iargs=None):
     inps = Parser.parse()
 
     unwObj = Snaphu(inps)
-    do_tiles = unwObj.need_to_split_tiles()
+    do_tiles, metadata = unwObj.need_to_split_tiles()
 
-    if do_tiles:
-        unwObj.unwrap_tile()
-    else:
-        unwObj.unwrap()
-
-    ifg_dir = os.path.dirname(inps.input_ifg)
-    os.system('rm -rf {}/snaphu_tiles_*'.format(ifg_dir))
+    try:
+        if do_tiles:
+            unwObj.unwrap_tile()
+        else:
+            unwObj.unwrap()
+    except:
+        metadata['defomax'] = inps.defo_max
+        runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
 
     return
 
@@ -84,12 +84,17 @@ class Snaphu:
 
     def need_to_split_tiles(self):
 
+        do_tiles, self.nproc, self.y_tile, self.x_tile = self.get_nproc_tile()
+
+        if do_tiles:
+            for indx, line in enumerate(self.config_default):
+                if 'SINGLETILEREOPTIMIZE' in line:
+                    self.config_default[indx] = 'SINGLETILEREOPTIMIZE  TRUE'
+
         with open(self.config_file, 'w+') as file:
             file.writelines(self.config_default)
 
-        do_tiles, self.nproc, self.y_tile, self.x_tile = self.get_nproc_tile()
-
-        return do_tiles
+        return do_tiles, self.metadata
 
     def get_metadata(self):
         with h5py.File(self.reference, 'r') as ds:
@@ -162,6 +167,76 @@ class Snaphu:
                           datatype='BYTE', scheme='BIL')
 
         return
+
+
+
+def runUnwrap(infile, outfile, corfile, config):
+    import isceobj
+    from contrib.Snaphu.Snaphu import Snaphu
+
+    costMode = 'DEFO'
+    initMethod = 'MCF'
+    defomax = config['defomax']
+
+    wrapName = infile
+    unwrapName = outfile
+
+    img = isceobj.createImage()
+    img.load(infile + '.xml')
+
+    wavelength = float(config['WAVELENGTH'])
+    width = img.getWidth()
+    length = img.getLength()
+    earthRadius = float(config['EARTH_RADIUS'])
+    altitude = float(config['HEIGHT'])
+    rangeLooks = int(config['RgLooks'])
+    azimuthLooks = int(config['AzLooks'])
+
+    snp = Snaphu()
+    snp.setInput(wrapName)
+    snp.setOutput(unwrapName)
+    snp.setWidth(width)
+    snp.setCostMode(costMode)
+    snp.setEarthRadius(earthRadius)
+    snp.setWavelength(wavelength)
+    snp.setAltitude(altitude)
+    snp.setCorrfile(corfile)
+    snp.setInitMethod(initMethod)
+    #snp.setCorrLooks(corrLooks)
+    #snp.setMaxComponents(maxComponents)
+    snp.setDefoMaxCycles(defomax)
+    snp.setRangeLooks(rangeLooks)
+    snp.setAzimuthLooks(azimuthLooks)
+    snp.setCorFileFormat('FLOAT_DATA')
+    snp.prepare()
+    snp.unwrap()
+
+    ######Render XML
+    outImage = isceobj.Image.createUnwImage()
+    outImage.setFilename(unwrapName)
+    outImage.setWidth(width)
+    outImage.setLength(length)
+    outImage.setAccessMode('read')
+    # outImage.createImage()
+    outImage.renderHdr()
+    outImage.renderVRT()
+    # outImage.finalizeImage()
+
+    #####Check if connected components was created
+    if snp.dumpConnectedComponents:
+        connImage = isceobj.Image.createImage()
+        connImage.setFilename(unwrapName + '.conncomp')
+        # At least one can query for the name used
+        connImage.setWidth(width)
+        connImage.setLength(length)
+        connImage.setAccessMode('read')
+        connImage.setDataType('BYTE')
+        #    connImage.createImage()
+        connImage.renderHdr()
+        connImage.renderVRT()
+    #   connImage.finalizeImage()
+
+    return
 
 
 if __name__ == '__main__':
