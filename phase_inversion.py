@@ -208,9 +208,12 @@ class PhaseLink:
             with open(run_file_inversion, 'w+') as f:
                 f.writelines(run_commands)
 
+            if not os.getenv('JOB_SUBMISSION_SCHEME'):
+                os.environ['JOB_SUBMISSION_SCHEME'] = 'launcher_multiTask_multiNode'
             inps_args = self.inps
             inps_args.work_dir = run_dir
             inps_args.out_dir = run_dir
+            inps_args.num_bursts = (self.patch_size**2)/40000
             job_obj = JOB_SUBMIT(inps_args)
 
             putils.remove_last_job_running_products(run_file=run_file_inversion)

@@ -52,30 +52,9 @@ STEP_LIST = [
 
 def main(iargs=None):
     start_time = time.time()
-    Parser = MinoPyParser(iargs, script='minopy_wrapper')
+    Parser = MinoPyParser(iargs, script='minopy_app')
     inps = Parser.parse()
-
-    if not iargs is None:
-        input_arguments = iargs
-    else:
-        input_arguments = sys.argv[1::]
-
-    #########################################
-    # Submit job
-    #########################################
-    inps.out_dir = inps.workDir
-    inps.work_dir = inps.workDir
-    inps.custom_template_file = inps.customTemplateFile
-    job_obj = JOB_SUBMIT(inps)
-
-    if inps.submit_flag:
-        job_name = inps.project_name
-        job_file_name = 'minopy_wrapper'
-        if '--submit' in input_arguments:
-            input_arguments.remove('--submit')
-        command = [os.path.abspath(__file__)] + input_arguments
-        job_obj.submit_script(job_name, job_file_name, command)
-
+    
     if not iargs is None:
         mut.log_message(inps.workDir, os.path.basename(__file__) + ' ' + ' '.join(iargs[:]))
     else:

@@ -24,10 +24,11 @@ class MinoPyParser:
         self.parser = argparse.ArgumentParser(description='MiNoPy scripts parser')
         commonp = self.parser.add_argument_group('General options:')
         commonp.add_argument('-v', '--version', action='store_true', help='print software version and exit')
-        commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
         commonp.add_argument('--walltime', dest='wall_time', default='None',
-                             help='walltime for submitting the script as a job')
+                            help='walltime for submitting the script as a job')
         commonp.add_argument('--queue', dest='queue', default=None, help='Queue name')
+        #commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
+
 
     def parse(self):
 
@@ -45,16 +46,16 @@ class MinoPyParser:
             self.parser = self.generate_interferograms_parser()
         elif self.script == 'unwrap_minopy':
             self.parser = self.unwrap_parser()
-        elif self.script == 'minopy_wrapper':
-            self.parser, self.STEP_LIST = self.minopy_wrapper_parser()
+        elif self.script == 'minopy_app':
+            self.parser, self.STEP_LIST = self.minopy_app_parser()
 
         inps = self.parser.parse_args(args=self.iargs)
 
         if self.script == 'crop_images':
             inps = self.out_crop_image(inps)
 
-        if self.script == 'minopy_wrapper':
-            inps = self.out_minopy_wrapper(inps)
+        if self.script == 'minopy_app':
+            inps = self.out_minopy_app(inps)
 
         return inps
 
@@ -86,7 +87,7 @@ class MinoPyParser:
         inps.out_dir = os.path.dirname(inps.out_file[0])
         return inps
 
-    def out_minopy_wrapper(self, sinps):
+    def out_minopy_app(self, sinps):
         inps = sinps
         STEP_LIST = self.STEP_LIST
         template_file = os.path.join(os.path.abspath(os.getenv('MINOPY_HOME')), 'defaults/minopy_template.cfg')
@@ -331,7 +332,7 @@ class MinoPyParser:
         return parser
 
     @staticmethod
-    def minopy_wrapper_parser():
+    def minopy_app_parser():
 
         STEP_LIST = [
             'crop',
@@ -366,7 +367,6 @@ class MinoPyParser:
 
         EXAMPLE = """example: 
               minopy_wrapper.py  <custom_template_file>              # run with default and custom templates
-              minopy_wrapper.py  <custom_template_file>  --submit    # submit as job
               minopy_wrapper.py  -h / --help                       # help 
               minopy_wrapper.py  -H                                # print    default template options
               # Run with --start/stop/step options
@@ -397,10 +397,8 @@ class MinoPyParser:
 
         parser.add_argument('--noplot', dest='plot', action='store_false',
                             help='do not plot results at the end of the processing.')
-
-        parser.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
         parser.add_argument('--walltime', dest='wall_time', default='None',
-                            help='walltime for submitting the script as a job')
+                             help='walltime for submitting the script as a job')
         parser.add_argument('--queue', dest='queue', default=None, help='Queue name')
 
         step = parser.add_argument_group('steps processing (start/end/dostep)', STEP_HELP)

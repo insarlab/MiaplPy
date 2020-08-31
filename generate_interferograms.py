@@ -6,7 +6,6 @@
 import logging
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
-import sys
 import os
 import isceobj
 from isceobj.Image.IntImage import IntImage
@@ -23,14 +22,6 @@ def main(iargs=None):
     Parser = MinoPyParser(iargs, script='generate_interferograms')
     inps = Parser.parse()
     resampName = run_interferogram(inps)
-
-    if inps.prefix == 'tops':
-        sys.path.append(os.path.join(os.getenv('ISCE_STACK'), 'topsStack'))
-
-    if inps.prefix == 'stripmap':
-        sys.path.append(os.path.join(os.getenv('ISCE_STACK'), 'stripmapStack'))
-
-    from FilterAndCoherence import estCoherence, runFilter
 
     resampInt = resampName + '.int'
 
@@ -77,6 +68,62 @@ def run_interferogram(inps):
     obj_int.renderVRT()
 
     return resampName
+
+
+def runFilter(infile, outfile, filterStrength):
+    from mroipac.filter.Filter import Filter
+
+    # Initialize the flattened interferogram
+    topoflatIntFilename = infile
+    intImage = isceobj.createIntImage()
+    intImage.load( infile + '.xml')
+    intImage.setAccessMode('read')
+    intImage.createImage()
+
+    # Create the filtered interferogram
+    filtImage = isceobj.createIntImage()
+    filtImage.setFilename(outfile)
+    filtImage.setWidth(intImage.getWidth())
+    filtImage.setAccessMode('write')
+    filtImage.createImage()
+
+    objFilter = Filter()
+    objFilter.wireInputPort(name='interferogram',object=intImage)
+    objFilter.wireOutputPort(name='filtered interferogram',object=filtImage)
+    objFilter.goldsteinWerner(alpha=filterStrength)
+
+    intImage.finalizeImage()
+    filtImage.finalizeImage()
+
+
+def estCoherence(outfile, corfile):
+    from mroipac.icu.Icu import Icu
+
+    # Create phase sigma correlation file here
+    filtImage = isceobj.createIntImage()
+    filtImage.load(outfile + '.xml')
+    filtImage.setAccessMode('read')
+    filtImage.createImage()
+
+    phsigImage = isceobj.createImage()
+    phsigImage.dataType = 'FLOAT'
+    phsigImage.bands = 1
+    phsigImage.setWidth(filtImage.getWidth())
+    phsigImage.setFilename(corfile)
+    phsigImage.setAccessMode('write')
+    phsigImage.createImage()
+
+    icuObj = Icu(name='sentinel_filter_icu')
+    icuObj.configure()
+    icuObj.unwrappingFlag = False
+    icuObj.useAmplitudeFlag = False
+    # icuObj.correlationType = 'NOSLOPE'
+
+    icuObj.icu(intImage=filtImage, phsigImage=phsigImage)
+    phsigImage.renderHdr()
+
+    filtImage.finalizeImage()
+    phsigImage.finalizeImage()
 
 
 if __name__ == '__main__':

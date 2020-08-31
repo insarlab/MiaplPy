@@ -95,7 +95,7 @@ def main(iargs=None):
     if not os.path.exists(out_reference):
         shutil.copytree(reference_dir, out_reference)
 
-    baseline_dir = inps.out_dir + 'baselines'
+    baseline_dir = inps.out_dir + '/baselines'
     if not os.path.exists(baseline_dir):
         shutil.copytree(inpsDict['MINOPY.load.baselineDir'], baseline_dir)
 

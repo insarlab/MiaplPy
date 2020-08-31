@@ -364,7 +364,7 @@ def prepare_geometry(geom_dir, metadata=dict(), update_mode=True):
 
 def prepare_stack(inputDir, filePattern, metadata=dict(), baseline_dict=dict(), update_mode=True):
     print('prepare .rsc file for ', filePattern)
-    if not os.path.exists(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern))[0]):
+    if not os.path.exists(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern + '.xml'))[0]):
         filePattern = filePattern.split('.full')[0]
     isce_files = sorted(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern + '.xml')))
     if len(isce_files) == 0:
