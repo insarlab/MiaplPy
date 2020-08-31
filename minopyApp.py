@@ -52,6 +52,7 @@ STEP_LIST = [
 
 def main(iargs=None):
     start_time = time.time()
+
     Parser = MinoPyParser(iargs, script='minopy_app')
     inps = Parser.parse()
     
