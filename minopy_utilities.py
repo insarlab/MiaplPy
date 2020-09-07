@@ -1096,7 +1096,16 @@ def get_phase_linking_coherence_mask(template, work_dir, functions):
     add_attribute = functions[3]
 
     tcoh_file = os.path.join(work_dir, 'temporalCoherence.h5')
+    water_mask_file = os.path.join(work_dir, 'waterMask.h5')
     mask_file = os.path.join(work_dir, 'maskTempCoh.h5')
+    
+    if os.path.exists(water_mask_file):
+        f1 = h5py.File(tcoh_file, 'a')
+        f2 = h5py.File(water_mask_file, 'r')
+        water_mask = f2['waterMask']
+        f1['temporalCoherence'][:, :] = np.multiply(f1['temporalCoherence'], water_mask)
+        f1.close()
+        f2.close()
 
     tcoh_min = float(template['mintpy.networkInversion.minTempCoh'])
 

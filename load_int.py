@@ -194,15 +194,11 @@ def read_inps2dict(inps):
             and inpsDict['MINOPY.load.unwFile']) == 'auto':
         print(('check auto path setting for Univ of Miami users'
                ' for processor: {}'.format(inpsDict['processor'])))
-        current_dir = os.getcwd()
-        if inpsDict['PROJECT_NAME'] in current_dir:
-            work_dir = current_dir.split(inpsDict['PROJECT_NAME'])[0]
-            work_dir = os.path.join(work_dir, inpsDict['PROJECT_NAME'], 'minopy')
-        else:
-            work_dir = os.path.abspath(inpsDict['PROJECT_NAME'])
-            work_dir = os.path.join(work_dir, 'minopy')
+
+        work_dir = os.path.dirname(os.path.dirname(inpsDict['outfile']))
+        
         inpsDict = auto_path.get_auto_path(processor=inpsDict['processor'],
-                                           work_dir= work_dir,
+                                           work_dir=work_dir,
                                            template=inpsDict)
     return inpsDict
 

@@ -28,9 +28,9 @@ MINOPY.load.metaFile       = ${PROJECT_DIR}/reference/IW*.xml
 MINOPY.load.baselineDir    = ${PROJECT_DIR}/baselines
 
 MINOPY.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc.full
-MINOPY.load.unwFile        = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*fine*.unw
-MINOPY.load.corFile        = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*fine*.cor
-MINOPY.load.connCompFile   = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*.unw.conncomp
+MINOPY.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.unw
+MINOPY.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.cor
+MINOPY.load.connCompFile   = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*.unw.conncomp
 MINOPY.load.ionoFile       = None
 MINOPY.load.intFile        = None
 
@@ -40,6 +40,7 @@ MINOPY.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_reference/lon.rdr.full
 MINOPY.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_reference/los.rdr.full
 MINOPY.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_reference/los.rdr.full
 MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_reference/shadowMask.rdr.full
+MINOPY.load.waterMaskFile  = ${PROJECT_DIR}/merged/geom_reference/waterMask.rdr.full
 MINOPY.load.bperpFile      = None
 
 '''
@@ -50,9 +51,9 @@ MINOPY.load.metaFile       = ${referenceShelve}/referenceShelve/data.dat
 MINOPY.load.baselineDir    = ${PROJECT_DIR}/baselines
 
 MINOPY.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc
-MINOPY.load.unwFile        = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*fine*.unw
-MINOPY.load.corFile        = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*fine*.cor
-MINOPY.load.connCompFile   = ${PROJECT_DIR}/minopy/inverted/interferograms_${int_type}/*/*.conncomp
+MINOPY.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.unw
+MINOPY.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.cor
+MINOPY.load.connCompFile   = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*.conncomp
 MINOPY.load.ionoFile       = None
 MINOPY.load.intFile        = None
 
@@ -62,6 +63,7 @@ MINOPY.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_reference/lon.rdr
 MINOPY.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_reference/los.rdr
 MINOPY.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_reference/los.rdr
 MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_reference/shadowMask.rdr
+MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_reference/waterMask.rdr.full
 MINOPY.load.bperpFile      = None
 
 '''
@@ -225,6 +227,7 @@ def get_auto_path(processor, work_dir, template=dict()):
             dem_file = os.path.join('${PROJECT_DIR}/PROCESS/DONE/*${m_date12}*', 'radar{}.hgt'.format(lks))
             auto_path_dict[prefix+'demFile'] = dem_file
 
+    var_dict['${WORK_DIR}'] = work_dir
     var_dict['${PROJECT_DIR}'] = project_dir
     if m_date12:
         var_dict['${m_date12}'] = m_date12
