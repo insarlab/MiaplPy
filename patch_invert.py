@@ -13,6 +13,7 @@ from mintpy.utils import ptime
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects import cluster_minopy
 import minopy.objects.inversion_utils as iut
+import gdal
 
 
 def main(iargs=None):
@@ -32,6 +33,15 @@ def main(iargs=None):
     with open(inps.data_kwargs, 'rb') as handle:
         data_kwargs = pickle.load(handle)
 
+    patch_dir = data_kwargs['patch_dir']
+    quality_file = os.path.join(patch_dir, 'quality')
+    ds = gdal.Open(quality_file + '.vrt', gdal.GA_ReadOnly)
+    quality = ds.GetRasterBand(1).ReadAsArray()
+
+    if not -1 in quality:
+        np.save(patch_dir + '/flag.npy', '{} is done inverting'.format(os.path.basename(patch_dir)))
+        return
+
     # inps.cluster = 'no'
     if inps.cluster == 'no':
         iut.parallel_invertion(**data_kwargs)
@@ -49,6 +59,8 @@ def main(iargs=None):
         cluster_obj.close()
 
         print('------- finished parallel processing -------\n\n')
+        
+    np.save(patch_dir + '/flag.npy', '{} is done inverting'.format(os.path.basename(patch_dir)))
 
     return
 

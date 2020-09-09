@@ -174,32 +174,31 @@ class PhaseLink:
                 print('box length: {}'.format(box_length))
 
             patch_dir = os.path.join(self.out_dir, 'PATCH_{}'.format(i))
+            
+            if not os.path.exists(patch_dir + '/flag.npy'):
 
-            if os.path.exists(patch_dir + '/flag.npy'):
-                continue
+                big_box, self.total_num_mini_stacks = iut.initiate_stacks(self.slc_stack, patch_dir, box,
+                                                                     self.mini_stack_default_size,
+                                                                     self.phase_linking_method, self.shp_size,
+                                                                     self.range_window, self.azimuth_window)
+                data_kwargs['patch_length'] = box_length
+                data_kwargs['patch_width'] = box_width
+                data_kwargs['patch_dir'] = patch_dir
+                data_kwargs['box'] = box
+                data_kwargs['patch_row_0'] = box[1]
+                data_kwargs['patch_col_0'] = box[0]
+                data_kwargs['big_box'] = big_box
+                data_kwargs['total_num_mini_stacks'] = self.total_num_mini_stacks
 
-            big_box, self.total_num_mini_stacks = iut.initiate_stacks(self.slc_stack, patch_dir, box,
-                                                                 self.mini_stack_default_size,
-                                                                 self.phase_linking_method, self.shp_size,
-                                                                 self.range_window, self.azimuth_window)
-            data_kwargs['patch_length'] = box_length
-            data_kwargs['patch_width'] = box_width
-            data_kwargs['patch_dir'] = patch_dir
-            data_kwargs['box'] = box
-            data_kwargs['patch_row_0'] = box[1]
-            data_kwargs['patch_col_0'] = box[0]
-            data_kwargs['big_box'] = big_box
-            data_kwargs['total_num_mini_stacks'] = self.total_num_mini_stacks
+                args_file = patch_dir + '/data_kwargs.pkl'
+                with open(args_file, 'wb') as handle:
+                    pickle.dump(data_kwargs, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-            args_file = patch_dir + '/data_kwargs.pkl'
-            with open(args_file, 'wb') as handle:
-                pickle.dump(data_kwargs, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                # The inversion command for each box
+                cmd = 'patch_invert.py --dataArg {a1} --cluster {a2} --num-worker {a3} --config-name {a4}\n'.format(
+                    a1=args_file, a2=self.cluster, a3=self.numWorker, a4=self.config)
 
-            # The inversion command for each box
-            cmd = 'patch_invert.py --dataArg {a1} --cluster {a2} --num-worker {a3} --config-name {a4}\n'.format(
-                a1=args_file, a2=self.cluster, a3=self.numWorker, a4=self.config)
-
-            run_commands.append(cmd)
+                run_commands.append(cmd)
 
         if len(run_commands) > 0:
             run_dir = self.work_dir + '/run_files'

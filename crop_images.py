@@ -462,6 +462,7 @@ def read_inps_dict2geometry_dict_object(inpsDict):
         key = datasetName2templateKey[dsName]
         if key in inpsDict.keys():
             files = sorted(glob.glob(str(inpsDict[key]) + '.xml'))
+            files = [item.split('.xml')[0] for item in files]
             if len(files) > 0:
                 if dsName == 'bperp':
                     bperpDict = {}

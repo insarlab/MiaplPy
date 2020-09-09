@@ -249,7 +249,6 @@ def parallel_invertion(distance_thresh=None, azimuth_window=None, range_window=N
     quality = get_numpy_data_from_file(quality_file, None, 'float32', shape=(patch_length, patch_width))
 
     if not -1 in quality:
-        np.save(patch_dir + '/flag.npy', '{} is done inverting'.format(os.path.basename(patch_dir)))
         return
 
     if 'sequential' in phase_linking_method:
