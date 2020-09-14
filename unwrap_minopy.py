@@ -27,7 +27,7 @@ def main(iargs=None):
 
     unwObj = Snaphu(inps)
     do_tiles, metadata = unwObj.need_to_split_tiles()
-
+    
     try:
         if do_tiles:
             unwObj.unwrap_tile()
@@ -36,7 +36,7 @@ def main(iargs=None):
     except:
         metadata['defomax'] = inps.defo_max
         runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
-
+    
     return
 
 
@@ -50,7 +50,7 @@ class Snaphu:
         self.out_unwrapped = inps.unwrapped_ifg
         self.inp_wrapped = inps.input_ifg
 
-        retry_times = 3
+        retry_times = 10
         for run in range(retry_times):
             try:
                 self.metadata = self.get_metadata()
@@ -89,7 +89,7 @@ class Snaphu:
         if do_tiles:
             for indx, line in enumerate(self.config_default):
                 if 'SINGLETILEREOPTIMIZE' in line:
-                    self.config_default[indx] = 'SINGLETILEREOPTIMIZE  TRUE'
+                    self.config_default[indx] = 'SINGLETILEREOPTIMIZE  TRUE\n'
 
         with open(self.config_file, 'w+') as file:
             file.writelines(self.config_default)
@@ -99,11 +99,24 @@ class Snaphu:
     def get_metadata(self):
         with h5py.File(self.reference, 'r') as ds:
             metadata = dict(ds.attrs)
+        
         length, width = self.get_image_size()
         LENGTH = int(metadata['LENGTH'])
         WIDTH = int(metadata['WIDTH'])
-        rglooks = int(WIDTH/width)
-        azlooks = int(LENGTH/length)
+
+        azlooks = None
+        rglooks = None
+
+        for key in metadata:
+            if 'azimuthLooks' in key:
+                azlooks = int(metadata[key])
+            if 'rangeLooks' in key:
+                rglooks = int(metadata[key])
+        if azlooks is None:
+            azlooks = int(LENGTH / length)
+        if rglooks is None:
+            rglooks = int(WIDTH/width)
+
         metadata['RgLooks'] = rglooks
         metadata['AzLooks'] = azlooks
         metadata['LENGTH'] = length

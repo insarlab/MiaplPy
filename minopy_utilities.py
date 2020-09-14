@@ -915,7 +915,19 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
 
     box_list, num_box = split2boxes(ifgram_file, memory_size=100e6)
 
-    unwDatasetName = [i for i in ['unwrapPhase_bridging', 'unwrapPhase'] if i in stack_obj.datasetNames][0]
+    # --dset option
+    unwDatasetName = 'unwrapPhase'
+
+    # determine suffix based on unwrapping error correction method
+    obs_suffix_map = {'bridging': '_bridging',
+                      'phase_closure': '_phaseClosure',
+                      'bridging+phase_closure': '_bridging_phaseClosure'}
+    key = 'mintpy.unwrapError.method'
+    if key in template.keys() and template[key]:
+        unw_err_method = template[key].lower().replace(' ', '')  # fix potential typo
+        unwDatasetName += obs_suffix_map[unw_err_method]
+        print('phase unwrapping error correction "{}" is turned ON'.format(unw_err_method))
+
     mask_dataset_name = template['mintpy.networkInversion.maskDataset']
     mask_threshold = float(template['mintpy.networkInversion.maskThreshold'])
 

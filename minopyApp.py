@@ -555,13 +555,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 self.run_reference_point(sname)
 
             elif sname == 'correct_unwrap_error':
-
-                if self.template['mintpy.unwrapError.method']:
-                    self.template['mintpy.unwrapError.method'] = 'bridging'
-                ifgram_file = os.path.join(self.workDir, 'inputs/ifgramStack.h5')
-                with h5py.File(ifgram_file, 'a') as f:
-                    if 'unwrapPhase_bridging' in f.keys():
-                        del f['unwrapPhase_bridging']
                 super().run_unwrap_error_correction(sname)
 
             elif sname == 'write_to_timeseries':
