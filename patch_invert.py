@@ -2,14 +2,21 @@
 ############################################################
 # Copyright(c) 2017, Sara Mirzaee                          #
 ############################################################
+import logging
+import warnings
+
+
+warnings.filterwarnings("ignore")
+
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
+
+mpl_logger = logging.getLogger('asyncio')
+mpl_logger.setLevel(logging.WARNING)
 
 import os
 import numpy as np
-import minopy_utilities as mut
-from skimage.measure import label
-import h5py
 import pickle
-from mintpy.utils import ptime
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects import cluster_minopy
 import minopy.objects.inversion_utils as iut
@@ -47,7 +54,7 @@ def main(iargs=None):
         iut.parallel_invertion(**data_kwargs)
     else:
         # parallel
-        print('\n\n------- start parallel processing using Dask -------')
+        print('\n\n------- start processing {} using Dask -------'.format(os.path.basename(patch_dir)))
 
         # initiate dask cluster and client
         cluster_obj = cluster_minopy.MDaskCluster(inps.cluster, inps.numWorker, config_name=inps.config)
@@ -58,7 +65,7 @@ def main(iargs=None):
         # close dask cluster and client
         cluster_obj.close()
 
-        print('------- finished parallel processing -------\n\n')
+        print('------- finished processing {} -------\n\n'.format(os.path.basename(patch_dir)))
         
     np.save(patch_dir + '/flag.npy', '{} is done inverting'.format(os.path.basename(patch_dir)))
 

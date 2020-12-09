@@ -2,18 +2,22 @@
 ############################################################
 # Copyright(c) 2017, Sara Mirzaee                          #
 ############################################################
+import logging
+import warnings
+
+
+warnings.filterwarnings("ignore")
+
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
 
 import os
-import sys
 import numpy as np
 import minopy_utilities as mut
 from skimage.measure import label
 import h5py
-from mintpy.utils import ptime
-from minopy.objects.arg_parser import MinoPyParser
 import gdal
 from isceobj.Util.ImageUtil import ImageLib as IML
-from multiprocessing import Process
 import time
 
 

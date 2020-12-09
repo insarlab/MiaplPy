@@ -2,6 +2,14 @@
 ############################################################
 # Copyright(c) 2017, Sara Mirzaee                          #
 ############################################################
+import logging
+import warnings
+
+
+warnings.filterwarnings("ignore")
+
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
 
 import os
 import time
@@ -367,10 +375,13 @@ def merge_patches(width, length, inverted_dir, box_list, date_list):
                 patch_name = 'PATCH_{}'.format(t)
                 out_rslc[box[1]:box[3], box[0]:box[2]] = patches[patch_name][d, :, :]
             IML.renderISCEXML(out_name, bands=1, nyy=length, nxx=width, datatype='complex64', scheme='BSQ')
+        else:
+            IML.renderISCEXML(out_name, bands=1, nyy=length, nxx=width, datatype='complex64', scheme='BSQ')
 
     return
 
 #################################################
+
 
 if __name__ == '__main__':
     main()

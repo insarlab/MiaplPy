@@ -308,8 +308,11 @@ class MinoPyParser:
                             help='output unwrapped interferogram')
         parser.add_argument('-s', '--reference', dest='reference', type=str, default='reference',
                             help='Reference .h5 file to get metadata')
+        parser.add_argument('-i', '--initMethod', dest='init_method', type=str, default='MST',
+                            help='unwrap initialization algorithm (MST, MCF)')
         parser.add_argument('-d', '--defoMax', dest='defo_max', type=float, default=1.2,
                             help='Maximum abrupt phase discontinuity (cycles)')
+
         return parser
 
     @staticmethod
@@ -326,6 +329,8 @@ class MinoPyParser:
                             help='Azimuth looks')
         parser.add_argument('-r', '--rlks', type=int, dest='rglooks', default=1,
                             help='Range looks')
+        parser.add_argument('-f', '--filterStrength', type=float, dest='filter_strength', default=0.5,
+                            help='filtering strength')
         parser.add_argument('-p', '--prefix', dest='prefix', type=str, default='tops'
                             , help='ISCE stack processor: options= tops, stripmap -- default = tops')
 

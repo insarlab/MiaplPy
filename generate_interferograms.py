@@ -26,7 +26,7 @@ def main(iargs=None):
     resampInt = resampName + '.int'
 
     filtInt = os.path.dirname(resampInt) + '/filt_fine.int'
-    filter_strength = 0.2
+    filter_strength = inps.filter_strength
     runFilter(resampInt, filtInt, filter_strength)
 
     cor_file = os.path.dirname(resampInt) + '/filt_fine.cor'

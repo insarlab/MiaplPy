@@ -27,7 +27,7 @@ def main(iargs=None):
 
     unwObj = Snaphu(inps)
     do_tiles, metadata = unwObj.need_to_split_tiles()
-    
+
     try:
         if do_tiles:
             unwObj.unwrap_tile()
@@ -35,8 +35,9 @@ def main(iargs=None):
             unwObj.unwrap()
     except:
         metadata['defomax'] = inps.defo_max
+        metadata['init_method'] = inps.init_method
         runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
-    
+
     return
 
 
@@ -72,6 +73,7 @@ class Snaphu:
         self.config_default.append('ALTITUDE   {}\n'.format(self.metadata['HEIGHT']))
         self.config_default.append('LAMBDA   {}\n'.format(self.metadata['WAVELENGTH']))
         self.config_default.append('EARTHRADIUS   {}\n'.format(self.metadata['EARTH_RADIUS']))
+        self.config_default.append('INITMETHOD   {}\n'.format(inps.init_method))
 
         return
 
@@ -188,7 +190,7 @@ def runUnwrap(infile, outfile, corfile, config):
     from contrib.Snaphu.Snaphu import Snaphu
 
     costMode = 'DEFO'
-    initMethod = 'MCF'
+    initMethod = config['init_method']
     defomax = config['defomax']
 
     wrapName = infile
@@ -206,6 +208,7 @@ def runUnwrap(infile, outfile, corfile, config):
     azimuthLooks = int(config['AzLooks'])
 
     snp = Snaphu()
+    snp.setInitOnly(False)
     snp.setInput(wrapName)
     snp.setOutput(unwrapName)
     snp.setWidth(width)
@@ -216,7 +219,7 @@ def runUnwrap(infile, outfile, corfile, config):
     snp.setCorrfile(corfile)
     snp.setInitMethod(initMethod)
     #snp.setCorrLooks(corrLooks)
-    #snp.setMaxComponents(maxComponents)
+    snp.setMaxComponents(100)
     snp.setDefoMaxCycles(defomax)
     snp.setRangeLooks(rangeLooks)
     snp.setAzimuthLooks(azimuthLooks)

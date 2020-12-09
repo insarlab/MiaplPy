@@ -5,15 +5,24 @@
 #############################################################
 # Recommend import:
 #     from minopy.objects import cluster_minopy as cluster
+import logging
+import warnings
 
+
+warnings.filterwarnings("ignore")
+
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
 
 import time
 from mintpy.objects import cluster
 import numpy as np
 import dask
+from dask.distributed import Client, as_completed
 
 # supported / tested clusters
 CLUSTER_LIST = ['lsf', 'pbs', 'slurm', 'local']
+
 
 class MDaskCluster(cluster.DaskCluster):
     """
@@ -46,7 +55,6 @@ class MDaskCluster(cluster.DaskCluster):
         :param dimlimits: [image_length, image_width]
         :return:
         """
-        from dask.distributed import Client
 
         # This line needs to be in a function or in a `if __name__ == "__main__":` block. If it is in no function
         # or "main" block, each worker will try to create its own client (which is bad) when loading the module
@@ -59,8 +67,7 @@ class MDaskCluster(cluster.DaskCluster):
         azimuth_window = func_data['azimuth_window']
         patch_dir = func_data['patch_dir']
 
-        sub_boxes = self.split_box2sub_boxes(box, range_window=range_window, azimuth_window=azimuth_window,
-                                             num_split=self.num_worker)
+        sub_boxes = self.split_box2sub_boxes(box, range_window=range_window, num_split=self.num_worker)
 
         print('split patch into {} sub boxes in x direction for workers to process'.format(len(sub_boxes)))
 
@@ -103,7 +110,7 @@ class MDaskCluster(cluster.DaskCluster):
         return results, submission_time
 
     @staticmethod
-    def split_box2sub_boxes(box, range_window, azimuth_window, num_split):
+    def split_box2sub_boxes(box, range_window, num_split):
         """Divide the input box into `num_split` different sub_boxes.
 
         :param box: [x0, y0, x1, y1]: list[int] of size 4
@@ -190,7 +197,6 @@ class MDaskCluster(cluster.DaskCluster):
                runtimes as a performance diagnostic)
         :return: results: tuple(numpy.nd.arrays), the processed results of the box
         """
-        from dask.distributed import as_completed
 
         num_future = 0
         for future, sub_results in as_completed(futures, with_results=True):

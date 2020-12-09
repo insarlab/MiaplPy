@@ -2,6 +2,15 @@
 ########################
 # Author: Sara Mirzaee
 #######################
+import logging
+import warnings
+
+
+warnings.filterwarnings("ignore")
+
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
+
 import os
 import sys
 import time
@@ -20,7 +29,6 @@ from mintpy.smallbaselineApp import TimeSeriesAnalysis
 import minopy_utilities as mut
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects.slcStack import slcStack
-from minopy.objects.stack_int import MinopyRun
 from minopy.defaults.auto_path import autoPath, PathFind
 from minopy.objects.utils import check_template_auto_value
 
@@ -129,7 +137,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self._read_template()
 
         # 4. Copy the plot shell file
-        sh_file = os.path.join(os.getenv('MINTPY_HOME'), 'sh/plot_smallbaselineApp.sh')
+        sh_file = os.path.join(os.getenv('MINTPY_HOME'), 'mintpy/sh/plot_smallbaselineApp.sh')
 
         def grab_latest_update_date(fname, prefix='# Latest update:'):
             try:
@@ -270,6 +278,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         print('phase_inversion.py ', scp_args)
         minopy.phase_inversion.main(scp_args.split())
 
+        if self.azimuth_look * self.range_look > 1:
+            self.run_multilook('multilook')
+
         return
 
     def run_multilook(self, sname):
@@ -324,18 +335,28 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.template['MINOPY.interferograms.type'] == 'sequential':
             reference_ind = None
+        elif self.template['MINOPY.interferograms.type'] == 'combine':
+            reference_ind = 'multi'
         else:
             reference_ind = date_list.index(reference_date)
 
         pairs = []
-        for i in range(0, len(date_list)):
-            if not reference_ind is None:
-                if not reference_ind == i:
-                    pairs.append((date_list[reference_ind], date_list[i]))
-            else:
+        if reference_ind == 'multi':
+            indx = date_list.index(reference_date)
+            for i in range(0, len(date_list)):
+                if not indx == i:
+                    pairs.append((date_list[indx], date_list[i]))
                 if not i == 0:
                     pairs.append((date_list[i - 1], date_list[i]))
-
+        else:
+            for i in range(0, len(date_list)):
+                if not reference_ind is None:
+                    if not reference_ind == i:
+                        pairs.append((date_list[reference_ind], date_list[i]))
+                else:
+                    if not i == 0:
+                        pairs.append((date_list[i - 1], date_list[i]))
+        pairs = list(set(pairs))
         # if reference_ind is False:
         #    pairs.append((date_list[0], date_list[-1]))
 
@@ -352,11 +373,14 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             out_dir = os.path.join(ifgram_dir, pair[0] + '_' + pair[1])
             os.makedirs(out_dir, exist_ok='True')
 
-            scp_args = '--reference {a1} --secondary {a2} --outdir {a3} --alks {a4} --rlks {a5} ' \
-                       '--prefix {a6}\n'.format(a1=os.path.join(wrapped_phase_dir, pair[0]),
+            scp_args = '--reference {a1} --secondary {a2} --outdir {a3} --alks {a4} ' \
+                       '--rlks {a5} --filterStrength {a6} ' \
+                       '--prefix {a7}\n'.format(a1=os.path.join(wrapped_phase_dir, pair[0]),
                                                 a2=os.path.join(wrapped_phase_dir, pair[1]),
                                                 a3=out_dir, a4=self.azimuth_look,
-                                                a5=self.range_look, a6=sensor_type)
+                                                a5=self.range_look,
+                                                a6=self.template['MINOPY.interferograms.filter_strength'],
+                                                a7=sensor_type)
 
             cmd = 'generate_interferograms.py ' + scp_args
             # print(cmd)
@@ -390,17 +414,28 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.template['MINOPY.interferograms.type'] == 'sequential':
             reference_ind = None
+        elif self.template['MINOPY.interferograms.type']  == 'combine':
+            reference_ind = 'multi'
         else:
             reference_ind = date_list.index(reference_date)
 
         pairs = []
-        for i in range(0, len(date_list)):
-            if not reference_ind is None:
-                if not reference_ind == i:
-                    pairs.append((date_list[reference_ind], date_list[i]))
-            else:
+        if reference_ind == 'multi':
+            indx = date_list.index(reference_date)
+            for i in range(0, len(date_list)):
+                if not indx == i:
+                    pairs.append((date_list[indx], date_list[i]))
                 if not i == 0:
                     pairs.append((date_list[i - 1], date_list[i]))
+        else:
+            for i in range(0, len(date_list)):
+                if not reference_ind is None:
+                    if not reference_ind == i:
+                        pairs.append((date_list[reference_ind], date_list[i]))
+                else:
+                    if not i == 0:
+                        pairs.append((date_list[i - 1], date_list[i]))
+        pairs = list(set(pairs))
 
         # if reference_ind is False:
         #    pairs.append((date_list[0], date_list[-1]))
@@ -417,12 +452,20 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             out_dir = os.path.join(inps.ifgram_dir, pair[0] + '_' + pair[1])
             os.makedirs(out_dir, exist_ok='True')
 
-            scp_args = '--ifg {a1} --cor {a2} --unw {a3} --defoMax {a4} ' \
-                       '--reference {a5}\n'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
-                                                   a2=os.path.join(out_dir, 'filt_fine.cor'),
+            if self.azimuth_look * self.range_look > 1:
+                corr_file = os.path.join(self.workDir, 'inverted/quality_ml')
+            else:
+                corr_file = os.path.join(self.workDir, 'inverted/quality')
+
+            # os.path.join(out_dir, 'filt_fine.cor')
+
+            scp_args = '--ifg {a1} --cor {a2} --unw {a3} --defoMax {a4} --initMethod {a5} ' \
+                       '--reference {a6}\n'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
+                                                   a2=corr_file,
                                                    a3=os.path.join(out_dir, 'filt_fine.unw'),
                                                    a4=self.template['MINOPY.unwrap.defomax'],
-                                                   a5=slc_file)
+                                                   a5=self.template['MINOPY.unwrap.init_method'],
+                                                   a6=slc_file)
             cmd = 'unwrap_minopy.py ' + scp_args
             # print(cmd)
             run_commands.append(cmd)
