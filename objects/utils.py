@@ -205,7 +205,7 @@ def read_attribute(fname, datasetName=None, standardize=True, metafile_ext=None)
 
         # FILE_TYPE - k
         py2_mintpy_stack_files = ['interferograms', 'coherence', 'wrapped']  # obsolete mintpy format
-        if any(i in d1_list for i in ['unwrapPhase']):
+        if any(i in d1_list for i in ['unwrapPhase', 'azimuthOffset']):
             k = 'ifgramStack'
         elif any(i in d1_list for i in ['height', 'latitude', 'azimuthCoord']):
             k = 'geometry'
@@ -213,6 +213,8 @@ def read_attribute(fname, datasetName=None, standardize=True, metafile_ext=None)
             k = 'timeseries'
         elif any(i in g1_list + d1_list for i in ['slc']):
             k = 'slc'
+        elif any(i in d1_list for i in ['velocity']):
+            k = 'velocity'
         elif 'HDFEOS' in g1_list:
             k = 'HDFEOS'
         elif 'recons' in d1_list:
@@ -293,71 +295,114 @@ def read_attribute(fname, datasetName=None, standardize=True, metafile_ext=None)
             atr['PROCESSOR'] = 'mintpy'
 
     else:
-
-        metafile_base = fname
-
-        if fname.endswith('.img') and os.path.isfile(os.path.splitext(fname)[0]+'.hdr'):
-            metafile_base = os.path.splitext(fname)[0]
-
-        # get existing metadata file extensions
-        metafile_exts = ['.rsc', '.xml', '.aux.xml', '.par', '.hdr']
-        if metafile_ext:
-            metafile_exts = [i for i in metafile_exts if i.endswith(metafile_ext)]
-        metafile_exts = [i for i in metafile_exts if os.path.isfile(metafile_base+i)]
-        if len(metafile_exts) == 0:
+        # grab all existed potential metadata file given the data file in prefered order/priority
+        # .aux.xml file does not have geo-coordinates info
+        # .vrt file (e.g. incLocal.rdr.vrt from isce) does not have band interleavee info
+        metafiles = [
+            fname + '.rsc',
+            fname + '.xml',
+            fname + '.par',
+            os.path.splitext(fname)[0] + '.hdr',
+            fname + '.vrt',
+            fname + '.aux.xml',
+        ]
+        metafiles = [i for i in metafiles if os.path.isfile(i)]
+        if len(metafiles) == 0:
             raise FileNotFoundError('No metadata file found for data file: {}'.format(fname))
 
         atr = {}
         # PROCESSOR
-        if any(i.endswith('.hdr') for i in metafile_exts) and fname.endswith('.img'):
+        if fname.endswith('.img') and any(i.endswith('.hdr') for i in metafiles):
             atr['PROCESSOR'] = 'snap'
-        elif any(i.endswith('.xml') for i in metafile_exts):
+
+        elif any(i.endswith(('.xml', '.hdr', '.vrt')) for i in metafiles):
             atr['PROCESSOR'] = 'isce'
-            xml_exts = [i for i in metafile_exts if i.endswith('.xml')]
-            if len(xml_exts) > 0:
-                atr.update(readfile.read_isce_xml(metafile_base+xml_exts[0]))
-        elif any(i.endswith('.par') for i in metafile_exts):
+            xml_files = [i for i in metafiles if i.endswith('.xml')]
+            if len(xml_files) > 0:
+                atr.update(readfile.read_isce_xml(xml_files[0]))
+
+        elif any(i.endswith('.par') for i in metafiles):
             atr['PROCESSOR'] = 'gamma'
-        elif any(i.endswith('.rsc') for i in metafile_exts):
+
+        elif any(i.endswith('.rsc') for i in metafiles):
             if 'PROCESSOR' not in atr.keys():
                 atr['PROCESSOR'] = 'roipac'
+
         if 'PROCESSOR' not in atr.keys():
             atr['PROCESSOR'] = 'mintpy'
 
         # Read metadata file and FILE_TYPE
-        metafile0 = metafile_base + metafile_exts[0]
+        metafile = metafiles[0]
         while fext in ['.geo', '.rdr', '.full']:
             fbase, fext = os.path.splitext(fbase)
         if not fext:
             fext = fbase
 
-        if metafile0.endswith('.rsc'):
-            atr.update(readfile.read_roipac_rsc(metafile0))
+        if metafile.endswith('.rsc'):
+            atr.update(readfile.read_roipac_rsc(metafile))
             if 'FILE_TYPE' not in atr.keys():
                 atr['FILE_TYPE'] = fext
 
-        elif metafile0.endswith('.xml'):
-            atr.update(readfile.read_isce_xml(metafile0))
+        elif metafile.endswith('.xml'):
+            atr.update(readfile.read_isce_xml(metafile))
             if 'FILE_TYPE' not in atr.keys():
-                atr['FILE_TYPE'] = fext  #atr.get('image_type', fext)
+                atr['FILE_TYPE'] = fext
 
-        elif metafile0.endswith('.par'):
-            atr.update(readfile.read_gamma_par(metafile0))
+        elif metafile.endswith('.par'):
+            atr.update(readfile.read_gamma_par(metafile))
             atr['FILE_TYPE'] = fext
 
-        elif metafile0.endswith('.hdr'):
-            atr.update(readfile.read_envi_hdr(metafile0))
-            fbase = os.path.basename(fname).lower()
-            if fbase.startswith('unw'):
-                atr['FILE_TYPE'] = '.unw'
-            elif fbase.startswith(('coh','cor')):
-                atr['FILE_TYPE'] = '.cor'
-            elif fbase.startswith('phase_ifg'):
-                atr['FILE_TYPE'] = '.int'
-            elif 'dem' in fbase:
-                atr['FILE_TYPE'] = 'dem'
+        elif metafile.endswith('.hdr'):
+            atr.update(readfile.read_envi_hdr(metafile))
+
+            # both snap and isce produce .hdr file
+            # grab file type based on their different naming conventions
+            if atr['PROCESSOR'] == 'snap':
+                fbase = os.path.basename(fname).lower()
+                if fbase.startswith('unw'):
+                    atr['FILE_TYPE'] = '.unw'
+                elif fbase.startswith(('coh', 'cor')):
+                    atr['FILE_TYPE'] = '.cor'
+                elif fbase.startswith('phase_ifg'):
+                    atr['FILE_TYPE'] = '.int'
+                elif 'dem' in fbase:
+                    atr['FILE_TYPE'] = 'dem'
+                else:
+                    atr['FILE_TYPE'] = atr['file type']
             else:
-                atr['FILE_TYPE'] = atr['file type']
+                atr['FILE_TYPE'] = fext
+
+        elif metafile.endswith('.vrt'):
+            atr.update(readfile.read_gdal_vrt(metafile))
+            atr['FILE_TYPE'] = fext
+
+        # DATA_TYPE for ISCE products
+        dataTypeDict = {
+            'byte': 'int8',
+            'float': 'float32',
+            'double': 'float64',
+            'cfloat': 'complex64',
+        }
+        data_type = atr.get('DATA_TYPE', 'none').lower()
+        if data_type != 'none' and data_type in dataTypeDict.keys():
+            atr['DATA_TYPE'] = dataTypeDict[data_type]
+
+    # UNIT
+    k = atr['FILE_TYPE'].replace('.', '')
+    if k == 'ifgramStack':
+        if datasetName and datasetName in datasetUnitDict.keys():
+            atr['UNIT'] = datasetUnitDict[datasetName]
+        else:
+            atr['UNIT'] = 'radian'
+
+    elif datasetName and datasetName in datasetUnitDict.keys():
+        atr['UNIT'] = datasetUnitDict[datasetName]
+
+    elif 'UNIT' not in atr.keys():
+        if k in datasetUnitDict.keys():
+            atr['UNIT'] = datasetUnitDict[k]
+        else:
+            atr['UNIT'] = '1'
 
     # UNIT
     k = atr['FILE_TYPE'].replace('.', '')
@@ -376,6 +421,7 @@ def read_attribute(fname, datasetName=None, standardize=True, metafile_ext=None)
 
     if standardize:
         atr = readfile.standardize_metadata(atr)
+
     return atr
 
 
@@ -446,6 +492,7 @@ def read(fname, box=None, datasetName=None, print_msg=True):
         data = read_hdf5_file(fname, datasetName=datasetName, box=box)
     else:
         data, atr = read_binary_file(fname, datasetName=datasetName, box=box)
+        #data, atr = readfile.read_binary_file(fname, datasetName=datasetName, box=box, xstep=1, ystep=1)
     return data, atr
 
 
@@ -541,10 +588,10 @@ def read_binary_file(fname, datasetName=None, box=None):
     # metadata
     atr = read_attribute(fname, metafile_ext='.xml')
     processor = atr['PROCESSOR']
-    #length = int(atr['LENGTH'])
-    #width = int(atr['WIDTH'])
-    #if not box:
-    #    box = (0, 0, width, length)
+    length = int(atr['LENGTH'])
+    width = int(atr['WIDTH'])
+    if not box:
+        box = (0, 0, width, length)
 
     # default data structure
     data_type = atr.get('DATA_TYPE', 'float32').lower()
@@ -569,17 +616,19 @@ def read_binary_file(fname, datasetName=None, box=None):
             data_type = dataTypeDict[data_type]
 
         k = atr['FILE_TYPE'].lower().replace('.', '')
-        if k in ['unw']:
-            band = 2
+        if k in ['unw', 'cor']:
+            band = min(2, num_band)
+            if datasetName and datasetName in ['band1', 'intensity', 'magnitude']:
+                band = 1
 
         elif k in ['slc']:
-            cpx_band = 'complex'
+            cpx_band = 'magnitude'
 
-        elif k in ['los'] and datasetName and datasetName.startswith(('az', 'head')):
-            band = 2
+        elif k in ['los'] and datasetName and datasetName.startswith(('band2', 'az', 'head')):
+            band = min(2, num_band)
 
         elif k in ['incLocal']:
-            band = 2
+            band = min(2, num_band)
             if datasetName and 'local' not in datasetName.lower():
                 band = 1
 
@@ -588,6 +637,18 @@ def read_binary_file(fname, datasetName=None, box=None):
                 band = 2
             elif datasetName.lower() == 'band3':
                 band = 3
+            elif datasetName.startswith(('mag', 'amp')):
+                cpx_band = 'magnitude'
+            elif datasetName in ['phase', 'angle']:
+                cpx_band = 'phase'
+            elif datasetName.lower() == 'real':
+                cpx_band = 'real'
+            elif datasetName.lower().startswith('imag'):
+                cpx_band = 'imag'
+            elif datasetName.startswith(('cpx', 'complex')):
+                cpx_band = 'complex'
+
+        band = min(band, num_band)
 
     # ROI_PAC
     elif processor in ['roipac']:
@@ -642,7 +703,7 @@ def read_binary_file(fname, datasetName=None, box=None):
                 cpx_band = 'real'
 
         elif fext == '.slc':
-            data_type = 'complex64'
+            data_type = 'complex32'
             cpx_band = 'magnitude'
 
         elif fext in ['.mli']:
@@ -664,12 +725,14 @@ def read_binary_file(fname, datasetName=None, box=None):
         print('Unknown InSAR processor.')
 
     # reading
-    data = read_image(fname, box=box)
+    data = read_image(fname, box=box, band=band)
 
     if 'DATA_TYPE' not in atr:
         atr['DATA_TYPE'] = data_type
+
     return data, atr
-    #return atr
+
+
 
 
 def get_slice_list(fname):
@@ -775,3 +838,27 @@ def print_write_setting(inpsDict):
     boxGeo = inpsDict['box4geo_lut']
     return updateMode, comp, box, boxGeo
 
+def print_write_setting(iDict):
+    updateMode = iDict['updateMode']
+    comp = iDict['compression']
+    print('-'*50)
+    print('updateMode : {}'.format(updateMode))
+    print('compression: {}'.format(comp))
+
+    # box
+    box = iDict['box']
+    # box for geometry file in geo-coordinates
+    if not iDict.get('geocoded', False):
+        boxGeo = iDict['box4geo_lut']
+    else:
+        boxGeo = box
+
+    # step
+    xyStep = (iDict['xstep'], iDict['ystep'])
+    if not iDict.get('geocoded', False):
+        xyStepGeo = (1, 1)
+    else:
+        xyStepGeo = xyStep
+    print('x/ystep: {}/{}'.format(xyStep[0], xyStep[1]))
+
+    return updateMode, comp, box, boxGeo, xyStep, xyStepGeo

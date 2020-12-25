@@ -566,14 +566,13 @@ def update_object(outFile, inObj, box, updateMode=True):
                 write_flag = False
     return write_flag
 
-##
 
 def prepare_metadata(inpsDict):
     processor = inpsDict['processor']
     script_name = 'prep_{}.py'.format(processor)
     print('-'*50)
     print('prepare metadata files for {} products'.format(processor))
-
+    
     if processor in ['gamma', 'roipac', 'snap']:
         for key in [i for i in inpsDict.keys() if (i.startswith('MINOPY.load.') and i.endswith('File'))]:
             if len(glob.glob(str(inpsDict[key]))) > 0:
@@ -613,6 +612,7 @@ def prepare_metadata(inpsDict):
         except:
             pass
     return
+
 
 def print_write_setting(inpsDict):
     updateMode = inpsDict['updateMode']

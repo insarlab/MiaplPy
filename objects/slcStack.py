@@ -21,7 +21,8 @@ except ImportError:
 from mintpy.objects import (dataTypeDict,
                             geometryDatasetNames,
                             datasetUnitDict)
-from mintpy.utils import readfile, ptime, utils as ut
+
+from mintpy.utils import readfile, ptime, utils as ut,  attribute as attr
 from minopy.objects.utils import read_attribute
 from minopy.objects.utils import read_binary_file
 
@@ -59,7 +60,7 @@ class slcStackDict:
         #self.pairsDict = pairsDict
         self.pairsDict = pairsDict
 
-    def get_size(self, box=None):
+    def get_size(self, box=None, xstep=1, ystep=1):
         self.numSlc = len(self.pairsDict)
         slcObj = [v for v in self.pairsDict.values()][0]
         self.length, slcObj.width = slcObj.get_size()
@@ -69,6 +70,11 @@ class slcStackDict:
         else:
             self.length = slcObj.length
             self.width = slcObj.width
+
+        # update due to multilook
+        self.length = self.length // ystep
+        self.width = self.width // xstep
+
         return self.numSlc, self.length, self.width
 
     def get_date_list(self):
@@ -91,7 +97,8 @@ class slcStackDict:
             dsDataType = dataTypeDict[metadata['DATA_TYPE'].lower()]
         return dsDataType
 
-    def write2hdf5(self, outputFile='slcStack.h5', access_mode='a', box=None, compression=None, extra_metadata=None):
+    def write2hdf5(self, outputFile='slcStack.h5', access_mode='a', box=None, xstep=1,
+                            ystep=1, compression=None, extra_metadata=None):
         '''Save/write an slcStackDict object into an HDF5 file with the structure below:
 
         /                  Root level
@@ -115,11 +122,12 @@ class slcStackDict:
         self.dsNames = list(self.pairsDict[self.dates[0]].datasetDict.keys())
         self.dsNames = [i for i in slcDatasetNames if i in self.dsNames]
         maxDigit = max([len(i) for i in self.dsNames])
-        self.get_size(box)
+        self.get_size(box=box, xstep=xstep, ystep=ystep)
 
         self.bperp = np.zeros(self.numSlc)
 
         ###############################
+
         # 3D datasets containing slc.
         for dsName in self.dsNames:
             dsShape = (self.numSlc, self.length, self.width)
@@ -187,7 +195,7 @@ class slcStackDict:
                                                                           s=dsShape))
         data = np.array(self.bperp, dtype=dsDataType)
         f.create_dataset(dsName, data=data)
-
+        
 
         ###############################
         # Attributes
@@ -195,7 +203,12 @@ class slcStackDict:
         if extra_metadata:
             self.metadata.update(extra_metadata)
             print('add extra metadata: {}'.format(extra_metadata))
-        self.metadata = ut.subset_attribute(self.metadata, box)
+        self.metadata = attr.update_attribute4subset(self.metadata, box)
+
+        # update metadata due to multilook
+        if xstep * ystep > 1:
+            self.metadata = attr.update_attribute4multilook(self.metadata, ystep, xstep)
+
         self.metadata['FILE_TYPE'] = 'slc'
         for key, value in self.metadata.items():
             f.attrs[key] = value
@@ -282,9 +295,13 @@ class slcStack:
         self.metadata['END_DATE'] = dateList[-1]
         return self.metadata
 
-    def get_size(self):
+    def get_size(self,xstep=1, ystep=1):
         with h5py.File(self.file, 'r') as f:
             self.numDate, self.length, self.width = f[self.name].shape
+
+        # update due to multilook
+        self.length = self.length // ystep
+        self.width = self.width // xstep
         return self.numDate, self.length, self.width
 
     def get_date_list(self):

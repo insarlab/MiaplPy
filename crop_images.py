@@ -20,7 +20,7 @@ from mintpy.utils import readfile, ptime, utils as ut
 from mintpy import subset
 import mintpy.load_data as mld
 from minopy.objects.utils import check_template_auto_value
-from minopy.objects.utils import read_attribute, coord_rev, print_write_setting
+from minopy.objects.utils import read_attribute, coord_rev #print_write_setting
 from minopy.objects.arg_parser import MinoPyParser
 
 #################################################################
@@ -49,19 +49,27 @@ datasetName2templateKey = {'slc': 'MINOPY.load.slcFile',
 def main(iargs=None):
     Parser = MinoPyParser(iargs, script='crop_images')
     inps = Parser.parse()
+
     # read input options
+    iDict = read_inps2dict(inps)
 
-    inpsDict = read_inps2dict(inps)
-    prepare_metadata(inpsDict)
+    # prepare metadata
+    prepare_metadata(iDict)
 
-    inpsDict = read_subset_box(inpsDict)
-    extraDict = mld.get_extra_metadata(inpsDict)
+    # skip data writing for aria as it is included in prep_aria
+    if iDict['processor'] == 'aria':
+        return
+
+    iDict = read_subset_box(iDict)
+    extraDict = mld.get_extra_metadata(iDict)
+
     # initiate objects
-    stackObj = read_inps_dict2slc_stack_dict_object(inpsDict)
-    geomRadarObj, geomGeoObj = read_inps_dict2geometry_dict_object(inpsDict)
+    stackObj = read_inps_dict2slc_stack_dict_object(iDict)
+    geomRadarObj, geomGeoObj = read_inps_dict2geometry_dict_object(iDict)
 
-    # prepare wirte
-    updateMode, comp, box, boxGeo = print_write_setting(inpsDict)
+    # prepare write
+    updateMode, comp, box, boxGeo, xyStep, xyStepGeo = mld.print_write_setting(iDict)
+
     if any([stackObj, geomRadarObj, geomGeoObj]) and not os.path.isdir(inps.out_dir):
         os.makedirs(inps.out_dir)
         print('create directory: {}'.format(inps.out_dir))
@@ -72,6 +80,8 @@ def main(iargs=None):
         stackObj.write2hdf5(outputFile=inps.out_file[0],
                             access_mode='a',
                             box=box,
+                            xstep=xyStep[0],
+                            ystep=xyStep[1],
                             compression=comp,
                             extra_metadata=extraDict)
 
@@ -80,6 +90,8 @@ def main(iargs=None):
         geomRadarObj.write2hdf5(outputFile=inps.out_file[1],
                                 access_mode='a',
                                 box=box,
+                                xstep=xyStep[0],
+                                ystep=xyStep[1],
                                 compression='lzf',
                                 extra_metadata=extraDict)
 
@@ -88,9 +100,11 @@ def main(iargs=None):
         geomGeoObj.write2hdf5(outputFile=inps.out_file[2],
                               access_mode='a',
                               box=boxGeo,
+                              xstep=xyStepGeo[0],
+                              ystep=xyStepGeo[1],
                               compression='lzf')
 
-    reference_dir = os.path.dirname(inpsDict['MINOPY.load.metaFile'])
+    reference_dir = os.path.dirname(iDict['MINOPY.load.metaFile'])
     out_reference = inps.out_dir + '/reference'
     if not os.path.exists(out_reference):
         shutil.copytree(reference_dir, out_reference)
@@ -128,11 +142,16 @@ def read_inps2dict(inps):
         value = template[prefix + key]
         if key in ['processor', 'updateMode', 'compression']:
             inpsDict[key] = template[prefix + key]
+        elif key in ['xstep', 'ystep']:
+            inpsDict[key] = int(template[prefix+key])
         elif value:
             inpsDict[prefix + key] = template[prefix + key]
 
     if inpsDict['compression'] == False:
         inpsDict['compression'] = None
+
+    inpsDict['xstep'] = inpsDict.get('xstep', 1)
+    inpsDict['ystep'] = inpsDict.get('ystep', 1)
 
     # PROJECT_NAME --> PLATFORM
     if not inpsDict['PROJECT_NAME']:
@@ -486,14 +505,14 @@ def read_inps_dict2geometry_dict_object(inpsDict):
         print('WARNING: No reqired {} data files found!'.format(dsName0))
 
     # metadata
-    ifgramRadarMetadata = None
-    ifgramKey = datasetName2templateKey['unwrapPhase']
-    if ifgramKey in inpsDict.keys():
-        ifgramFiles = glob.glob(str(inpsDict[ifgramKey]))
-        if len(ifgramFiles) > 0:
-            atr = readfile.read_attribute(ifgramFiles[0])
+    slcRadarMetadata = None
+    slcKey = datasetName2templateKey['slc']
+    if slcKey in inpsDict.keys():
+        slcFiles = glob.glob(str(inpsDict[slcKey]))
+        if len(slcFiles) > 0:
+            atr = readfile.read_attribute(slcFiles[0])
             if 'Y_FIRST' not in atr.keys():
-                ifgramRadarMetadata = atr.copy()
+                slcRadarMetadata = atr.copy()
 
     # dsPathDict --> dsGeoPathDict + dsRadarPathDict
     dsNameList = list(dsPathDict.keys())
@@ -515,7 +534,7 @@ def read_inps_dict2geometry_dict_object(inpsDict):
     if len(dsRadarPathDict) > 0:
         geomRadarObj = geometryDict(processor=inpsDict['processor'],
                                     datasetDict=dsRadarPathDict,
-                                    extraMetadata=ifgramRadarMetadata)
+                                    extraMetadata=slcRadarMetadata)
     if len(dsGeoPathDict) > 0:
         geomGeoObj = geometryDict(processor=inpsDict['processor'],
                                   datasetDict=dsGeoPathDict,

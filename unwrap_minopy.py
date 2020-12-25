@@ -13,7 +13,7 @@ from isceobj.Util.ImageUtil import ImageLib as IML
 from minopy.objects.arg_parser import MinoPyParser
 import numpy as np
 import gdal
-
+import subprocess
 
 CONFIG_FILE = os.path.dirname(os.path.abspath(__file__)) + '/defaults/conf.full'
 
@@ -24,7 +24,7 @@ def main(iargs=None):
     """
     Parser = MinoPyParser(iargs, script='unwrap_minopy')
     inps = Parser.parse()
-
+    
     unwObj = Snaphu(inps)
     do_tiles, metadata = unwObj.need_to_split_tiles()
 
@@ -151,11 +151,11 @@ class Snaphu:
         cmd = 'snaphu -f {config_file} -d {wrapped_file} {line_length} -o ' \
               '{unwrapped_file}'.format(config_file=self.config_file, wrapped_file=self.inp_wrapped,
                                         line_length=self.width, unwrapped_file=self.out_unwrapped)
-
-        #print(cmd)
-        #os.system(cmd)
-        os.system('echo {c}; {c}'.format(c=cmd))
-
+        
+        p = subprocess.Popen(cmd, stdout=PIPE, stderr=PIPE)
+        output, error = p.communicate()
+        #outs, errs  = subprocess.Popen(cmd, shell=True).communicate()
+        
         IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,
                           datatype='float32', scheme='BIL')
 
@@ -171,9 +171,9 @@ class Snaphu:
               '--nproc {num_proc}'.format(config_file=self.config_file, wrapped_file=self.inp_wrapped,
                                           line_length=self.width, unwrapped_file=self.out_unwrapped, ytile=self.y_tile,
                                           xtile=self.x_tile, num_proc=self.nproc)
-        #print(cmd)
-        #os.system(cmd)
-        os.system('echo {c}; {c}'.format(c=cmd))
+        
+        p = subprocess.Popen(cmd, stdout=PIPE, stderr=PIPE)
+        output, error = p.communicate()
 
         IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,
                           datatype='float32', scheme='BIL')

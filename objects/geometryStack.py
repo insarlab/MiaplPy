@@ -19,8 +19,8 @@ except ImportError:
 from mintpy.objects import (dataTypeDict,
                             geometryDatasetNames,
                             ifgramDatasetNames)
-from mintpy.utils import readfile, ptime, utils as ut
-
+from mintpy.utils import readfile, ptime, utils as ut, attribute as attr
+from mintpy.objects.stackDict import geometryDict as GDict, read_isce_bperp_file
 
 BOOL_ZERO = np.bool_(0)
 INT_ZERO = np.int16(0)
@@ -30,30 +30,7 @@ CPX_ZERO = np.complex64(0.0)
 dataType = np.float32
 
 
-class geometryDict:
-    '''
-    Geometry object for Lat, Lon, Heigt, Incidence, Heading, Bperp, ... from the same platform and track.
-
-    Example:
-        from mintpy.utils import readfile
-        from mintpy.utils.insarobj import geometryDict
-        datasetDict = {'height'        :'$PROJECT_DIR/merged/geom_reference/hgt.rdr',
-                       'latitude'      :'$PROJECT_DIR/merged/geom_reference/lat.rdr',
-                       'longitude'     :'$PROJECT_DIR/merged/geom_reference/lon.rdr',
-                       'incidenceAngle':'$PROJECT_DIR/merged/geom_reference/los.rdr',
-                       'heandingAngle' :'$PROJECT_DIR/merged/geom_reference/los.rdr',
-                       'shadowMask'    :'$PROJECT_DIR/merged/geom_reference/shadowMask.rdr',
-                       'bperp'         :bperpDict
-                       ...
-                      }
-        bperpDict = {'20160406':'$PROJECT_DIR/merged/baselines/20160406/bperp',
-                     '20160418':'$PROJECT_DIR/merged/baselines/20160418/bperp',
-                     ...
-                    }
-        metadata = readfile.read_attribute('$PROJECT_DIR/merged/interferograms/20160629_20160723/filt_fine.unw')
-        geomObj = geometryDict(processor='isce', datasetDict=datasetDict, extraMetadata=metadata)
-        geomObj.write2hdf5(outputFile='geometryRadar.h5', access_mode='w', box=(200,500,300,600))
-    '''
+class geometryDict(GDict):
 
     def __init__(self, name='geometry', processor=None, datasetDict={}, extraMetadata=None):
         self.name = name
@@ -64,55 +41,41 @@ class geometryDict:
         # get extra metadata from geometry file if possible
         self.dsNames = list(self.datasetDict.keys())
         if not self.extraMetadata:
-            dsFile = self.datasetDict[self.dsNames[0]]
+            dsFile = self.datasetDict[self.dsNames[0]] 
             metadata = read_attribute(dsFile.split('.xml')[0], metafile_ext='.rsc')
+            #metadata = read_attribute(dsFile, metafile_ext='.rsc')
             if all(i in metadata.keys() for i in ['STARTING_RANGE', 'RANGE_PIXEL_SIZE']):
                 self.extraMetadata = metadata
 
-    def read(self, family, box=None):
+    def read(self, family, box=None): #, xstep=1, ystep=1):
+        #super().read(family, box, xstep=xstep, ystep=ystep)
+        if self.file.endswith('.h5'):
+            dsName = None
+        else:
+            dsName = family
         self.file = self.datasetDict[family].split('.xml')[0]
         data, metadata = read_geo(self.file,
-                                  datasetName=family,
-                                  box=box)
+                                  datasetName=dsName,
+                                 box=box)
         return data, metadata
-
-    def get_slant_range_distance(self, box=None):
-
-        if not self.extraMetadata or 'Y_FIRST' in self.extraMetadata.keys():
-            return None
-
-        data = ut.range_distance(self.extraMetadata, dimension=2, print_msg=False)
-
-        if box is not None:
-            data = data[box[1]:box[3], box[0]:box[2]]
-        return data
-
-    def get_incidence_angle(self, box=None):
-        if not self.extraMetadata or 'Y_FIRST' in self.extraMetadata.keys():
-            return None
-        if 'height' in self.dsNames:
-            dem = readfile.read(self.datasetDict['height'], datasetName='height')[0]
-        else:
-            dem = None
-        data = ut.incidence_angle(self.extraMetadata,
-                                  dem=dem,
-                                  dimension=2,
-                                  print_msg=False)
-        if box is not None:
-            data = data[box[1]:box[3], box[0]:box[2]]
-        return data
-
-    def get_size(self, family=None, box=None):
+    
+    def get_size(self, family=None, box=None, xstep=1, ystep=1):
         if not family:
             family = [i for i in self.datasetDict.keys() if i != 'bperp'][0]
         self.file = self.datasetDict[family]
         metadata = read_attribute(self.file.split('.xml')[0], metafile_ext='.rsc')
+        #metadata = read_attribute(self.file, metafile_ext='.rsc')
+        # update due to subset
         if box:
             length = box[3] - box[1]
             width = box[2] - box[0]
         else:
             length = int(metadata['LENGTH'])
             width = int(metadata['WIDTH'])
+
+        # update due to multilook
+        length = length // ystep
+        width = width // xstep
         return length, width
 
     def get_dataset_list(self):
@@ -124,6 +87,7 @@ class geometryDict:
             family = [i for i in self.datasetDict.keys() if i != 'bperp'][0]
         self.file = self.datasetDict[family]
         self.metadata = read_attribute(self.file.split('.xml')[0], metafile_ext='.rsc')
+        #self.metadata = read_attribute(self.file, metafile_ext='.rsc')
         self.length = int(self.metadata['LENGTH'])
         self.width = int(self.metadata['WIDTH'])
         if 'UNIT' in self.metadata.keys():
@@ -147,7 +111,8 @@ class geometryDict:
         #self.metadata['PROCESSOR'] = self.processor
         return self.metadata
 
-    def write2hdf5(self, outputFile='geometryRadar.h5', access_mode='w', box=None, compression='lzf', extra_metadata=None):
+    def write2hdf5(self, outputFile='geometryRadar.h5', access_mode='w', box=None,
+                   xstep=1, ystep=1, compression='lzf', extra_metadata=None):
         '''
         /                        Root level
         Attributes               Dictionary for metadata. 'X/Y_FIRST/STEP' attribute for geocoded.
@@ -176,8 +141,8 @@ class geometryDict:
         #print('create group   /{}'.format(groupName))
 
         maxDigit = max([len(i) for i in geometryDatasetNames])
-        length, width = self.get_size(box=box)
-        self.length, self.width = self.get_size()
+        length, width = self.get_size(box=box, xstep=xstep, ystep=ystep)
+        #self.length, self.width = self.get_size()
 
         ###############################
         for dsName in self.dsNames:
@@ -205,8 +170,10 @@ class geometryDict:
                 for i in range(self.numDate):
                     fname = self.datasetDict[dsName][self.dateList[i]]
                     data = read_isce_bperp_file(fname=fname,
-                                                out_shape=(self.length, self.width),
-                                                box=box)
+                                                full_shape=self.get_size(),
+                                                box=box,
+                                                xstep=xstep,
+                                                ystep=ystep)
                     ds[i, :, :] = data
                     prog_bar.update(i+1, suffix=self.dateList[i])
                 prog_bar.close()
@@ -275,7 +242,7 @@ class geometryDict:
         if extra_metadata:
             self.metadata.update(extra_metadata)
             print('add extra metadata: {}'.format(extra_metadata))
-        self.metadata = ut.subset_attribute(self.metadata, box)
+        self.metadata = attr.update_attribute4subset(self.metadata, box)
         self.metadata['FILE_TYPE'] = self.name
         for key, value in self.metadata.items():
             f.attrs[key] = value

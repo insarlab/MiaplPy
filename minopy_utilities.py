@@ -181,15 +181,15 @@ def write_SLC(date_list, slc_dir, patch_dir, range_win, azimuth_win):
 ################################################################################
 
 
-def read_image(image_file, box=None):
+def read_image(image_file, box=None, band=1):
     """ Reads images from isce. """
 
     ds = gdal.Open(image_file + '.vrt', gdal.GA_ReadOnly)
     if not box is None:
-        band = ds.GetRasterBand(1)
-        image = band.ReadAsArray()[box[1]:box[3], box[0]:box[2]]
+        imds = ds.GetRasterBand(band)
+        image = imds.ReadAsArray()[box[1]:box[3], box[0]:box[2]]
     else:
-        image = ds.GetRasterBand(1).ReadAsArray()
+        image = ds.GetRasterBand(band).ReadAsArray()
 
     del ds
 
@@ -913,7 +913,7 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
     ## 3. run the inversion / estimation and write to disk
     # 3.1 split ifgram_file into blocks to save memory
 
-    box_list, num_box = split2boxes(ifgram_file, memory_size=100e6)
+    box_list, num_box = split2boxes(ifgram_file)
 
     # --dset option
     unwDatasetName = 'unwrapPhase'
