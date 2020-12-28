@@ -216,9 +216,9 @@ class geometryDict(GDict):
             # Calculate data
             data = None
             if dsName == 'incidenceAngle':
-                data = self.get_incidence_angle(box=None)
+                data = self.get_incidence_angle(box=box)
             elif dsName == 'slantRangeDistance':
-                data = self.get_slant_range_distance(box=None)
+                data = self.get_slant_range_distance(box=box)
 
             # Write dataset
             if data is not None:
