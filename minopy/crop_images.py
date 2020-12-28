@@ -111,7 +111,7 @@ def main(iargs=None):
 
     baseline_dir = inps.out_dir + '/baselines'
     if not os.path.exists(baseline_dir):
-        shutil.copytree(inpsDict['MINOPY.load.baselineDir'], baseline_dir)
+        shutil.copytree(iDict['MINOPY.load.baselineDir'], baseline_dir)
 
     return inps.out_file
 
