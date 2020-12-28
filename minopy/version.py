@@ -43,7 +43,7 @@ _________________________________________________
 _________________________________________________
 """.format(v=release_version, d=release_date)
 
-website = 'https://github.com/geodesymiami/minopy'
+website = 'https://github.com/geodesymiami/MiNoPy'
 
 description = """MiNoPy release version {v}, release date {d}""".format(v=release_version,
                                                                         d=release_date)
