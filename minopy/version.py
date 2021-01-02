@@ -13,7 +13,7 @@ def get_release_info(version='v1.0-dev', date='2019-08-06'):
 
     # grab git info into string
     try:
-        version = subprocess.check_output(["git", "describe", "--tags"])
+        version = subprocess.check_output(["git", "describe", "--tags", "--always"])
         version = version.decode('utf-8').strip()
 
         # if there are new commits after the latest release
