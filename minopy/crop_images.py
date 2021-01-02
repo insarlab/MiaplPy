@@ -403,18 +403,18 @@ def skip_files_with_inconsistent_size(dsPathDict, pix_box=None, dsName='slc'):
         msg += '\nThe following dates have different size:'
 
         dsNames = list(dsPathDict.keys())
-        date12_list = [atr['DATE12'] for atr in atr_list]
-        for i in range(len(date12_list)):
+        date_list = [atr['DATE'] for atr in atr_list]
+        for i in range(len(date_list)):
             if length_list[i] != common_length or width_list[i] != common_width:
-                date12 = date12_list[i]
-                dates = ptime.yyyymmdd(date12.split('-'))
+                date = date_list[i]
+                dates = ptime.yyyymmdd(date)
                 # update file list for all datasets
                 for dsName in dsNames:
                     fnames = [i for i in dsPathDict[dsName]
                               if all(d[2:8] in i for d in dates)]
                     if len(fnames) > 0:
                         dsPathDict[dsName].remove(fnames[0])
-                msg += '\n\t{}\t({}, {})'.format(date12, length_list[i], width_list[i])
+                msg += '\n\t{}\t({}, {})'.format(date, length_list[i], width_list[i])
 
         msg += '\n' + '-' * 30
         msg += '\nSkip loading the interferograms above.'
