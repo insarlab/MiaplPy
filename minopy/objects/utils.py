@@ -828,16 +828,6 @@ def most_common(L, k=1):
     return item_mm
 
 
-def print_write_setting(inpsDict):
-    updateMode = inpsDict['updateMode']
-    comp = inpsDict['compression']
-    print('-'*50)
-    print('updateMode : {}'.format(updateMode))
-    print('compression: {}'.format(comp))
-    box = inpsDict['box']
-    boxGeo = inpsDict['box4geo_lut']
-    return updateMode, comp, box, boxGeo
-
 def print_write_setting(iDict):
     updateMode = iDict['updateMode']
     comp = iDict['compression']

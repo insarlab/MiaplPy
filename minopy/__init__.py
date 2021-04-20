@@ -13,6 +13,8 @@ minopy_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(1, minopy_path)
 sys.path.insert(1, os.path.join(minopy_path, 'defaults'))
 sys.path.insert(1, os.path.join(minopy_path, 'objects'))
+sys.path.insert(1, os.path.join(minopy_path, 'lib'))
+
 
 from minopy.version import *
 __version__ = release_version
@@ -22,3 +24,5 @@ try:
 except KeyError:
     print('Using default MintPy Path: %s' % (minopy_path))
     os.environ['MINOPY_HOME'] = minopy_path
+
+#os.environ['PATH'] = os.getenv('PATH') + ':$MINOPY_HOME/minopy/lib'

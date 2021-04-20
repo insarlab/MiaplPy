@@ -75,7 +75,7 @@ class MDaskCluster(cluster.DaskCluster):
         futures, submission_time = self.submit_job(func, func_data, sub_boxes)
 
         # assemble results from all workers
-        return self.collect_result(futures, submission_time, patch_dir)
+        return self.collect_result(futures, results, box, submission_time)
 
     def submit_job(self, func, func_data, sub_boxes):
         """Submit dask workers to the networking client that run the specified function (func)
@@ -185,7 +185,7 @@ class MDaskCluster(cluster.DaskCluster):
 
         return sub_boxes
 
-    def collect_result(self, futures, submission_time, patch_dir):
+    def collect_result_dep(self, futures, submission_time, patch_dir):
         """Compile results from completed workers and recompiles their sub outputs into the output
         for the complete box being worked on.
         :param futures: list(dask.Future), list of futures representing future dask worker calculations

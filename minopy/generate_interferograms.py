@@ -7,11 +7,13 @@ import logging
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 import os
+import isce
 import isceobj
 from isceobj.Image.IntImage import IntImage
 import numpy as np
 from minopy.objects.arg_parser import MinoPyParser
-import gdal
+from osgeo import gdal
+import h5py
 
 
 def main(iargs=None):
@@ -21,60 +23,79 @@ def main(iargs=None):
 
     Parser = MinoPyParser(iargs, script='generate_interferograms')
     inps = Parser.parse()
-    resampName = run_interferogram(inps)
 
+    os.makedirs(inps.out_dir, exist_ok=True)
+
+    resampName = inps.out_dir + '/fine'
     resampInt = resampName + '.int'
-
     filtInt = os.path.dirname(resampInt) + '/filt_fine.int'
+    cor_file = os.path.dirname(resampInt) + '/filt_fine.cor'
+
+    #if os.path.exists(cor_file + '.xml'):
+    #    return
+
+    run_interferogram(inps, resampName)
+
     filter_strength = inps.filter_strength
     runFilter(resampInt, filtInt, filter_strength)
 
-    cor_file = os.path.dirname(resampInt) + '/filt_fine.cor'
     estCoherence(filtInt, cor_file)
 
     return
 
 
-def run_interferogram(inps):
+def run_interferogram(inps, resampName):
     if inps.azlooks * inps.rglooks > 1:
         extention = '.ml.slc'
     else:
         extention = '.slc'
 
-    inps.reference = os.path.join(inps.reference, os.path.basename(inps.reference) + extention)
-    inps.secondary = os.path.join(inps.secondary, os.path.basename(inps.secondary) + extention)
+    with h5py.File(inps.stack_file, 'r') as ds:
+        date_list = np.array([x.decode('UTF-8') for x in ds['dates'][:]])
+        ref_ind = np.where(date_list==inps.reference)[0]
+        sec_ind = np.where(date_list==inps.secondary)[0]
 
-    ds = gdal.Open(inps.reference + '.vrt', gdal.GA_ReadOnly)
-    width = ds.RasterXSize
-    length = ds.RasterYSize
+        slcs =  ds['slc']
+        length = slcs.shape[1]
+        width = slcs.shape[2]
 
-    reference = np.memmap(inps.reference, dtype=np.complex64, mode='r', shape=(length, width))
-    secondary = np.memmap(inps.secondary, dtype=np.complex64, mode='r', shape=(length, width))
+        resampInt = resampName + '.int'
 
-    resampName = inps.out_dir + '/fine'
-    resampInt = resampName + '.int'
+        #ifg_mem = np.zeros([length, width], dtype=np.complex64)
+ 
+        ref_image = slcs[ref_ind, :, :].reshape(length, width)
+        sec_image = np.conj(slcs[sec_ind, :, :]).reshape(length, width)
 
-    ifg = np.memmap(resampInt, dtype=np.complex64, mode='w+', shape=(length, width))
+        ifg = np.memmap(resampInt, dtype=np.complex64, mode='write', shape=(length, width))
+        ifg[:, :] = ref_image * sec_image
 
-    for kk in range(length):
-        ifg[kk, :] = reference[kk, :] * np.conj(secondary[kk, :])
+        #for kk in range(length):
+        #    ifg[kk, :] = (slcs[ref_ind, kk, :] * np.conj(slcs[sec_ind, kk, :])).reshape(1, -1)
 
-    obj_int = IntImage()
-    obj_int.setFilename(resampInt)
-    obj_int.setWidth(width)
-    obj_int.setLength(length)
-    obj_int.setAccessMode('READ')
-    obj_int.renderHdr()
-    obj_int.renderVRT()
+
+        #ifg[:, :] = ifg_mem[:, :]
+
+        obj_int = IntImage()
+        obj_int.setFilename(resampInt)
+        obj_int.setWidth(width)
+        obj_int.setLength(length)
+        obj_int.setAccessMode('READ')
+        obj_int.renderHdr()
+        obj_int.renderVRT()
+
+
+        intImage = isceobj.createIntImage()
+        intImage.load(resampInt + '.xml')
+        intImage.setAccessMode('read')
+        intImage.createImage()
+        intImage.finalizeImage()
 
     return resampName
-
 
 def runFilter(infile, outfile, filterStrength):
     from mroipac.filter.Filter import Filter
 
     # Initialize the flattened interferogram
-    topoflatIntFilename = infile
     intImage = isceobj.createIntImage()
     intImage.load( infile + '.xml')
     intImage.setAccessMode('read')

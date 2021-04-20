@@ -4,6 +4,7 @@
 ############################################################
 import logging
 import warnings
+from numba.decorators import jit
 
 warnings.filterwarnings("ignore")
 
@@ -12,14 +13,14 @@ mpl_logger.setLevel(logging.WARNING)
 
 import os
 import numpy as np
-import minopy.minopy_utilities as mut
+import minopy_utilities as mut
 from skimage.measure import label
 import h5py
-from osgeo import gdal
+grom osgeo import gdal
 from isceobj.Util.ImageUtil import ImageLib as IML
 import time
 
-
+@jit(nopython=True, parallel=True)
 def get_big_box(box, range_window, azimuth_window, width, length):
     big_box = [box[0] - range_window, box[1] - azimuth_window,
                box[2] + range_window, box[3] + azimuth_window]
@@ -33,7 +34,7 @@ def get_big_box(box, range_window, azimuth_window, width, length):
         big_box[3] = length
     return big_box
 
-
+@jit(nopython=True, parallel=True)
 def sequential_phase_linking(full_stack_complex_samples, method, mini_stack_default_size, total_num_mini_stacks):
     """ phase linking of each pixel sequentially and applying a datum shift at the end """
 
@@ -68,7 +69,7 @@ def sequential_phase_linking(full_stack_complex_samples, method, mini_stack_defa
 
     return vec_refined, squeezed_images
 
-
+@jit(nopython=True, parallel=True)
 def datum_connect(squeezed_images, vector_refined, mini_stack_size):
     """
 
@@ -95,9 +96,10 @@ def datum_connect(squeezed_images, vector_refined, mini_stack_size):
         new_vector_refined[first_line:last_line, 0] = np.multiply(vector_refined[first_line:last_line, 0],
                                                               np.exp(1j * datum_shift[step:step + 1, 0]))
 
-    return new_vector_refined.reshape(-1, 1, 1)  #, datum_shift
+    return new_vector_refined.reshape(-1, 1, 1), datum_shift
 
 
+@jit(nopython=True, parallel=True)
 def get_shp_row_col(data, input_slc, distance_thresh, samp_rows, samp_cols, ref_row, ref_col,
                     azimuth_window, range_window):
 
@@ -133,7 +135,7 @@ def get_shp_row_col(data, input_slc, distance_thresh, samp_rows, samp_cols, ref_
 
     return ksres
 
-
+@jit(nopython=True, parallel=True)
 def get_numpy_data_from_file(file, box, dtype, shape=None):
     temp_image_memmap = np.memmap(file, dtype=dtype, mode='r+', shape=shape)
     if box:
@@ -145,7 +147,7 @@ def get_numpy_data_from_file(file, box, dtype, shape=None):
     else:
         return temp_image_memmap
 
-
+@jit(nopython=True, parallel=True)
 def initiate_stacks(slc_stack, patch_dir, box, mini_stack_default_size, phase_linking_method, shp_size, range_window,
                     azimuth_window):
 
@@ -216,7 +218,7 @@ def initiate_stacks(slc_stack, patch_dir, box, mini_stack_default_size, phase_li
 
     return big_box, total_num_mini_stacks
 
-
+@jit(nopython=True, parallel=True)
 def parallel_invertion(distance_thresh=None, azimuth_window=None, range_window=None, default_mini_stack_size=10,
               phase_linking_method='EMI', samples=None, patch_length=None, patch_width=None,
               patch_dir=None, box=None, big_box=None, patch_row_0=0, patch_col_0=0, total_num_mini_stacks=None):
@@ -336,7 +338,6 @@ def parallel_invertion(distance_thresh=None, azimuth_window=None, range_window=N
             rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = vec_refined
             quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mut.gam_pta(np.angle(coh_mat),
                                                                                 vec_refined.reshape(-1, 1))
-            print('final quality:', quality[coord[0], coord[1]])
 
         return coord
 
@@ -359,7 +360,7 @@ def parallel_invertion(distance_thresh=None, azimuth_window=None, range_window=N
 
     t2 = time.perf_counter()
 
-    print(f'finish time : {t2 - t1} seconds')
+    #print(f'finish time : {t2 - t1} seconds')
 
     np.save(patch_dir + '/flag.npy', '{} is done inverting'.format(os.path.basename(patch_dir)))
 

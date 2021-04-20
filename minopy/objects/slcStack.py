@@ -12,7 +12,7 @@ import time
 import h5py
 import numpy as np
 from datetime import datetime
-import gdal
+from osgeo import gdal
 try:
     from skimage.transform import resize
 except ImportError:
@@ -173,10 +173,10 @@ class slcStackDict:
             ds.attrs['MODIFICATION_TIME'] = str(time.time())
 
         ###############################
-        # 2D dataset containing reference and secondary dates of all pairs
+        # 1D dataset containing dates of all images
         dsName = 'dates'
         dsDataType = np.string_
-        dsShape = (self.numSlc, 2)
+        dsShape = (self.numSlc, 1)
         print('create dataset /{d:<{w}} of {t:<25} in size of {s}'.format(d=dsName,
                                                                           w=maxDigit,
                                                                           t=str(dsDataType),
@@ -350,7 +350,7 @@ class slcStack:
             if box is None:
                 box = [0, 0, self.width, self.length]
 
-            data = ds[dateFlag, box[1]:box[3], box[0]:box[2]]
+            data = ds[np.where(dateFlag==True)[0], box[1]:box[3], box[0]:box[2]]
             data = np.squeeze(data)
         return data
 

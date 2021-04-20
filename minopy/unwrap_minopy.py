@@ -7,13 +7,15 @@
 ############################################################
 
 import os
-import h5py
+import sys
 import multiprocessing
+import isce
 from isceobj.Util.ImageUtil import ImageLib as IML
 from minopy.objects.arg_parser import MinoPyParser
 import numpy as np
-import gdal
+from osgeo import gdal
 import subprocess
+import time
 
 CONFIG_FILE = os.path.dirname(os.path.abspath(__file__)) + '/defaults/conf.full'
 
@@ -28,16 +30,19 @@ def main(iargs=None):
     unwObj = Snaphu(inps)
     do_tiles, metadata = unwObj.need_to_split_tiles()
 
+    time0 = time.time()
     try:
         if do_tiles:
+            print('1')
             unwObj.unwrap_tile()
         else:
+            print('2')
             unwObj.unwrap()
     except:
-        metadata['defomax'] = inps.defo_max
-        metadata['init_method'] = inps.init_method
+        print('3')
         runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
 
+    print('Time spent: {} m'.format((time.time() - time0)/60))
     return
 
 
@@ -46,21 +51,28 @@ class Snaphu:
     def __init__(self, inps):
 
         work_dir = os.path.dirname(inps.input_ifg)
+        if os.path.exists(work_dir + '/filt_fine.unw.conncomp.vrt'):
+            sys.exit(1)
         self.config_file = os.path.join(work_dir, 'config_all')
-        self.reference = inps.reference
+        LENGTH = inps.ref_length
+        WIDTH = inps.ref_width
+        self.num_tiles = inps.num_tiles
         self.out_unwrapped = inps.unwrapped_ifg
         self.inp_wrapped = inps.input_ifg
 
-        retry_times = 10
-        for run in range(retry_times):
-            try:
-                self.metadata = self.get_metadata()
-                break
-            except:
-                continue
+        self.length, self.width = self.get_image_size()
 
-        self.length = int(self.metadata['LENGTH'])
-        self.width = int(self.metadata['WIDTH'])
+        azlooks = int(LENGTH / self.length)
+        rglooks = int(WIDTH / self.width)
+
+        self.metadata = {'defomax': inps.defo_max,
+                         'init_method': inps.init_method,
+                         'wavelength': inps.wavelength,
+                         'earth_radius': inps.earth_radius,
+                         'height': inps.height,
+                         'azlooks': azlooks,
+                         'rglooks': rglooks}
+
 
         with open(CONFIG_FILE, 'r') as f:
             self.config_default = f.readlines()
@@ -68,11 +80,11 @@ class Snaphu:
         self.config_default.append('DEFOMAX_CYCLE   {}\n'.format(inps.defo_max))
         self.config_default.append('CORRFILE   {}\n'.format(inps.input_cor))
         self.config_default.append('CONNCOMPFILE   {}\n'.format(inps.unwrapped_ifg + '.conncomp'))
-        self.config_default.append('NLOOKSRANGE {}\n'.format(self.metadata['RgLooks']))
-        self.config_default.append('NLOOKSAZ {}\n'.format(self.metadata['AzLooks']))
-        self.config_default.append('ALTITUDE   {}\n'.format(self.metadata['HEIGHT']))
-        self.config_default.append('LAMBDA   {}\n'.format(self.metadata['WAVELENGTH']))
-        self.config_default.append('EARTHRADIUS   {}\n'.format(self.metadata['EARTH_RADIUS']))
+        self.config_default.append('NLOOKSRANGE {}\n'.format(rglooks))
+        self.config_default.append('NLOOKSAZ {}\n'.format(azlooks))
+        self.config_default.append('ALTITUDE   {}\n'.format(inps.height))
+        self.config_default.append('LAMBDA   {}\n'.format(inps.wavelength))
+        self.config_default.append('EARTHRADIUS   {}\n'.format(inps.earth_radius))
         self.config_default.append('INITMETHOD   {}\n'.format(inps.init_method))
 
         return
@@ -86,7 +98,7 @@ class Snaphu:
 
     def need_to_split_tiles(self):
 
-        do_tiles, self.nproc, self.y_tile, self.x_tile = self.get_nproc_tile()
+        do_tiles, self.y_tile, self.x_tile = self.get_nproc_tile()
 
         if do_tiles:
             for indx, line in enumerate(self.config_default):
@@ -98,64 +110,34 @@ class Snaphu:
 
         return do_tiles, self.metadata
 
-    def get_metadata(self):
-        with h5py.File(self.reference, 'r') as ds:
-            metadata = dict(ds.attrs)
-        
-        length, width = self.get_image_size()
-        LENGTH = int(metadata['LENGTH'])
-        WIDTH = int(metadata['WIDTH'])
-
-        azlooks = None
-        rglooks = None
-
-        for key in metadata:
-            if 'azimuthLooks' in key:
-                azlooks = int(metadata[key])
-            if 'rangeLooks' in key:
-                rglooks = int(metadata[key])
-        if azlooks is None:
-            azlooks = int(LENGTH / length)
-        if rglooks is None:
-            rglooks = int(WIDTH/width)
-
-        metadata['RgLooks'] = rglooks
-        metadata['AzLooks'] = azlooks
-        metadata['LENGTH'] = length
-        metadata['WIDTH'] = width
-        return metadata
 
     def get_nproc_tile(self):
 
-        nproc = np.min([64, multiprocessing.cpu_count()])
-
-        npixels = self.length * self.width
-
-        ntiles = npixels / 5000000
-
-        if ntiles > 1:
+        if self.num_tiles > 1:
             do_tiles = True
-            x_tile = int(np.sqrt(ntiles)) + 1
+            x_tile = int(np.sqrt(self.num_tiles)) + 1
             y_tile = x_tile
         else:
             do_tiles = False
             x_tile = 1
             y_tile = 1
 
-        nproc = np.min([nproc, int(ntiles) + 1])
-
-        return do_tiles, nproc, y_tile, x_tile
+        return do_tiles, y_tile, x_tile
 
     def unwrap(self):
 
         cmd = 'snaphu -f {config_file} -d {wrapped_file} {line_length} -o ' \
               '{unwrapped_file}'.format(config_file=self.config_file, wrapped_file=self.inp_wrapped,
                                         line_length=self.width, unwrapped_file=self.out_unwrapped)
+
+        print(cmd)
         
-        p = subprocess.Popen(cmd, stdout=PIPE, stderr=PIPE)
+        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = p.communicate()
-        #outs, errs  = subprocess.Popen(cmd, shell=True).communicate()
-        
+        print(error)
+        if 'ERROR' in error.decode('UTF-8'):
+            raise RuntimeError(error)
+
         IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,
                           datatype='float32', scheme='BIL')
 
@@ -167,13 +149,18 @@ class Snaphu:
     def unwrap_tile(self):
 
         cmd = 'snaphu -f {config_file} -d {wrapped_file} {line_length} -o ' \
-              '{unwrapped_file} --tile {ytile} {xtile} 500 500 ' \
+              '{unwrapped_file} --tile {ytile} {xtile} 200 200 ' \
               '--nproc {num_proc}'.format(config_file=self.config_file, wrapped_file=self.inp_wrapped,
                                           line_length=self.width, unwrapped_file=self.out_unwrapped, ytile=self.y_tile,
-                                          xtile=self.x_tile, num_proc=self.nproc)
+                                          xtile=self.x_tile, num_proc=self.num_tiles)
+        print(cmd)
         
-        p = subprocess.Popen(cmd, stdout=PIPE, stderr=PIPE)
+        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = p.communicate()
+        print(error)
+
+        if 'ERROR' in error.decode('UTF-8'):
+            raise RuntimeError(error)
 
         IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,
                           datatype='float32', scheme='BIL')
@@ -182,7 +169,6 @@ class Snaphu:
                           datatype='BYTE', scheme='BIL')
 
         return
-
 
 
 def runUnwrap(infile, outfile, corfile, config):
@@ -199,13 +185,13 @@ def runUnwrap(infile, outfile, corfile, config):
     img = isceobj.createImage()
     img.load(infile + '.xml')
 
-    wavelength = float(config['WAVELENGTH'])
+    wavelength = float(config['wavelength'])
     width = img.getWidth()
     length = img.getLength()
-    earthRadius = float(config['EARTH_RADIUS'])
-    altitude = float(config['HEIGHT'])
-    rangeLooks = int(config['RgLooks'])
-    azimuthLooks = int(config['AzLooks'])
+    earthRadius = float(config['earth_radius'])
+    altitude = float(config['height'])
+    rangeLooks = int(config['rglooks'])
+    azimuthLooks = int(config['azlooks'])
 
     snp = Snaphu()
     snp.setInitOnly(False)

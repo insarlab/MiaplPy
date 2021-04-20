@@ -5,7 +5,6 @@
 import logging
 import warnings
 
-
 warnings.filterwarnings("ignore")
 
 mpl_logger = logging.getLogger('matplotlib')
@@ -20,7 +19,8 @@ import pickle
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects import cluster_minopy
 import minopy.objects.inversion_utils as iut
-import gdal
+from osgeo import gdal
+import time
 
 
 def main(iargs=None):
@@ -44,14 +44,17 @@ def main(iargs=None):
     quality_file = os.path.join(patch_dir, 'quality')
     ds = gdal.Open(quality_file + '.vrt', gdal.GA_ReadOnly)
     quality = ds.GetRasterBand(1).ReadAsArray()
+    quality[:, :] = -1
 
     if not -1 in quality:
         np.save(patch_dir + '/flag.npy', '{} is done inverting'.format(os.path.basename(patch_dir)))
         return
 
-    # inps.cluster = 'no'
+    #inps.cluster = 'no'
     if inps.cluster == 'no':
+        t0 = time.time()
         iut.parallel_invertion(**data_kwargs)
+        print('time spent: {} s'.format(time.time() - t0))
     else:
         # parallel
         print('\n\n------- start processing {} using Dask -------'.format(os.path.basename(patch_dir)))

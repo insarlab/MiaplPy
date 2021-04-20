@@ -1,0 +1,4 @@
+#! /bin/bash
+cd $PWD/minopy/lib;
+python setup.py 
+echo 'setup successfull'

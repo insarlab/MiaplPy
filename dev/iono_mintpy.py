@@ -14,7 +14,7 @@ from mintpy.utils import readfile, writefile, utils as ut
 from mintpy.objects import ifgramStack, timeseries
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 import h5py
-import gdal
+from osgeo import gdal
 import numpy as np
 
 ##########################################################################

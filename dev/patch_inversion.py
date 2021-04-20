@@ -240,3 +240,24 @@ if __name__ == '__main__':
     main()
 
 #################################################
+
+'''
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
+np.random.seed(seed=rank)
+
+if size > len(box_list):
+    num = 1
+else:
+    num = ceil(len(box_list) // size) + 1
+
+index = np.arange(0, len(box_list), num)
+index[-1] = len(box_list)
+
+if rank < len(index) - 1:
+    time_passed = inversionObj.loop_patches(box_list[index[rank]:index[rank+1]])
+    comm.gather(time_passed, root=0)
+
+MPI.Finalize()
+'''
