@@ -1080,10 +1080,7 @@ def transform_patch(stack_obj, box=None, ref_phase=None, unwDatasetName='unwrapP
     ts = np.zeros((num_date, num_pixel), np.float32)
     num_inv_ifg = np.zeros((num_row, num_col), np.int16) + num_ifgram
 
-    if num_pixel2inv < 1:
-        ts = ts.reshape(num_date, num_row, num_col)
-    else:
-
+    if num_pixel2inv >= 1:
         # Mask for Non-Zero Phase in ALL ifgrams (share one B in sbas inversion)
         mask_all_net = np.all(pha_data, axis=0)
         mask_all_net *= mask
@@ -1092,10 +1089,10 @@ def transform_patch(stack_obj, box=None, ref_phase=None, unwDatasetName='unwrapP
 
         if np.sum(mask_all_net) > 0:
             tsi = LA.lstsq(A, pha_data[:, mask_all_net], cond=1e-5)[0]
-
-        ts[0:reference_ind, idx_pixel2inv] = tsi[0:reference_ind, :]
-        ts[reference_ind + 1::, idx_pixel2inv] = tsi[reference_ind::, :]
-        ts = ts.reshape(num_date, num_row, num_col)
+            ts[0:reference_ind, idx_pixel2inv] = tsi[0:reference_ind, :]
+            ts[reference_ind + 1::, idx_pixel2inv] = tsi[reference_ind::, :]
+            
+    ts = ts.reshape(num_date, num_row, num_col)
 
     return ts, num_inv_ifg, box
 
