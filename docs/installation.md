@@ -22,9 +22,9 @@ export PYTHONPATH=${PYTHONPATH}:${MINSAR_HOME}
 export PATH=${PATH}:${MINSAR_HOME}/minsar:${MINSAR_HOME}/minsar/utils
 
 #---------- MiNoPy ------------------##
-export MINOPY_HOME=~/tools/minopy
+export MINOPY_HOME=~/tools/MiNoPy
 export PYTHONPATH=${PYTHONPATH}:${MINOPY_HOME}
-export PATH=${PATH}:${MINOPY_HOME}
+export PATH=${PATH}:${MINOPY_HOME}/minopy
 
 ```
 
