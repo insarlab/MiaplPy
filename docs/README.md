@@ -6,7 +6,7 @@
 *MIami NOn linear phase inversion in PYthon*
 
 An open source python package of InSAR processing with Non Linear phase inversion in full resolution. It reads a stack of coregistered SLCs and
-produces time series of surface deformation. This package depends on MintPy for time series corrections and MinSAR for job submission.
+produces time series of surface deformation. This package depends on MintPy for time series corrections.
 It works with all data based on ISCE outputs format. The inversion is based on wrapped phase time series and it includes PTA, EMI and EVD techniques.
 It also supports sequential inversion.
 
