@@ -1066,9 +1066,9 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
         # temporal coherence - 2D
         block = [box[1], box[3], box[0], box[2]]
         temp_coh = quality[box[1]:box[3], box[0]:box[2]]
-        inv_quality = (inv_quality > 0.7) * temp_coh
+        #inv_quality = (inv_quality > 0.7) * temp_coh
         writefile.write_hdf5_block(inps.invQualityFile,
-                                   data=inv_quality,
+                                   data=temp_coh,
                                    datasetName=inv_quality_name,
                                    block=block)
 
