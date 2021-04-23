@@ -29,7 +29,7 @@ def main(iargs=None):
     
     unwObj = Snaphu(inps)
     do_tiles, metadata = unwObj.need_to_split_tiles()
-
+    
     time0 = time.time()
     try:
         if do_tiles:
@@ -38,6 +38,7 @@ def main(iargs=None):
         else:
             print('2')
             unwObj.unwrap()
+    
     except:
         print('3')
         runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
@@ -131,20 +132,21 @@ class Snaphu:
                                         line_length=self.width, unwrapped_file=self.out_unwrapped)
 
         print(cmd)
-        
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = p.communicate()
         print(error)
-        if 'ERROR' in error.decode('UTF-8'):
+        if 'ERROR' in error.decode('UTF-8') or len(error.decode('UTF-8'))>0:
             raise RuntimeError(error)
+        
+        if os.path.exists(self.out_unwrapped):
 
-        IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,
-                          datatype='float32', scheme='BIL')
+            IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,
+                              datatype='float32', scheme='BIL')
 
-        IML.renderISCEXML(self.out_unwrapped + '.conncomp', bands=1, nyy=self.length, nxx=self.width,
-                          datatype='BYTE', scheme='BIL')
+            IML.renderISCEXML(self.out_unwrapped + '.conncomp', bands=1, nyy=self.length, nxx=self.width,
+                              datatype='BYTE', scheme='BIL')
 
-        return
+        return 
 
     def unwrap_tile(self):
 
@@ -159,14 +161,16 @@ class Snaphu:
         output, error = p.communicate()
         print(error)
 
-        if 'ERROR' in error.decode('UTF-8'):
-            raise RuntimeError(error)
+        if 'ERROR' in error.decode('UTF-8') or len(error.decode('UTF-8'))>0:
+           raise RuntimeError(error)  
+        
+        if os.path.exists(self.out_unwrapped):
+  
+            IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,
+                              datatype='float32', scheme='BIL')
 
-        IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,
-                          datatype='float32', scheme='BIL')
-
-        IML.renderISCEXML(self.out_unwrapped + '.conncomp', bands=1, nyy=self.length, nxx=self.width,
-                          datatype='BYTE', scheme='BIL')
+            IML.renderISCEXML(self.out_unwrapped + '.conncomp', bands=1, nyy=self.length, nxx=self.width,
+                              datatype='BYTE', scheme='BIL')
 
         return
 

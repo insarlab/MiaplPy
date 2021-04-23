@@ -19,7 +19,7 @@ ext_modules=[
 setup(
   name = 'inversion_utils',
   script_args=["build_ext", "--inplace"],
-  ext_modules = cythonize(ext_modules),
+  ext_modules = cythonize(ext_modules, language_level=3),
 )
 
 

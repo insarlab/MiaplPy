@@ -1,0 +1,43 @@
+# create environment : conda env create -f conda_env.yml
+# update dependencies: conda env update -f conda_env.yml
+# remove environment : conda env remove -n mintpy
+# enter  environment : conda activate mintpy
+# exit   environment : conda deactivate
+name: minopy
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.6,<3.9
+  - cartopy
+  - cvxopt
+  - dask>=1.0
+  - dask-jobqueue>=0.3
+  - defusedxml
+  - h5py<3
+  - lxml
+  - matplotlib
+  - numpy
+  - pip
+  - pyproj
+  - scikit-image
+  - scipy
+  - gdal
+  - isce2
+  - cython
+  - setuptools
+  - pip:
+    - git+https://github.com/insarlab/PySolid.git
+    - git+https://github.com/tylere/pykml.git
+  # pyaps dependencies
+  - cdsapi
+  - ecCodes
+  - netcdf4
+  - pygrib
+  - pyhdf
+  # pyresample dependencies
+  - pyresample
+  - openmp
+  - pykdtree
+  - xarray
+  - zarr

@@ -12,6 +12,7 @@ warnings.filterwarnings("ignore")
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 
+import isce
 from isceobj.Planet.Planet import Planet
 import os
 import glob

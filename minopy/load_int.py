@@ -189,9 +189,8 @@ def read_inps2dict(inps):
     print('processor: {}'.format(inpsDict['processor']))
     # Here to insert code to check default file path for miami user
     if (auto_path.autoPath
-            and 'SCRATCHDIR' in os.environ
             and inpsDict['PROJECT_NAME'] is not None
-            and inpsDict['MINOPY.load.unwFile']) == 'auto':
+            and inpsDict['MINOPY.load.unwFile'] == 'auto'):
         print(('check auto path setting for Univ of Miami users'
                ' for processor: {}'.format(inpsDict['processor'])))
 
@@ -589,7 +588,6 @@ def prepare_metadata(inpsDict):
             meta_file = meta_files[0]
             baseline_dir = inpsDict['MINOPY.load.baselineDir']
             geom_dir = os.path.dirname(inpsDict['MINOPY.load.demFile'])
-
             # observation
             obs_keys = ['MINOPY.load.unwFile', 'MINOPY.load.azOffFile']
             obs_keys = [i for i in obs_keys if i in inpsDict.keys()]

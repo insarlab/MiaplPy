@@ -18,12 +18,11 @@ import shutil
 import h5py
 import re
 import math
-#import subprocess
 
 import minopy
 import minopy.workflow
 from mintpy.utils import writefile, readfile, utils as ut
-#from minsar.job_submission import JOB_SUBMIT
+
 import mintpy
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 import minopy.minopy_utilities as mut
@@ -195,10 +194,13 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.customTemplateFile:
             cfile = self.customTemplateFile
             # Copy custom template file to inputs directory for backup
+
+            for backup_dirname in ['inputs', 'pic']:
+                backup_dir = os.path.join(self.workDir, backup_dirname)
+                # create directory
+                os.makedirs(backup_dir, exist_ok=True)
+            
             inputs_dir = os.path.join(self.workDir, 'inputs')
-            if not os.path.isdir(inputs_dir):
-                os.makedirs(inputs_dir)
-                print('create directory:', inputs_dir)
             if ut.run_or_skip(out_file=os.path.join(inputs_dir, os.path.basename(cfile)),
                               in_file=cfile,
                               check_readable=False) == 'run':
@@ -273,11 +275,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         os.makedirs(self.run_dir, exist_ok=True)
         run_file_crop = os.path.join(self.run_dir, 'run_01_minopy_crop')
         run_commands = ['{} crop_images.py '.format(self.text_cmd.strip("'")) + scp_args]
+        run_commands = [cmd.lstrip() for cmd in run_commands]
 
         with open(run_file_crop, 'w+') as frun:
             frun.writelines(run_commands)
 
-        if not self.write_job and not self.hostname is 'login':
+        if self.write_job == False and self.hostname != 'login':
             minopy.crop_images.main(scp_args.split())
         else:
             from minsar.job_submission import JOB_SUBMIT
@@ -323,7 +326,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         inps.num_bursts = num_pixels // 40000 // self.num_workers
 
-        if not self.write_job and not self.hostname is 'login':
+        if self.write_job == False and self.hostname != 'login':
             scp_args = scp_args + ' --slcStack {a}'.format(a=os.path.join(self.workDir, 'inputs/slcStack.h5'))
             print('{} phase_inversion.py '.format(self.text_cmd.strip("'"), scp_args))
             minopy.phase_inversion.main(scp_args.split())
@@ -433,6 +436,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                            a8=rslc_ref)
 
             cmd = '{} generate_interferograms.py '.format(self.text_cmd.strip("'")) + scp_args
+            cmd = cmd.lstrip()
+
             if not self.write_job:
                 cmd = cmd + ' &\n'
                 run_commands.append(cmd)
@@ -449,7 +454,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         with open(run_ifgs, 'w+') as frun:
             frun.writelines(run_commands)
 
-        if not self.write_job and not self.hostname is 'login':
+        if self.write_job == False and self.hostname != 'login':
             os.system('bash {}'.format(run_ifgs))
             #status = subprocess.Popen('bash {}'.format(run_ifgs), stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
         else:
@@ -559,6 +564,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                                        a6=length, a7=width, a8=height, a9= num_cpu,
                                                                        a10=earth_radius, a11=wavelength)
             cmd = '{} unwrap_minopy.py '.format(self.text_cmd.strip("'")) + scp_args
+            cmd = cmd.lstrip()
 
             if not self.write_job:
                 cmd = cmd + ' &\n'
@@ -579,7 +585,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         with open(run_file_unwrap, 'w+') as frun:
             frun.writelines(run_commands)
 
-        if not self.write_job and not self.hostname is 'login':
+        if self.write_job == False and self.hostname != 'login':
             os.system('bash {}'.format(run_file_unwrap))
             #status = subprocess.Popen(run_commands, stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
         else:
@@ -620,7 +626,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         minopy.load_int.main(scp_args.split())
 
         # 3) check loading result
-        load_complete, stack_file, geom_file = ut.check_loaded_dataset(self.workDir, print_msg=True)[0:3]
+        load_complete, stack_file, geom_file = ut.check_loaded_dataset(work_dir=self.workDir, print_msg=True)[0:3]
 
         # 4) add custom metadata (optional)
         if self.customTemplateFile:
@@ -661,6 +667,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
     def write_correction_job(self, sname):
         from minsar.job_submission import JOB_SUBMIT
         run_commands = ['{} minopyApp.py {} --start load_int'.format(self.text_cmd.strip("'"), self.templateFile)]
+        run_commands = run_commands.lstrip()
         os.makedirs(self.run_dir, exist_ok=True)
         run_file_corrections = os.path.join(self.run_dir, 'run_05_mintpy_corrections')
 

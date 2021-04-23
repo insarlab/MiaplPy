@@ -6,7 +6,7 @@
 import os
 import shutil
 import glob
-from natsort import natsorted
+#from natsort import natsorted
 from mintpy.objects.coord import coordinate
 import h5py
 from mintpy.utils import readfile
@@ -50,7 +50,7 @@ class OutControl:
         """Removes files with zero size or zero length (*.e files in run_files)."""
 
         error_files = glob.glob(self.run_file + '*.e')
-        error_files = natsorted(error_files)
+        error_files.sort() # = natsorted(error_files)
         for item in error_files:
             if os.path.getsize(item) == 0:  # remove zero-size files
                 os.remove(item)
@@ -66,7 +66,7 @@ class OutControl:
         # need to add for PBS. search_string='Terminated'
         search_string = 'Exited with exit code'
 
-        files = natsorted(files)
+        files.sort() # = natsorted(files)
         for file in files:
             with open(file) as fr:
                 lines = fr.readlines()

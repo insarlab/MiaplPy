@@ -59,7 +59,8 @@ def main(iargs=None):
         num_cores = cpu_count
     else:
         num_cores = num_workers
-
+    
+    print('Number of parallel tasks: {}'.format(num_cores))
     pool = mp.Pool(num_cores, init_worker)
     data_kwargs = inversionObj.get_datakwargs()
     os.makedirs(data_kwargs['out_dir'].decode('UTF-8') + '/PATCHES', exist_ok=True)
