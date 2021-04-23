@@ -77,7 +77,8 @@ def main(iargs=None):
         app.run(steps=inps.runSteps)
 
     if inps.plot or (app.template['mintpy.plot'] and len(inps.runSteps) > 1):
-        app.plot_result()
+        if inps.runSteps[-1] in STEP_LIST[5::]:
+            app.plot_result()
 
     app.close()
 
