@@ -878,7 +878,7 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
     inps.skip_ref = True
     inps.minNormVelocity = False
     inps.minRedundancy = 1
-    inps.maskDataset = 'coherence'
+    inps.maskDataset = None     # 'coherence'
     inps.maskThreshold = 0.4
     inps.weightFunc = 'no'
     inps.outfile = ['timeseries.h5', 'temporalCoherence.h5', 'numInvIfgram.h5']
