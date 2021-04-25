@@ -878,8 +878,8 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
     inps.skip_ref = True
     inps.minNormVelocity = False
     inps.minRedundancy = 1
-    inps.maskDataset = None     # 'coherence'
-    inps.maskThreshold = 0.4
+    inps.maskDataset = 'coherence'
+    inps.maskThreshold = 0.0
     inps.weightFunc = 'no'
     inps.outfile = ['timeseries.h5', 'temporalCoherence.h5', 'numInvIfgram.h5']
     inps.tsFile, inps.invQualityFile, inps.numInvFile = inps.outfile
@@ -914,6 +914,9 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
     # 1.0 read minopy quality
     quality_name = template['quality_file']
     quality = np.memmap(quality_name, mode='r', dtype='float32', shape=(length, width))
+
+    with h5py.File(os.path.join(work_dir, 'avgSpatialCoh.h5'), 'r') as dsa:
+        avgSpCoh = dsa['coherence'][:, :]
 
 
     # 1.1 read values on the reference pixel
@@ -1058,6 +1061,9 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
         # and  2D block in         [y0, y1, x0, x1]
         # time-series - 3D
         block = [0, num_date, box[1], box[3], box[0], box[2]]
+        avgSpCoh_p = avgSpCoh[box[1]:box[3], box[0]:box[2]].reshape(1, (box[3]-box[1]), (box[2]-box[0]))
+        avgSpCoh_p = np.repeat(avgSpCoh_p, num_date, axis=0)
+        ts[avgSpCoh_p < 0.6] = np.nan
         writefile.write_hdf5_block(inps.tsFile,
                                    data=ts,
                                    datasetName='timeseries',
@@ -1066,9 +1072,9 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
         # temporal coherence - 2D
         block = [box[1], box[3], box[0], box[2]]
         temp_coh = quality[box[1]:box[3], box[0]:box[2]]
-        #inv_quality = (inv_quality > 0.7) * temp_coh
+        inv_quality = (inv_quality > 0.4) * temp_coh
         writefile.write_hdf5_block(inps.invQualityFile,
-                                   data=temp_coh,
+                                   data=inv_quality,
                                    datasetName=inv_quality_name,
                                    block=block)
 
