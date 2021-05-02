@@ -533,7 +533,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_commands = []
 
         num_cpu = os.cpu_count()
-        ntiles = num_pixels / 2000000
+        ntiles = num_pixels / 4000000
         if ntiles > 1:
             x_tile = int(math.sqrt(ntiles)) + 1
             y_tile = x_tile
@@ -579,7 +579,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 run_commands.append(cmd)
 
             # print(cmd)
-            run_commands.append(cmd)
+            # run_commands.append(cmd)
 
         run_commands.append('wait\n\n')
 
