@@ -539,6 +539,8 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
         block = [box[1], box[3], box[0], box[2]]
         temp_coh = quality[box[1]:box[3], box[0]:box[2]]
         inv_quality = (inv_quality > 0.4) * temp_coh
+        avgSpCoh_p = avgSpCoh[box[1]:box[3], box[0]:box[2]]
+        inv_quality[avgSpCoh_p < 0.6] = 0.0
         writefile.write_hdf5_block(inps.invQualityFile,
                                    data=inv_quality,
                                    datasetName=inv_quality_name,
@@ -757,3 +759,6 @@ def multilook(infile, outfile, rlks, alks, multilook_tool='gdal'):
         lkObj.looks()
 
     return outfile
+
+##########################################
+
