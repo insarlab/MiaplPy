@@ -2,15 +2,17 @@
 # Author: Sara Mirzaee
 
 import os
-import datetime
 import numpy as np
 import argparse
-
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import minimum_spanning_tree
+#import matplotlib.pyplot as plt
 
 def cmd_line_parse(iargs=None):
     parser = argparse.ArgumentParser(description='find the minimum number of connected good interferograms')
     parser.add_argument('-b', '--baselineDir', dest='baseline_dir', type=str, help='baseline directory')
     parser.add_argument('-o', '--outFile', dest='out_file', type=str, default='./bestints.txt', help='output text file')
+    parser.add_argument('-t', '--temporalBaseline', dest='threshold', type=int, help='temporal baseline threshold')
     inps = parser.parse_args(args=iargs)
     return inps
 
@@ -19,11 +21,20 @@ def main(iargs=None):
     inps = cmd_line_parse(iargs)
 
     bf = os.listdir(inps.baseline_dir)
+    if not bf[0].endswith('txt'):
+        bf2 = ['{}/{}.txt'.format(d, d) for d in bf]
+    else:
+        bf2 = bf
     baselines = []
-    for d in bf:
+    for d in bf2:
+        print(d)
         with open(os.path.join(inps.baseline_dir, d), 'r') as f:
             lines = f.readlines()
-            baseline = lines[1].split('PERP_BASELINE_TOP')[1]
+            #print(d)
+            if 'Bperp (average):' in lines[1]:
+                baseline = lines[1].split('Bperp (average):')[1]
+            else:
+                baseline = lines[1].split('PERP_BASELINE_TOP')[1]
             baselines.append(baseline)
 
     baselines = [float(x.split('\n')[0].strip()) for x in baselines]
@@ -38,88 +49,46 @@ def main(iargs=None):
     dates = [x[0] for x in db_tuples]
     baselines = [x[1] for x in db_tuples]
 
-    dates_val = [datetime.datetime.strptime(x, '%Y%m%d') for x in dates]
+    q = np.zeros([len(dates), len(dates)])
 
-    date11 = []
-    date22 = []
-    bs_ifgs = []
-
-    for i, ds in enumerate(dates_val):
-        t = np.arange(i + 1, i + 6)
+    for i, ds in enumerate(dates):
+        t = np.arange(i - inps.threshold, i + inps.threshold)
         t = t[t >= 0]
-        t = t[t <= len(dates_val)]
+        t = t[t < len(dates)]
         if len(t) > 0:
-            for m in range(t[0], t[-1]):
-                if np.abs(ds - dates_val[m]).days < 100:
-                    date11.append(ds)
-                    date22.append(dates_val[m])
-                    bs_ifgs.append(baselines[i] - baselines[m])
+            for m in range(t[0], t[-1] + 1):
+                q[i, m] = np.abs(baselines[i] - baselines[m])
+                q[m, i] = q[i, m]
+        
+        #if len(t) > 3:
+        #    ss = np.where(q[i, :] == np.max(q[i, :]))[0]
+        #    q[i,ss]=0 
 
-    date1 = [x.strftime("%Y%m%d") for x in date11]
-    date2 = [x.strftime("%Y%m%d") for x in date22]
-    ifg_tuple = [(x, y) for x, y in zip(date11, date22)]
+    X = csr_matrix(q)
+    Tcsr = minimum_spanning_tree(X)
+    A = Tcsr.toarray()
+    
+    A = q
+    A[A>200] = 0
 
-    intd1 = []
-    intd2 = []
-    intd = []
-    ind_taken = []
+    for i in range(len(dates)):
+        if len(np.nonzero(A[i,:])[0]) <= 1:
+            A[i,:] = 0
+            print(dates[i])
+    
+    A = np.triu(q) 
+    
+    ind1, ind2 = np.where(A > 0)
+    intdates = ['{}_{}\n'.format(dates[g], dates[h]) for g, h in zip(ind1, ind2)]
+    intdates_test = ['{}_{}, {}, {}, {}\n'.format(dates[g], dates[h], str(baselines[g]),
+                                             str(baselines[h]), str(baselines[g] - baselines[h]))
+                for g, h in zip(ind1, ind2)]
 
-    intdates = []
+    #for x in intdates:
+    #    print(x)
 
-    for g, tdate in enumerate(dates_val):
-        later_check = np.any(np.array(intd2) > tdate)
-        if later_check:
-           indi = list(np.where(np.array(date11) == tdate)[0]) + list(np.where(np.array(date22) == tdate)[0])
-        else:
-           indi = list(np.where(np.array(date11) == tdate)[0])
-
-        indi = list(set(indi) - set(ind_taken))
-
-        bsm = np.array([bs_ifgs[i] for i in indi])
-        bsm_sort = np.sort(np.abs(bsm))
-        if len(bsm) == 0:
-            continue
-
-        ind2 = int(np.where(np.abs(bsm) == bsm_sort[0])[0])
-        ind = indi[ind2]
-
-        i = 0
-        while date22[ind] == tdate:
-            i += 1
-            if i == len(bsm_sort):
-                break
-            ind2 = int(np.where(np.abs(bsm) == bsm_sort[i])[0])
-            ind = indi[ind2]
-
-        stat = True
-
-        for ifg in intd:
-            if ifg[0] < date11[ind] and ifg[1] > date11[ind]:
-                dist1 = baselines[dates_val.index(ifg[0])] - baselines[dates.index(date1[ind])]
-                dist2 = baselines[dates.index(date2[ind])] - baselines[dates.index(date1[ind])]
-                if abs(dist1) < abs(dist2):
-                    ind = ifg_tuple.index((ifg[0], date11[ind]))
-                    intd1.append(date11[ind])
-                    intd2.append(date22[ind])
-                    intd.append((date11[ind], date22[ind]))
-                    ind_taken.append(ind)
-                    #print(date1[ind], date2[ind], str(bs_ifgs[ind]))
-                    #intdates.append(
-                    #    '{}_{}, {}, {}, {}\n'.format(date1[ind], date2[ind], str(baselines[dates.index(date1[ind])]),
-                    #                                 str(baselines[dates.index(date2[ind])]), str(bs_ifgs[ind])))
-                    intdates.append('{}_{}\n'.format(date1[ind], date2[ind]))
-                    stat = False
-                    break
-
-        if stat:
-            intd1.append(date11[ind])
-            intd2.append(date22[ind])
-            intd.append((date11[ind], date22[ind]))
-            ind_taken.append(ind)
-            #print(date1[ind], date2[ind], str(bs_ifgs[ind]))
-            #intdates.append('{}_{}, {}, {}, {}\n'.format(date1[ind], date2[ind], str(baselines[dates.index(date1[ind])]),
-            #                                             str(baselines[dates.index(date2[ind])]), str(bs_ifgs[ind])))
-            intdates.append('{}_{}\n'.format(date1[ind], date2[ind]))
+    with open(os.path.join(os.path.dirname(inps.out_file), 'test.txt'), 'w') as f:
+        f.writelines(intdates_test)
 
     with open(inps.out_file, 'w') as f:
         f.writelines(intdates)

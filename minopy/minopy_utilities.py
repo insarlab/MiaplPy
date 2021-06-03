@@ -526,10 +526,7 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
         # with 3D block in [z0, z1, y0, y1, x0, x1]
         # and  2D block in         [y0, y1, x0, x1]
         # time-series - 3D
-        block = [0, num_date, box[1], box[3], box[0], box[2]]
-        avgSpCoh_p = avgSpCoh[box[1]:box[3], box[0]:box[2]].reshape(1, (box[3]-box[1]), (box[2]-box[0]))
-        avgSpCoh_p = np.repeat(avgSpCoh_p, num_date, axis=0)
-        ts[avgSpCoh_p < 0.6] = np.nan
+        block = [0, num_date, box[1], box[3], box[0], box[2]] 
         writefile.write_hdf5_block(inps.tsFile,
                                    data=ts,
                                    datasetName='timeseries',
@@ -537,10 +534,9 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
 
         # temporal coherence - 2D
         block = [box[1], box[3], box[0], box[2]]
-        temp_coh = quality[box[1]:box[3], box[0]:box[2]]
-        inv_quality = (inv_quality > 0.4) * temp_coh
-        avgSpCoh_p = avgSpCoh[box[1]:box[3], box[0]:box[2]]
-        inv_quality[avgSpCoh_p < 0.6] = 0.0
+        #temp_coh = quality[box[1]:box[3], box[0]:box[2]]
+        inv_quality[:, :] = quality[box[1]:box[3], box[0]:box[2]]
+        inv_quality[inv_quality<=0] = np.nan
         writefile.write_hdf5_block(inps.invQualityFile,
                                    data=inv_quality,
                                    datasetName=inv_quality_name,

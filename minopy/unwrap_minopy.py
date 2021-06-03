@@ -135,7 +135,7 @@ class Snaphu:
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = p.communicate()
         print(error)
-        if 'ERROR' in error.decode('UTF-8') or len(error.decode('UTF-8'))>0:
+        if 'ERROR' in error.decode('UTF-8') or 'Error' in error.decode('UTF-8'): # or len(error.decode('UTF-8'))>0:
             raise RuntimeError(error)
         
         if os.path.exists(self.out_unwrapped):
@@ -161,7 +161,7 @@ class Snaphu:
         output, error = p.communicate()
         print(error)
 
-        if 'ERROR' in error.decode('UTF-8') or len(error.decode('UTF-8'))>0:
+        if 'ERROR' in error.decode('UTF-8') or 'Error' in error.decode('UTF-8'):  # or len(error.decode('UTF-8'))>0:
            raise RuntimeError(error)  
         
         if os.path.exists(self.out_unwrapped):
