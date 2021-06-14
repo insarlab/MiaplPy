@@ -54,6 +54,11 @@ Please follow the [guidelines](./CONTRIBUTING.md) for contributing to the code
 
 ### 4. Citation ###
 
-Sara. Mirzaee , Falk. Amelung, Heresh Fattahi, "Non-linear phase inversion package for time series analysis (MiNoPy)", AGUFM, 2019, pp.G13C0572M
+S. Mirzaee, F. Amelung, and H. Fattahi, Non-linear phase inversion package for time series
+analysis, in AGU Fall Meeting Abstracts, Dec. 2019, vol. 2019, pp. G13C-0572.
+
+S. Mirzaee and F. Amelung, Volcanic Activity Change Detection Using SqueeSAR-InSAR and
+Backscatter Analysis, in AGU Fall Meeting Abstracts, Dec. 2018, vol. 2018, pp. G41B-0707.
+
 
 
