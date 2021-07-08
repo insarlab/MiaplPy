@@ -22,15 +22,15 @@ Interferograms are then unwrapped and different corrections are applied on the f
 Everything is followed by defined steps in the `minopyApp.py` and the input is a text file containing adjustable options (template_file)
 
 examples:
-
+```
 - minopyApp.py template_file
 - minopyApp.py template_file --start crop --stop unwrap
 - minopyApp.py template_file --dostep ifgrams
+```
 
+Use `minopyApp.py -H` for a complete list of required options.
 
-Use 'minopyApp.py -H' for a complete list of required options.
-
-Use 'minopyApp.py -h' for a help on the steps you need to run 
+Use `minopyApp.py -h` for a help on the steps you need to run 
 
 -- Note:
 Inversion step may take long time depending on the number of pixels in the subset area you are processing and number of images. 
