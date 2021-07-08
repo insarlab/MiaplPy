@@ -1,6 +1,5 @@
 [![Language](https://img.shields.io/badge/python-3.5%2B-blue.svg)](https://www.python.org/)
 
-#### NOTICE: Under development... ####
 
 ## MiNoPy ##
 *MIami NOn linear phase inversion in PYthon*
