@@ -45,7 +45,7 @@ class MinoPyParser:
         elif self.script == 'unwrap_minopy':
             self.parser = self.unwrap_parser()
         elif self.script == 'minopy_app':
-            self.parser, self.STEP_LIST = self.minopy_app_parser()
+            self.parser, self.STEP_LIST, self.STEP_JOBS = self.minopy_app_parser()
 
         inps = self.parser.parse_args(args=self.iargs)
 
@@ -94,6 +94,7 @@ class MinoPyParser:
     def out_minopy_app(self, sinps):
         inps = sinps
         STEP_LIST = self.STEP_LIST
+        STEP_JOBS = self.STEP_JOBS
         template_file = os.path.join(os.path.abspath(os.getenv('MINOPY_HOME')), 'defaults/minopy_template.cfg')
 
         # print default template
@@ -142,10 +143,21 @@ class MinoPyParser:
         if not inps.startStep == 'multilook':
             idx0 = STEP_LIST.index(inps.startStep)
             idx1 = STEP_LIST.index(inps.endStep)
+
             if idx0 > idx1:
                 msg = 'input start step "{}" is AFTER input end step "{}"'.format(inps.startStep, inps.endStep)
                 raise ValueError(msg)
-            inps.runSteps = STEP_LIST[idx0:idx1 + 1]
+
+            if inps.write_job:
+                idx0 = STEP_JOBS.index(inps.startStep)
+                if inps.endStep in STEP_JOBS:
+                    idx1 = STEP_JOBS.index(inps.endStep)
+                else:
+                    idx1 = len(STEP_JOBS)
+                inps.runSteps = STEP_JOBS[idx0:idx1 + 1]
+            else:
+                inps.runSteps = STEP_LIST[idx0:idx1 + 1]
+
         else:
             inps.runSteps = ['multilook']
             idx0 = STEP_LIST.index('ifgrams')
@@ -367,6 +379,12 @@ class MinoPyParser:
             'google_earth',
             'hdfeos5']
 
+        STEP_JOBS = ['crop',
+            'inversion',
+            'ifgrams',
+            'unwrap',
+            'write_correction_job']
+
 
         STEP_HELP = """Command line options for steps processing with names are chosen from the following list:
         {}
@@ -424,7 +442,7 @@ class MinoPyParser:
         step.add_argument('--job', dest='write_job', action='store_true',
                           help=' do not run tasks created in [inversion, ifgrams, unwrap] steps, only write their job')
 
-        return parser, STEP_LIST
+        return parser, STEP_LIST, STEP_JOBS
 
 
 
