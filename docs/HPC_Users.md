@@ -4,7 +4,7 @@ In this workflow, you need to create jobs and then run them in order
 
 To create jobs, run:
 ```
-minopyApp.py $template_file --dir minopy --job
+minopyApp.py $PWD/PichinchaSenAT18.template --dir minopy --job
 ```
 After the jobs are created, you may run them with appropriate submit commands. MinSAR provides `sbatch_conditional.bash` to further 
 limit number of submitting jobs:
