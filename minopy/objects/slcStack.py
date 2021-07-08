@@ -78,7 +78,7 @@ class slcStackDict:
         return self.numSlc, self.length, self.width
 
     def get_date_list(self):
-        self.dateList = self.pairsDict.keys()
+        self.dateList = sorted([date for date in self.pairsDict.keys()])
         return self.dateList
 
     def get_metadata(self):
