@@ -10,9 +10,9 @@ After the jobs are created, you may run them with appropriate submit commands. M
 limit number of submitting jobs:
 
 ```
-sbatch_conditional.bash minopy/run_files/run_01 
-sbatch_conditional.bash minopy/run_files/run_02
-sbatch_conditional.bash minopy/run_files/run_03
-sbatch_conditional.bash minopy/run_files/run_04
-sbatch_conditional.bash minopy/run_files/run_05
+sbatch_conditional.bash minopy/run_files/run_01_minopy_crop 
+sbatch_conditional.bash minopy/run_files/run_02_phase_inversion
+sbatch_conditional.bash minopy/run_files/run_03_minopy_ifgrams
+sbatch_conditional.bash minopy/run_files/run_04_minopy_un-wrap
+sbatch_conditional.bash minopy/run_files/run_05_mintpy_corrections
 ```
