@@ -61,6 +61,7 @@ def main(iargs=None):
         return
 
     iDict = read_subset_box(iDict)
+
     extraDict = mld.get_extra_metadata(iDict)
 
     # initiate objects
@@ -245,7 +246,6 @@ def read_subset_box(inpsDict):
         atr = read_attribute(file.split('.xml')[0], metafile_ext='.rsc')
     except:
         atr = dict()
-
     geocoded = None
     if 'Y_FIRST' in atr.keys():
         geocoded = True
@@ -268,8 +268,8 @@ def read_subset_box(inpsDict):
             fnames = ut.get_file_list(inpsDict['MINOPY.load.slcFile'])
             pix_box = update_box4files_with_inconsistent_size(fnames)
 
-        if not pix_box:
-            return inpsDict
+        #if not pix_box:
+        #    return inpsDict
 
     # geo_box --> pix_box
     coord = coord_rev(atr, lookup_file=lookupFile)
@@ -288,9 +288,12 @@ def read_subset_box(inpsDict):
             box4geo_lut = ut.coordinate(atrLut).bbox_geo2radar(geo_box)
             print('box to read for geocoded lookup file in y/x: {}'.format(box4geo_lut))
 
-    inpsDict['box'] = pix_box
-    inpsDict['box4geo_lut'] = box4geo_lut
-    return inpsDict
+    if pix_box in [None, 'None']:
+        pix_box = (0, 0, int(atr['WIDTH']), int(atr['LENGTH']))
+
+    atr['box'] = pix_box
+    atr['box4geo_lut'] = box4geo_lut
+    return atr
 
 
 #################################################################
