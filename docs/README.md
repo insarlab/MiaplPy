@@ -48,6 +48,7 @@ cd PichinchaSenAT18
 minopyApp.py PichinchaSenAT18.template 
 ```
 
+[Guide for University of Miami HPC users](./HPC_Users.md)
 
 ### 3. Contribution ###
 Please follow the [guidelines](./CONTRIBUTING.md) for contributing to the code
