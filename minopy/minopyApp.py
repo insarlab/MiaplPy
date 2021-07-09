@@ -324,8 +324,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         inps.out_dir = self.run_dir
         inps.custom_template_file = self.customTemplateFile
 
-        run_file_inversion = os.path.join(self.run_dir, 'run_02_phase_inversion')
-
         scp_args = '--workDir {a0} --rangeWin {a1} --azimuthWin {a2} --method {a3} --test {a4} ' \
                    '--patchSize {a5} --numWorker {a6}'.format(a0=self.workDir,
                                                               a1=self.template['MINOPY.inversion.range_window'],
@@ -355,10 +353,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             command_line1 = command_line1 + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
             command_line2 = '\nrm /tmp/slcStack.h5\n'
             run_commands = command_line0 + command_line1 + command_line2
-            job_name = os.path.join(self.run_dir, 'run_02_phase_inversion.job')
+            job_name = os.path.join(self.run_dir, 'run_02_minopy_inversion.job')
 
             job_obj.get_memory_walltime(job_name)
-            job_obj.write_single_job_file(job_name=job_name, job_file_name='run_02_phase_inversion',
+            job_obj.write_single_job_file(job_name=job_name, job_file_name='run_02_minopy_inversion',
                                           command_line=run_commands, work_dir=self.run_dir,
                                           number_of_nodes=self.num_nodes)
 
