@@ -35,10 +35,10 @@ else
     fi
 fi
 template_file=$1
-if [[ $PROJECT_NAME == "minopy_template.cfg"]]; then
+if [[ $PROJECT_NAME == "minopy_template.cfg" ]]; then
   template_real_path = $(realpath "$1")
   WORK_DIR=$( dirname "$template_real_path")
-else;
+else
   WORK_DIR=$SCRATCHDIR/$PROJECT_NAME/minopy
 fi
 
