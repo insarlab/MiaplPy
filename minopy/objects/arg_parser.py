@@ -181,15 +181,16 @@ class MinoPyParser:
                 print('--dostep option enabled, disable the plotting at the end of the processing.')
                 inps.plot = False
 
-        current_dir = os.getcwd()
+        path1 = os.path.dirname(inps.customTemplateFile)
+        path2 = path1 + '/minopy'
+
         if not inps.workDir:
-            if 'minopy' in current_dir:
-                inps.workDir = current_dir.split('minopy')[0] + 'minopy'
+            if path1.endswith('minopy'):
+                inps.workDir = path1
             else:
-                inps.workDir = os.path.join(current_dir, 'minopy')
-
+                inps.workDir = path2
         inps.workDir = os.path.abspath(inps.workDir)
-
+         
         inps.project_name = None
         if inps.customTemplateFile and not os.path.basename(inps.customTemplateFile) == 'minopy_template.cfg':
             inps.project_name = os.path.splitext(os.path.basename(inps.customTemplateFile))[0]
