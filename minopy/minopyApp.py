@@ -100,16 +100,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         self.customTemplateFile = customTemplateFile
         self.cwd = os.path.abspath(os.getcwd())
-
         # 1. Go to the work directory
         # 1.1 Get workDir
-        current_dir = os.getcwd()
-        if not self.workDir:
-            if 'minopy' in current_dir:
-                self.workDir = current_dir.split('minopy')[0] + 'minopy'
-            else:
-                self.workDir = os.path.join(current_dir, 'minopy')
-        self.workDir = os.path.abspath(self.workDir)
 
         # 2. Get project name
         self.project_name = None
@@ -186,6 +178,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.num_nodes = int(self.template['MINOPY.parallel.num_nodes'])
 
         slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
+
         if os.path.exists(slc_file):
             slcObj = slcStack(slc_file)
             slcObj.open(print_msg=False)
