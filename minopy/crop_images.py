@@ -50,6 +50,8 @@ def main(iargs=None):
     Parser = MinoPyParser(iargs, script='crop_images')
     inps = Parser.parse()
 
+    os.chdir(inps.work_dir)
+
     # read input options
     iDict = read_inps2dict(inps)
     
@@ -66,6 +68,7 @@ def main(iargs=None):
 
     # initiate objects
     stackObj = read_inps_dict2slc_stack_dict_object(iDict)
+    
     geomRadarObj, geomGeoObj = read_inps_dict2geometry_dict_object(iDict)
 
     # prepare write
@@ -287,13 +290,17 @@ def read_subset_box(inpsDict):
             geo_box = coord.bbox_radar2geo(pix_box)
             box4geo_lut = ut.coordinate(atrLut).bbox_geo2radar(geo_box)
             print('box to read for geocoded lookup file in y/x: {}'.format(box4geo_lut))
-
+    
     if pix_box in [None, 'None']:
         pix_box = (0, 0, int(atr['WIDTH']), int(atr['LENGTH']))
+    
+    for key in atr:
+        if not key in inpsDict or inpsDict[key] in [None, 'NONE']:
+            inpsDict[key] = atr[key]
 
-    atr['box'] = pix_box
-    atr['box4geo_lut'] = box4geo_lut
-    return atr
+    inpsDict['box'] = pix_box
+    inpsDict['box4geo_lut'] = box4geo_lut
+    return inpsDict
 
 
 #################################################################
@@ -462,6 +469,8 @@ def update_object(outFile, inObj, box, updateMode=True):
 
 def read_inps_dict2geometry_dict_object(inpsDict):
     # eliminate dsName by processor
+    if not 'processor' in inpsDict and 'PROCESSOR'in inpsDict:
+        inpsDict['processor'] = inpsDict['PROCESSOR']
     if inpsDict['processor'] in ['isce', 'doris']:
         datasetName2templateKey.pop('azimuthCoord')
         datasetName2templateKey.pop('rangeCoord')
