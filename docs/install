@@ -1,3 +1,11 @@
 #! /bin/bash
 cd $MINOPY_HOME/minopy/lib;
-python setup.py 
+python setup.py
+echo 'Installing snaphu...';
+cd $MINOPY_HOME;
+wget https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/snaphu-v2.0.4.tar.gz
+tar -xvf snaphu-v2.0.4.tar.gz
+mv snaphu-v2.0.4 snaphu;
+rm snaphu-v2.0.4.tar.gz;
+sed -i 's/\/usr\/local/$(MINOPY_HOME)\/snaphu/g' snaphu/src/Makefile
+cd snaphu/src; make
