@@ -11,7 +11,7 @@ limit number of submitting jobs:
 
 ```
 sbatch_conditional.bash minopy/run_files/run_01_minopy_crop 
-sbatch_conditional.bash minopy/run_files/run_02_phase_inversion
+sbatch_conditional.bash minopy/run_files/run_02_minopy_inversion
 sbatch_conditional.bash minopy/run_files/run_03_minopy_ifgrams
 sbatch_conditional.bash minopy/run_files/run_04_minopy_un-wrap
 sbatch_conditional.bash minopy/run_files/run_05_mintpy_corrections
