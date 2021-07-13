@@ -233,7 +233,11 @@ def get_auto_path(processor, work_dir, template=dict()):
     if m_date12:
         var_dict['${m_date12}'] = m_date12
 
-    var_dict['${int_type}'] = template['MINOPY.interferograms.type']
+    if not template['MINOPY.interferograms.list'] in [None, 'None', 'auto']:
+        var_dict['${int_type}'] = 'list'
+    else:
+        var_dict['${int_type}'] = template['MINOPY.interferograms.type']
+
     if processor == 'isceStripmap':
         if template['MINOPY.load.metaFile'] == 'auto':
 
