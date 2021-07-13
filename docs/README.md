@@ -23,7 +23,7 @@ Everything is followed by defined steps in the `minopyApp.py` and the input is a
 examples:
 ```
 - minopyApp.py template_file
-- minopyApp.py template_file --start crop --stop unwrap
+- minopyApp.py template_file --start load_slc --stop unwrap
 - minopyApp.py template_file --dostep ifgrams
 ```
 
