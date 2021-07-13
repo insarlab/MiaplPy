@@ -23,7 +23,7 @@ as_logger.setLevel(logging.WARNING)
 
 # expose the following modules
 __all__ = [
-    'crop_images',
+    'load_slc',
     'generate_interferograms',
     'phase_inversion',
     'load_int',
