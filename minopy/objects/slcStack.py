@@ -182,7 +182,8 @@ class slcStackDict:
                                                                           t=str(dsDataType),
                                                                           s=dsShape))
         data = np.array(self.dates, dtype=dsDataType)
-        f.create_dataset(dsName, data=data)
+        if not dsName in f.keys():
+            f.create_dataset(dsName, data=data)
 
         ###############################
         # 1D dataset containing perpendicular baseline of all pairs
@@ -194,7 +195,8 @@ class slcStackDict:
                                                                           t=str(dsDataType),
                                                                           s=dsShape))
         data = np.array(self.bperp, dtype=dsDataType)
-        f.create_dataset(dsName, data=data)
+        if not dsName in f.keys():
+            f.create_dataset(dsName, data=data)
         
 
         ###############################

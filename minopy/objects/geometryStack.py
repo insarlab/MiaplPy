@@ -188,7 +188,8 @@ class geometryDict(GDict):
                                                  t=str(dsDataType),
                                                  s=dsShape))
                 data = np.array(self.dateList, dtype=dsDataType)
-                ds = f.create_dataset(dsName, data=data)
+                if not dsName in f.keys():
+                    ds = f.create_dataset(dsName, data=data)
 
             # 2D datasets containing height, latitude, incidenceAngle, shadowMask, etc.
             else:
@@ -204,10 +205,11 @@ class geometryDict(GDict):
                                                          c=str(compression)))
 
                 data = np.array(self.read(family=dsName, box=box)[0], dtype=dsDataType)
-                ds = f.create_dataset(dsName,
-                                      data=data,
-                                      chunks=True,
-                                      compression=compression)
+                if not dsName in f.keys():
+                    ds = f.create_dataset(dsName,
+                                          data=data,
+                                          chunks=True,
+                                          compression=compression)
 
         ###############################
         # Generate Dataset if not existed in binary file: incidenceAngle, slantRangeDistance
@@ -230,11 +232,12 @@ class geometryDict(GDict):
                                                          t=str(dsDataType),
                                                          s=dsShape,
                                                          c=str(compression)))
-                ds = f.create_dataset(dsName,
-                                      data=data,
-                                      dtype=dataType,
-                                      chunks=True,
-                                      compression=compression)
+                if not dsName in f.keys():
+                    ds = f.create_dataset(dsName,
+                                          data=data,
+                                          dtype=dataType,
+                                          chunks=True,
+                                          compression=compression)
 
         ###############################
         # Attributes
