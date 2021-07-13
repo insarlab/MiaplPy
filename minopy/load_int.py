@@ -96,8 +96,8 @@ NOTE = """NOTE:
 
 EXAMPLE = """example:
   load_data.py -t GalapagosSenDT128.tempalte
-  load_data.py -t smallbaselineApp.cfg
-  load_data.py -t smallbaselineApp.cfg GalapagosSenDT128.tempalte --project GalapagosSenDT128
+  load_data.py -t minopy_template.cfg
+  load_data.py -t minopy_template.cfg GalapagosSenDT128.tempalte --project GalapagosSenDT128
   load_data.py -H #Show example input template for ISCE/ROI_PAC/GAMMA products
 """
 
@@ -567,11 +567,12 @@ def update_object(outFile, inObj, box, updateMode=True):
 
 
 def prepare_metadata(inpsDict):
+
     processor = inpsDict['processor']
     script_name = 'prep_{}.py'.format(processor)
     print('-'*50)
     print('prepare metadata files for {} products'.format(processor))
-    
+
     if processor in ['gamma', 'roipac', 'snap']:
         for key in [i for i in inpsDict.keys() if (i.startswith('MINOPY.load.') and i.endswith('File'))]:
             if len(glob.glob(str(inpsDict[key]))) > 0:
@@ -638,6 +639,9 @@ def get_extra_metadata(inpsDict):
 #################################################################
 def main(iargs=None):
     inps = cmd_line_parse(iargs)
+
+    work_dir = os.path.dirname(inps.outdir)
+    os.chdir(work_dir)
 
     # read input options
     inpsDict = read_inps2dict(inps)
