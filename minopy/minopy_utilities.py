@@ -336,9 +336,16 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
               'minRedundancy',
               'minNormVelocity']
  
-    inps.waterMaskFile = os.path.join(work_dir, 'waterMask.h5')
+    #inps.waterMaskFile = os.path.join(work_dir, 'waterMask.h5')
+    inps.waterMaskFile = template['mintpy.unwrapError.waterMaskFile']
     if not os.path.exists(inps.waterMaskFile):
-       inps.waterMaskFile = None 
+       inps.waterMaskFile = None
+    else:
+        with h5py.File(inps.waterMaskFile, 'r') as f2:
+            if 'waterMask' in f2:
+                water_mask = f2['waterMask'][:,:]
+            else:
+                water_mask = f2['mask'][:,:]
     
     inps.ifgramStackFile = os.path.join(work_dir, 'inputs/ifgramStack.h5')
     inps.skip_ref = True
@@ -537,6 +544,8 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
         #temp_coh = quality[box[1]:box[3], box[0]:box[2]]
         inv_quality[:, :] = quality[box[1]:box[3], box[0]:box[2]]
         inv_quality[inv_quality<=0] = np.nan
+        water_mask_box = water_mask[box[1]:box[3], box[0]:box[2]]
+        inv_quality[water_mask_box<0.5] = np.nan
         writefile.write_hdf5_block(inps.invQualityFile,
                                    data=inv_quality,
                                    datasetName=inv_quality_name,
@@ -643,13 +652,17 @@ def get_phase_linking_coherence_mask(template, work_dir, functions):
     add_attribute = functions[3]
 
     tcoh_file = os.path.join(work_dir, 'temporalCoherence.h5')
-    water_mask_file = os.path.join(work_dir, 'waterMask.h5')
+    water_mask_file = template['mintpy.unwrapError.waterMaskFile']
+    #water_mask_file = os.path.join(work_dir, 'waterMask.h5')
     mask_file = os.path.join(work_dir, 'maskTempCoh.h5')
     
     if os.path.exists(water_mask_file):
         f1 = h5py.File(tcoh_file, 'a')
         f2 = h5py.File(water_mask_file, 'r')
-        water_mask = f2['waterMask']
+        if 'waterMask' in f2:
+            water_mask = f2['waterMask']
+        else:
+            water_mask = f2['mask']
         f1['temporalCoherence'][:, :] = np.multiply(f1['temporalCoherence'], water_mask)
         f1.close()
         f2.close()
