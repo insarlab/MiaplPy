@@ -567,7 +567,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
             #corr_file = os.path.join(out_dir, 'filt_fine.cor')
 
-            scp_args = '--ifg {a1} --correlation_file {a2} --unwrapped_ifg {a3} '\
+            scp_args = '--ifg {a1} --coherence {a2} --unwrapped_ifg {a3} '\
                        '--max_discontinuity {a4} --init_method {a5} ' \
                        '--length {a6} --width {a7} --height {a8} --num_tiles {a9} ' \
                        '--earth_radius {a10} --wavelength {a11}'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
