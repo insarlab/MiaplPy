@@ -6,12 +6,16 @@ To create jobs, run:
 ```
 minopyApp.py $PWD/PichinchaSenAT18.template --dir minopy --job
 ```
-After the jobs are created, you may run them with appropriate submit commands. MinSAR provides `sbatch_conditional.bash` to further 
-limit number of submitting jobs:
+After the jobs are created, you may run them with one of the appropriate submit commands:
+```
+submit_jobs.bash $PWD/PichinchaSenAT18.template --minopy
+submit_jobs.bash $PWD/PichinchaSenAT18.template --dostep minopy
+```
+This uses the `sbatch_conditional.bash` commmand, that can be used for individual run_files:
 
 ```
 sbatch_conditional.bash minopy/run_files/run_01_minopy_crop 
-sbatch_conditional.bash minopy/run_files/run_02_phase_inversion
+sbatch_conditional.bash minopy/run_files/run_02_minopy_inversion
 sbatch_conditional.bash minopy/run_files/run_03_minopy_ifgrams
 sbatch_conditional.bash minopy/run_files/run_04_minopy_un-wrap
 sbatch_conditional.bash minopy/run_files/run_05_mintpy_corrections

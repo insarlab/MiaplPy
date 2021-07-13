@@ -18,10 +18,7 @@ export PYTHONPATH=${PYTHONPATH}:${PYAPS_HOME}
 export MINOPY_HOME=~/tools/MiNoPy
 export PYTHONPATH=${PYTHONPATH}:${MINOPY_HOME}
 export PATH=${PATH}:${MINOPY_HOME}/minopy
-
-#---------- snaphu (optional) -------##
-export SNAPHU_HOME=~/tools/snaphu
-export PATH=${PATH}:${SNAPHU_HOME}/bin
+export PATH=${PATH}:${MINOPY_HOME}/snaphu/bin
 
 ```
 #### 2. Download
@@ -71,17 +68,6 @@ $CONDA_PREFIX/bin/pip install git+https://github.com/tylere/pykml.git
 ```
 bash $MINOPY_HOME/docs/install
 ```
-
-#### 5. Install [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/) (optional)
-```
-wget https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/snaphu-v2.0.4.tar.gz
-tar -xvf snaphu-v2.0.4.tar.gz
-mv snaphu-v2.0.4 snaphu
-sed -i 's/\/usr\/local/$(SNAPHU_HOME)/g' snaphu/src/Makefile
-cd snaphu/src; make
-
-```
-
 
 
 ### Notes
