@@ -193,8 +193,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             Parser_LoadSlc = MinoPyParser(scp_args.split(), script='load_slc')
             inps_loadSlc = Parser_LoadSlc.parse()
 
-            #self.template['template_file'] = self.customTemplateFile
             iDict = minopy.load_slc.read_inps2dict(inps_loadSlc)
+            minopy.load_slc.prepare_metadata(iDict)
             self.metadata = minopy.load_slc.read_subset_box(iDict)
             box = self.metadata['box']
             self.num_pixels = (box[2] - box[0]) * (box[3] - box[1])
