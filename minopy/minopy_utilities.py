@@ -335,18 +335,7 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
               'maskThreshold',
               'minRedundancy',
               'minNormVelocity']
- 
-    #inps.waterMaskFile = os.path.join(work_dir, 'waterMask.h5')
-    inps.waterMaskFile = template['mintpy.unwrapError.waterMaskFile']
-    if not os.path.exists(inps.waterMaskFile):
-       inps.waterMaskFile = None
-    else:
-        with h5py.File(inps.waterMaskFile, 'r') as f2:
-            if 'waterMask' in f2:
-                water_mask = f2['waterMask'][:,:]
-            else:
-                water_mask = f2['mask'][:,:]
-    
+
     inps.ifgramStackFile = os.path.join(work_dir, 'inputs/ifgramStack.h5')
     inps.skip_ref = True
     inps.minNormVelocity = False
@@ -390,6 +379,18 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
 
     with h5py.File(os.path.join(work_dir, 'avgSpatialCoh.h5'), 'r') as dsa:
         avgSpCoh = dsa['coherence'][:, :]
+
+    # inps.waterMaskFile = os.path.join(work_dir, 'waterMask.h5')
+    inps.waterMaskFile = template['mintpy.unwrapError.waterMaskFile']
+    if not os.path.exists(inps.waterMaskFile):
+        inps.waterMaskFile = None
+        water_mask = quality * 0 + 1
+    else:
+        with h5py.File(inps.waterMaskFile, 'r') as f2:
+            if 'waterMask' in f2:
+                water_mask = f2['waterMask'][:, :]
+            else:
+                water_mask = f2['mask'][:, :]
 
 
     # 1.1 read values on the reference pixel
@@ -545,7 +546,7 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_w
         inv_quality[:, :] = quality[box[1]:box[3], box[0]:box[2]]
         inv_quality[inv_quality<=0] = np.nan
         water_mask_box = water_mask[box[1]:box[3], box[0]:box[2]]
-        inv_quality[water_mask_box<0.5] = np.nan
+        inv_quality[water_mask_box < 0.5] = np.nan
         writefile.write_hdf5_block(inps.invQualityFile,
                                    data=inv_quality,
                                    datasetName=inv_quality_name,
