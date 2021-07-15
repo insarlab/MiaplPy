@@ -65,6 +65,11 @@ def main(iargs=None):
     data_kwargs = inversionObj.get_datakwargs()
     os.makedirs(data_kwargs['out_dir'].decode('UTF-8') + '/PATCHES', exist_ok=True)
 
+    if int(data_kwargs['n_image']) < 10 and 'sequential' in data_kwargs['phase_linking_method']:
+        new_plmethod = data_kwargs['phase_linking_method'].split('sequential_')[1]
+        print('Number of images less than 10, phase linking method switched to "{}"'.format(new_plmethod))
+        data_kwargs['phase_linking_method'] = new_plmethod
+
     func = partial(iut.process_patch_c, range_window=data_kwargs['range_window'],
                    azimuth_window=data_kwargs['azimuth_window'], width=data_kwargs['width'],
                    length=data_kwargs['length'], n_image=data_kwargs['n_image'],
