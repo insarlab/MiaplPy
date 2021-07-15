@@ -173,8 +173,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.text_cmd in [None, 'None']:
             self.text_cmd = ''
 
-        self.num_workers = int(self.template['MINOPY.parallel.num_workers'])
-        self.num_nodes = int(self.template['MINOPY.parallel.num_nodes'])
+        self.num_workers = int(self.template['MINOPY.compute.num_workers'])
+        self.num_nodes = int(self.template['MINOPY.compute.num_nodes'])
 
         slc_file = os.path.join(self.workDir, 'inputs/slcStack.h5')
 
