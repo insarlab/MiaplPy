@@ -441,7 +441,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                            a7=sensor_type,
                                                            a8=rslc_ref)
 
-            cmd = '{} generate_interferograms.py {}\n'.format(self.text_cmd.strip("'"), scp_args)
+            cmd = '{} generate_interferograms.py {}'.format(self.text_cmd.strip("'"), scp_args)
             cmd = cmd.lstrip()
 
             if not self.write_job:
@@ -577,7 +577,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                                        a5=self.template['MINOPY.unwrap.init_method'],
                                                                        a6=length, a7=width, a8=height, a9= num_cpu,
                                                                        a10=earth_radius, a11=wavelength)
-            cmd = '{} unwrap_minopy.py {}\n'.format(self.text_cmd.strip("'"), scp_args)
+            cmd = '{} unwrap_minopy.py {}'.format(self.text_cmd.strip("'"), scp_args)
             cmd = cmd.lstrip()
 
             if not self.write_job:
