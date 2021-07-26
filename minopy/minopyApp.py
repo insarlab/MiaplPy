@@ -17,28 +17,29 @@ import shutil
 
 from mintpy.utils import writefile, readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
-import minopy.minopy_utilities as mut
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.defaults.auto_path import autoPath, PathFind
-from minopy.objects.utils import check_template_auto_value
+from minopy.objects.utils import (check_template_auto_value,
+                                  log_message, get_latest_template_minopy,
+                                  read_initial_info)
 
 pathObj = PathFind()
 ###########################################################################################
 STEP_LIST = [
     'load_slc',
     'inversion',
-    'ifgrams',
+    'ifgram',
     'unwrap',
-    'load_ifg',
+    'load_ifgram',
     'correct_unwrap_error',
     'phase_to_range',
     'mintpy_corrections']
 
 RUN_FILES = {'load_slc': 'run_01_minopy_load_slc',
              'inversion': 'run_02_minopy_inversion',
-             'ifgrams': 'run_03_minopy_ifgrams',
+             'ifgram': 'run_03_minopy_ifgram',
              'unwrap': 'run_04_minopy_unwrap',
-             'load_ifg': 'run_05_minopy_load_ifg',
+             'load_ifgram': 'run_05_minopy_load_ifgram',
              'correct_unwrap_error': 'run_06_mintpy_correct_unwrap_error',
              'phase_to_range': 'run_07_minopy_phase_to_range',
              'mintpy_corrections': 'run_08_mintpy_corrections'}
@@ -53,9 +54,9 @@ def main(iargs=None):
     inps = Parser.parse()
 
     if not iargs is None:
-        mut.log_message(inps.workDir, os.path.basename(__file__) + ' ' + ' '.join(iargs[:]))
+        log_message(inps.workDir, os.path.basename(__file__) + ' ' + ' '.join(iargs[:]))
     else:
-        mut.log_message(inps.workDir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
+        log_message(inps.workDir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
 
     os.chdir(inps.workDir)
 
@@ -93,7 +94,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         # Read minopy templates and add to mintpy template
         # 1. Get default template file
-        self.templateFile = mut.get_latest_template_minopy(self.workDir)
+        self.templateFile = get_latest_template_minopy(self.workDir)
         # 2. read (custom) template files into dicts
         self._read_template_minopy()
 
@@ -118,7 +119,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.num_nodes = int(self.template['minopy.compute.numNode'])
 
         if not self.inps.generate_template:
-            self.date_list, self.num_pixels, self.metadata = mut.read_initial_info(self.workDir, self.templateFile)
+            self.date_list, self.num_pixels, self.metadata = read_initial_info(self.workDir, self.templateFile)
         os.chdir(self.workDir)
         return
 
@@ -170,9 +171,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             job_obj = None
         self.run_load_slc('load_slc', job_obj)
         self.run_phase_inversion('inversion', job_obj)
-        self.run_interferogram('ifgrams', job_obj)
+        self.run_interferogram('ifgram', job_obj)
         self.run_unwrap('unwrap', job_obj)
-        self.run_load_ifg('load_ifg', job_obj)
+        self.run_load_ifg('load_ifgram', job_obj)
         self.run_correct_unwrap_error('correct_unwrap_error', job_obj)
         self.run_phase_to_range('phase_to_range', job_obj)
         self.run_write_correction_job('mintpy_corrections', job_obj)
@@ -468,7 +469,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             scp_args += ' --project {}'.format(self.projectName)
         scp_args += ' --output {}'.format(self.workDir + '/inputs/ifgramStack.h5')
 
-        run_commands = ['{} load_ifg.py {}\n'.format(self.text_cmd.strip("'"), scp_args)]
+        run_commands = ['{} load_ifgram.py {}\n'.format(self.text_cmd.strip("'"), scp_args)]
         run_commands = run_commands[0].lstrip()
         os.makedirs(self.run_dir, exist_ok=True)
 
@@ -548,12 +549,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 self.run_load_slc('load_slc', job_obj)
             elif sname == 'inversion':
                 self.run_phase_inversion('inversion', job_obj)
-            elif sname == 'ifgrams':
-                self.run_interferogram('ifgrams', job_obj)
+            elif sname == 'ifgram':
+                self.run_interferogram('ifgram', job_obj)
             elif sname == 'unwrap':
                 self.run_unwrap('unwrap', job_obj)
-            elif sname == 'load_ifg':
-                self.run_load_ifg('load_ifg', job_obj)
+            elif sname == 'load_ifgram':
+                self.run_load_ifg('load_ifgram', job_obj)
             elif sname == 'correct_unwrap_error':
                 self.run_correct_unwrap_error('correct_unwrap_error', job_obj)
             elif sname == 'phase_to_range':
