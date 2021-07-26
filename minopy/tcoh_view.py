@@ -11,12 +11,12 @@ import time
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-import minopy_utilities as mnp
+from minopy.objects.utils import ks_lut, est_corr, custom_cmap
 from skimage.measure import label
 from mintpy import subset, view
 #from mintpy.tsview import *
 import mintpy.tsview as tsview
-
+from minopy.simulation import phase_linking_process, ecdf_distance, gam_pta
 ###########################################################################################
 EXAMPLE = """example:
   tsview.py timeseries.h5
@@ -230,7 +230,7 @@ class CoherenceViewer(tsview.timeseriesViewer):
 
         time0 = time.time()
 
-        distance_thresh = mnp.ks_lut(self.num_slc, self.num_slc, alpha=0.05)
+        distance_thresh = ks_lut(self.num_slc, self.num_slc, alpha=0.05)
 
         sample_rows = np.ogrid[-((self.azimuth_window - 1) / 2):((self.azimuth_window - 1) / 2) + 1]
         sample_rows = sample_rows.astype(int)
@@ -266,7 +266,7 @@ class CoherenceViewer(tsview.timeseriesViewer):
         data_all = np.concatenate((data1, testvec), axis=0)
 
         res = np.zeros([self.azimuth_window, self.range_window])
-        res[indx[0], indx[1]] = 1 * (np.apply_along_axis(mnp.ecdf_distance, 0, data_all) <= distance_thresh)
+        res[indx[0], indx[1]] = 1 * (np.apply_along_axis(ecdf_distance, 0, data_all) <= distance_thresh)
 
         ks_label = label(res, background=0, connectivity=2)
         shp = 1 * (ks_label == ks_label[reference_row, reference_col]) * mask
@@ -279,15 +279,15 @@ class CoherenceViewer(tsview.timeseriesViewer):
         CCG = np.exp(1j * CCG)
         CCG[:, :] = np.matrix(self.rslc[:, shp_rows, shp_cols])
 
-        coh_mat = mnp.est_corr(CCG)
+        coh_mat = est_corr(CCG)
 
-        vec_refined = mnp.phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
-        tcoh = mnp.gam_pta(np.angle(coh_mat), vec_refined)
+        vec_refined = phase_linking_process(coh_mat, 0, 'EMI', squeez=False)
+        tcoh = gam_pta(np.angle(coh_mat), vec_refined)
 
-        cmap, norm = mnp.custom_cmap()
+        cmap, norm = custom_cmap()
         im1 = self.ax_coh[0, 0].imshow(np.abs(coh_mat), cmap='jet', norm=norm)
 
-        cmap, norm = mnp.custom_cmap(-np.pi, np.pi)
+        cmap, norm = custom_cmap(-np.pi, np.pi)
         im2 = self.ax_coh[0, 1].imshow(np.angle(coh_mat), cmap='jet', norm=norm)
 
         im3 = self.ax_coh[1, 0].imshow(np.mean(win[:, :, :], axis=0), cmap='jet')
