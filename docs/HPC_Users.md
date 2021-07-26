@@ -16,9 +16,9 @@ This uses the `sbatch_conditional.bash` commmand, that can be used for individua
 ```
 sbatch_conditional.bash minopy/run_files/run_01_minopy_load_slc 
 sbatch_conditional.bash minopy/run_files/run_02_minopy_inversion
-sbatch_conditional.bash minopy/run_files/run_03_minopy_ifgrams
+sbatch_conditional.bash minopy/run_files/run_03_minopy_ifgram
 sbatch_conditional.bash minopy/run_files/run_04_minopy_unwrap
-sbatch_conditional.bash minopy/run_files/run_05_minopy_load_ifg
+sbatch_conditional.bash minopy/run_files/run_05_minopy_load_ifgram
 sbatch_conditional.bash minopy/run_files/run_06_mintpy_correct_unwrap_error 
 sbatch_conditional.bash minopy/run_files/run_07_minopy_phase_to_range
 sbatch_conditional.bash minopy/run_files/run_08_mintpy_corrections
