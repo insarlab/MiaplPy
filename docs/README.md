@@ -19,13 +19,18 @@ THIS IS RESEARCH CODE PROVIDED TO YOU "AS IS" WITH NO WARRANTIES OF CORRECTNESS.
 The workflow starts with reading coregistered SLCs, then performs an inversion to get wrapped phase time series.
 Interferograms are then unwrapped and different corrections are applied on the final time series.
 Everything is followed by defined steps in the `minopyApp.py` and the input is a text file containing adjustable options (template_file)
+Starting the software will create two templates in minopy folder: `minopyApp.cfg` and `smallbaselineApp.cfg`
+Use `smallbaselineApp.cfg` only for mintpy corrections. 
 
 examples:
+
 ```
 - minopyApp.py template_file
 - minopyApp.py template_file --start load_slc --stop unwrap
 - minopyApp.py template_file --dostep ifgrams
 ```
+
+Use `minopyApp.py template_file --runfiles` to create run files, you may then run them one by one manually
 
 Use `minopyApp.py -H` for a complete list of required options.
 
@@ -38,13 +43,13 @@ Inversion step may take long time depending on the number of pixels in the subse
 **Example:** Here is an example of SAR stack pre-processed using ISCE:
 
 Area: Pichincha volcano, Ecuador\
-Dataset: Sentinel-1 Ascending Track 18, 23 acquisitions, 2019.01.01 - 2019.06.12\
-Size: ~340 Mb\
+Dataset: Sentinel-1 Descending Track 142, 20 acquisitions, 2016.04.19 - 2017.12.28\
+Size: ~318 Mb\
 ```
-wget https://zenodo.org/record/4713042/files/PichinchaSenAT18.zip
-unzip PichinchaSenAT18.zip 
-cd PichinchaSenAT18
-minopyApp.py PichinchaSenAT18.template 
+wget https://zenodo.org/record/5136727/files/PichinchaSenD142.zip
+unzip PichinchaSenD142.zip
+cd PichinchaSenD142
+minopyApp.py PichinchaSenD142.template --dir ./minopy
 ```
 
 [Guide for University of Miami HPC users](./HPC_Users.md)
