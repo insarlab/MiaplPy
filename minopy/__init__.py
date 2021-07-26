@@ -1,7 +1,6 @@
 #########################################################################
-# Program is part of PySAR                                              #
-# Copyright(c) 2013-2018, Sara Mirzaee Zhang Yunjun, Heresh Fattahi     #
-# Author:  Sara Mirzaee, 2019 Jan                                       #
+# Program is part of MiNoPy                                             #
+# Author:  Sara Mirzaee                                                 #
 #########################################################################
 
 from __future__ import print_function
@@ -18,6 +17,7 @@ sys.path.insert(1, os.path.join(minopy_path, 'lib'))
 
 from minopy.version import *
 __version__ = release_version
+#__logo__ = logo
 
 try:
     os.environ['MINOPY_HOME']

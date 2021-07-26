@@ -16,6 +16,7 @@ import numpy as np
 from osgeo import gdal
 import subprocess
 import time
+import datetime
 
 CONFIG_FILE = os.path.dirname(os.path.abspath(__file__)) + '/defaults/conf.full'
 
@@ -26,11 +27,25 @@ def main(iargs=None):
     """
     Parser = MinoPyParser(iargs, script='unwrap_minopy')
     inps = Parser.parse()
-    
+
+    dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+
+    if not iargs is None:
+        msg = os.path.basename(__file__) + ' ' + ' '.join(iargs[:])
+        string = dateStr + " * " + msg
+        print(string)
+    else:
+        msg = os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::])
+        string = dateStr + " * " + msg
+        print(string)
+
     unwObj = Snaphu(inps)
     do_tiles, metadata = unwObj.need_to_split_tiles()
-    
+
+
     time0 = time.time()
+
+
     try:
         if do_tiles:
             print('1')
@@ -42,6 +57,7 @@ def main(iargs=None):
     except:
         print('3')
         runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
+
 
     print('Time spent: {} m'.format((time.time() - time0)/60))
     return
@@ -87,6 +103,8 @@ class Snaphu:
         self.config_default.append('LAMBDA   {}\n'.format(inps.wavelength))
         self.config_default.append('EARTHRADIUS   {}\n'.format(inps.earth_radius))
         self.config_default.append('INITMETHOD   {}\n'.format(inps.init_method))
+        if not inps.unwrap_mask is None:
+            self.config_default.append('BYTEMASKFILE   {}\n'.format(inps.unwrap_mask))
 
         return
 

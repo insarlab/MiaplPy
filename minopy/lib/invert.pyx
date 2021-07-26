@@ -41,7 +41,7 @@ cdef void write_wrapped(list date_list, bytes out_dir, int width, int length, by
     return
 
 
-cdef void write_hdf5_block_3D(object fhandle, float complex[:, :, ::1] data, bytes datasetName, list block):
+cdef void write_hdf5_block_3D(object fhandle, float[:, :, ::1] data, bytes datasetName, list block):
 
     fhandle[datasetName.decode('UTF-8')][block[0]:block[1], block[2]:block[3], block[4]:block[5]] = data
     return
@@ -102,7 +102,7 @@ cdef class CPhaseLink:
 
         self.window_for_shp()
 
-        self.RSLCfile = self.out_dir + b'/rslc_ref.h5'
+        self.RSLCfile = self.out_dir + b'/phase_series.h5'
 
 
         if b'sequential' == self.phase_linking_method[0:10]:
@@ -166,18 +166,30 @@ cdef class CPhaseLink:
 
         with h5py.File(self.RSLCfile.decode('UTF-8'), 'a') as RSLC:
 
-            if 'slc' in RSLC.keys():
-                RSLC['slc'].resize(self.n_image, 0)
+            if 'phase' in RSLC.keys():
+                RSLC['phase'].resize(self.n_image, 0)
             else:
-                self.metadata['FILE_TYPE'] = 'slc'
+                self.metadata['FILE_TYPE'] = 'timeseries' #'phase'
+                self.metadata['DATA_TYPE'] = 'float32'
+                self.metadata['data_type'] = 'FLOAT'
+                self.metadata['description'] = 'Inverted wrapped phase time series'
+                self.metadata['file_name'] = self.RSLCfile.decode('UTF-8')
+                self.metadata['family'] = 'wrappedphase'
+
                 for key, value in self.metadata.items():
                     RSLC.attrs[key] = value
 
-                RSLC.create_dataset('slc',
+                RSLC.create_dataset('phase',
                                     shape=(self.n_image, self.length, self.width),
                                     maxshape=(None, self.length, self.width),
                                     chunks=True,
-                                    dtype=np.complex64)
+                                    dtype=np.float32)
+
+                RSLC.create_dataset('amplitude',
+                                    shape=(self.n_image, self.length, self.width),
+                                    maxshape=(None, self.length, self.width),
+                                    chunks=True,
+                                    dtype=np.float32)
 
                 RSLC.create_dataset('shp',
                                     shape=(self.length, self.width),
@@ -198,7 +210,7 @@ cdef class CPhaseLink:
 
                 # 1D dataset containing dates of all images
                 data = np.array(self.all_date_list, dtype=np.string_)
-                RSLC.create_dataset('dates', data=data)
+                RSLC.create_dataset('date', data=data)
 
 
         return
@@ -252,17 +264,17 @@ cdef class CPhaseLink:
         cdef float[:, ::1] quality
 
         if os.path.exists(self.RSLCfile.decode('UTF-8')):
-            print('Deleting old rslc_ref.h5 ...')
+            print('Deleting old phase_series.h5 ...')
             os.remove(self.RSLCfile.decode('UTF-8'))
-            #print('rslc_ref.h5 exists, skip unpatching ...')
 
         self.initiate_output()
-        print('open  HDF5 file rslc_ref.h5 in a mode')
+        print('Unpatch and write wrapped phase time series to HDF5 file phase_series.h5 ')
+        print('open  HDF5 file phase_series.h5 in a mode')
 
         with h5py.File(self.RSLCfile.decode('UTF-8'), 'a') as fhandle:
             for index, box in enumerate(self.box_list):
                 patch_dir = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
-                rslc_ref = np.load(patch_dir.decode('UTF-8') + '/rslc_ref.npy')
+                rslc_ref = np.load(patch_dir.decode('UTF-8') + '/phase_ref.npy')
                 quality = np.load(patch_dir.decode('UTF-8') + '/quality.npy')
                 shp = np.load(patch_dir.decode('UTF-8') + '/shp.npy')
 
@@ -271,7 +283,9 @@ cdef class CPhaseLink:
 
                 # wrapped interferograms 3D
                 block = [0, self.n_image, box[1], box[3], box[0], box[2]]
-                write_hdf5_block_3D(fhandle, rslc_ref, b'slc', block)
+                #write_hdf5_block_3D(fhandle, rslc_ref, b'slc', block)
+                write_hdf5_block_3D(fhandle, np.angle(rslc_ref), b'phase', block)
+                write_hdf5_block_3D(fhandle, np.abs(rslc_ref), b'amplitude', block)
 
                 # SHP - 2D
                 block = [box[1], box[3], box[0], box[2]]
@@ -313,7 +327,7 @@ cdef class CPhaseLink:
             quality_memmap[:, :] = fhandle['quality']
             quality_memmap = None
 
-            print('close HDF5 file rslc_ref.h5.')
+            print('close HDF5 file phase_series.h5.')
         return
 
 

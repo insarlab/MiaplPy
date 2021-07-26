@@ -4,7 +4,6 @@ cimport cython
 import os
 import numpy as np
 cimport numpy as cnp
-#from libc.stdio cimport printf
 from scipy import linalg as LA
 from scipy.linalg import lapack as lap
 from libc.math cimport sqrt, log, exp, isnan
@@ -12,8 +11,6 @@ from scipy.optimize import minimize
 from skimage.measure._ccomp import label_cython as clabel
 from scipy.stats import anderson_ksamp, ttest_ind
 from mintpy.utils import ptime
-#from cython.parallel import prange
-#from libcpp.string cimport string
 
 
 cdef extern from "complex.h":
@@ -397,6 +394,7 @@ cdef inline float complex[::1] squeeze_images(float complex[::1] x, float comple
     for t in range(s):
         for i in range(n - step):
             out[t] += ccg[i + step, t] * conjf(vm[i])
+        out[t] = out[t]/(n-step)
 
     return out
 
@@ -829,8 +827,6 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
                     bytes phase_linking_method, int total_num_mini_stacks, int default_mini_stack_size,
                     bytes shp_test, bytes out_dir):
 
-    #cdef int[::1] def_sample_rows = def_sample_rows_i
-    #cdef int[::1] def_sample_cols = def_sample_cols_i
     cdef cnp.ndarray[int, ndim=1] big_box = get_big_box_cy(box, range_window, azimuth_window, width, length)
     cdef int box_width = box[2] - box[0]
     cdef int box_length = box[3] - box[1]
@@ -849,7 +845,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef int noval, num_points, num_shp, i, t, p, m = 0
     cdef (int, int) data
     cdef int[:, ::1] shp
-    cdef cnp.ndarray[float complex, ndim=3] patch_slc_images = slcStackObj.read(datasetName='slc', box=big_box)
+    cdef cnp.ndarray[float complex, ndim=3] patch_slc_images = slcStackObj.read(datasetName='slc', box=big_box, print_msg=False)
     cdef float complex[:, ::1] CCG, coh_mat, squeezed_images
     cdef float complex[::1] vec_refined
     cdef float[::1] amp_refined
@@ -915,10 +911,10 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
 
         quality[data[0] - row1, data[1] - col1] = temp_quality
 
-        prog_bar.update(p + 1, every=10, suffix='{}/{} pixels'.format(p + 1, num_points))
+        prog_bar.update(p + 1, every=500, suffix='{}/{} pixels, patch {}'.format(p + 1, num_points, index))
         p += 1
 
-    np.save(out_folder.decode('UTF-8') + '/rslc_ref.npy', rslc_ref)
+    np.save(out_folder.decode('UTF-8') + '/phase_ref.npy', rslc_ref)
     np.save(out_folder.decode('UTF-8') + '/shp.npy', SHP)
     np.save(out_folder.decode('UTF-8') + '/quality.npy', quality)
 

@@ -23,81 +23,81 @@ autoPath = True
 
 # Default path of data files from different InSAR processors to be loaded into MintPy
 isceTopsAutoPath = '''##----------Default file path of ISCE/topsStack products
-MINOPY.load.processor      = isce
-MINOPY.load.metaFile       = ${PROJECT_DIR}/reference/IW*.xml
-MINOPY.load.baselineDir    = ${PROJECT_DIR}/baselines
+minopy.load.processor      = isce
+minopy.load.metaFile       = ${PROJECT_DIR}/reference/IW*.xml
+minopy.load.baselineDir    = ${PROJECT_DIR}/baselines
 
-MINOPY.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc.full
-MINOPY.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.unw
-MINOPY.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.cor
-MINOPY.load.connCompFile   = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*.unw.conncomp
-MINOPY.load.ionoFile       = None
-MINOPY.load.intFile        = None
+minopy.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc.full
+minopy.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.unw
+minopy.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.cor
+minopy.load.connCompFile   = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*.unw.conncomp
+minopy.load.ionoFile       = None
+minopy.load.intFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/filt_fine*.int
 
-MINOPY.load.demFile        = ${PROJECT_DIR}/merged/geom_reference/hgt.rdr.full
-MINOPY.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_reference/lat.rdr.full
-MINOPY.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_reference/lon.rdr.full
-MINOPY.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_reference/los.rdr.full
-MINOPY.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_reference/los.rdr.full
-MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_reference/shadowMask.rdr.full
-MINOPY.load.waterMaskFile  = ${PROJECT_DIR}/merged/geom_reference/waterMask.rdr.full
-MINOPY.load.bperpFile      = None
+minopy.load.demFile        = ${PROJECT_DIR}/merged/geom_reference/hgt.rdr.full
+minopy.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_reference/lat.rdr.full
+minopy.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_reference/lon.rdr.full
+minopy.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_reference/los.rdr.full
+minopy.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_reference/los.rdr.full
+minopy.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_reference/shadowMask.rdr.full
+minopy.load.waterMaskFile  = ${PROJECT_DIR}/merged/geom_reference/waterMask.rdr.full
+minopy.load.bperpFile      = None
 
 '''
 
 isceStripmapAutoPath = '''##----------Default file path of ISCE/stripmapStack products
-MINOPY.load.processor      = isce
-MINOPY.load.metaFile       = ${referenceShelve}/referenceShelve/data.dat
-MINOPY.load.baselineDir    = ${PROJECT_DIR}/baselines
+minopy.load.processor      = isce
+minopy.load.metaFile       = ${referenceShelve}/referenceShelve/data.dat
+minopy.load.baselineDir    = ${PROJECT_DIR}/baselines
 
-MINOPY.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc
-MINOPY.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.unw
-MINOPY.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.cor
-MINOPY.load.connCompFile   = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*.conncomp
-MINOPY.load.ionoFile       = None
-MINOPY.load.intFile        = None
+minopy.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc
+minopy.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.unw
+minopy.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.cor
+minopy.load.connCompFile   = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*.conncomp
+minopy.load.ionoFile       = None
+minopy.load.intFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/filt_fine*.int
 
-MINOPY.load.demFile        = ${PROJECT_DIR}/merged/geom_reference/hgt.rdr
-MINOPY.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_reference/lat.rdr
-MINOPY.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_reference/lon.rdr
-MINOPY.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_reference/los.rdr
-MINOPY.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_reference/los.rdr
-MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_reference/shadowMask.rdr
-MINOPY.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_reference/waterMask.rdr.full
-MINOPY.load.bperpFile      = None
+minopy.load.demFile        = ${PROJECT_DIR}/merged/geom_reference/hgt.rdr
+minopy.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_reference/lat.rdr
+minopy.load.lookupXFile    = ${PROJECT_DIR}/merged/geom_reference/lon.rdr
+minopy.load.incAngleFile   = ${PROJECT_DIR}/merged/geom_reference/los.rdr
+minopy.load.azAngleFile    = ${PROJECT_DIR}/merged/geom_reference/los.rdr
+minopy.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_reference/shadowMask.rdr
+minopy.load.shadowMaskFile = ${PROJECT_DIR}/merged/geom_reference/waterMask.rdr.full
+minopy.load.bperpFile      = None
 
 '''
 
 roipacAutoPath = '''##----------Default file path of ROI_PAC products
-MINOPY.load.processor      = roipac
-MINOPY.load.unwFile        = ${PROJECT_DIR}/PROCESS/DONE/IFG*/filt*.unw
-MINOPY.load.corFile        = ${PROJECT_DIR}/PROCESS/DONE/IFG*/filt*.cor
-MINOPY.load.connCompFile   = ${PROJECT_DIR}/PROCESS/DONE/IFG*/filt*snap_connect.byt
-MINOPY.load.intFile        = None
+minopy.load.processor      = roipac
+minopy.load.unwFile        = ${PROJECT_DIR}/PROCESS/DONE/IFG*/filt*.unw
+minopy.load.corFile        = ${PROJECT_DIR}/PROCESS/DONE/IFG*/filt*.cor
+minopy.load.connCompFile   = ${PROJECT_DIR}/PROCESS/DONE/IFG*/filt*snap_connect.byt
+minopy.load.intFile        = ${PROJECT_DIR}/PROCESS/DONE/IFG*/filt_filt*.int
 
-MINOPY.load.demFile        = ${PROJECT_DIR}/PROCESS/DONE/*${m_date12}*/radar_*rlks.hgt
-MINOPY.load.lookupYFile    = ${PROJECT_DIR}/PROCESS/GEO/geo_${m_date12}/geomap_*rlks.trans
-MINOPY.load.lookupXFile    = ${PROJECT_DIR}/PROCESS/GEO/geo_${m_date12}/geomap_*rlks.trans
-MINOPY.load.incAngleFile   = None
-MINOPY.load.azAngleFile    = None
-MINOPY.load.shadowMaskFile = None
-MINOPY.load.bperpFile      = None
+minopy.load.demFile        = ${PROJECT_DIR}/PROCESS/DONE/*${m_date12}*/radar_*rlks.hgt
+minopy.load.lookupYFile    = ${PROJECT_DIR}/PROCESS/GEO/geo_${m_date12}/geomap_*rlks.trans
+minopy.load.lookupXFile    = ${PROJECT_DIR}/PROCESS/GEO/geo_${m_date12}/geomap_*rlks.trans
+minopy.load.incAngleFile   = None
+minopy.load.azAngleFile    = None
+minopy.load.shadowMaskFile = None
+minopy.load.bperpFile      = None
 '''
 
 gammaAutoPath = '''##----------Default file path of GAMMA products
-MINOPY.load.processor      = gamma
-MINOPY.load.unwFile        = ${PROJECT_DIR}/PROCESS/DONE/IFG*/diff*rlks.unw
-MINOPY.load.corFile        = ${PROJECT_DIR}/PROCESS/DONE/IFG*/*filt*rlks.cor
-MINOPY.load.connCompFile   = None
-MINOPY.load.intFile        = None
+minopy.load.processor      = gamma
+minopy.load.unwFile        = ${PROJECT_DIR}/PROCESS/DONE/IFG*/diff*rlks.unw
+minopy.load.corFile        = ${PROJECT_DIR}/PROCESS/DONE/IFG*/*filt*rlks.cor
+minopy.load.connCompFile   = None
+minopy.load.intFile        = None
 
-MINOPY.load.demFile        = ${PROJECT_DIR}/PROCESS/SIM/sim_${m_date12}/sim*.hgt_sim
-MINOPY.load.lookupYFile    = ${PROJECT_DIR}/PROCESS/SIM/sim_${m_date12}/sim*.UTM_TO_RDC
-MINOPY.load.lookupXFile    = ${PROJECT_DIR}/PROCESS/SIM/sim_${m_date12}/sim*.UTM_TO_RDC
-MINOPY.load.incAngleFile   = None
-MINOPY.load.azAngleFile    = None
-MINOPY.load.shadowMaskFile = None
-MINOPY.load.bperpFile      = ${PROJECT_DIR}/merged/baselines/*/*.base_perp
+minopy.load.demFile        = ${PROJECT_DIR}/PROCESS/SIM/sim_${m_date12}/sim*.hgt_sim
+minopy.load.lookupYFile    = ${PROJECT_DIR}/PROCESS/SIM/sim_${m_date12}/sim*.UTM_TO_RDC
+minopy.load.lookupXFile    = ${PROJECT_DIR}/PROCESS/SIM/sim_${m_date12}/sim*.UTM_TO_RDC
+minopy.load.incAngleFile   = None
+minopy.load.azAngleFile    = None
+minopy.load.shadowMaskFile = None
+minopy.load.bperpFile      = ${PROJECT_DIR}/merged/baselines/*/*.base_perp
 '''
 
 autoPathDict = {
@@ -107,7 +107,7 @@ autoPathDict = {
     'gamma' : gammaAutoPath,
 }
 
-prefix = 'MINOPY.load.'
+prefix = 'minopy.load.'
 
 
 class PathFind:
@@ -121,7 +121,7 @@ class PathFind:
         self.configdir = 'configs'
         self.mergeddir = 'subset'
         self.intdir = 'inverted/interferograms'
-        self.auto_template = self.defaultdir + '/minopy_template.cfg'
+        self.auto_template = self.defaultdir + '/minopyApp.cfg'
         self.wrappercommandtops = 'SentinelWrapper.py -c '
         self.wrappercommandstripmap = 'stripmapWrapper.py -c '
         return
@@ -233,13 +233,13 @@ def get_auto_path(processor, work_dir, template=dict()):
     if m_date12:
         var_dict['${m_date12}'] = m_date12
 
-    if not template['MINOPY.interferograms.list'] in [None, 'None', 'auto']:
+    if not template['minopy.interferograms.list'] in [None, 'None', 'auto']:
         var_dict['${int_type}'] = 'list'
     else:
-        var_dict['${int_type}'] = template['MINOPY.interferograms.type']
+        var_dict['${int_type}'] = template['minopy.interferograms.type']
 
     if processor == 'isceStripmap':
-        if template['MINOPY.load.metaFile'] == 'auto':
+        if template['minopy.load.metaFile'] == 'auto':
 
             try:
                 var_dict['${referenceShelve}'] = os.path.join(project_dir, 'merged/SLC',
@@ -259,14 +259,14 @@ def get_auto_path(processor, work_dir, template=dict()):
         if value and template[key] == 'auto':
             template[key] = value
 
-    if not os.path.exists(template['MINOPY.load.baselineDir']):
-        template['MINOPY.load.baselineDir'] = os.path.join(work_dir, 'inputs/baselines')
+    if not os.path.exists(template['minopy.load.baselineDir']):
+        template['minopy.load.baselineDir'] = os.path.join(work_dir, 'inputs/baselines')
 
-    if not os.path.exists(os.path.dirname(template['MINOPY.load.metaFile'])):
+    if not os.path.exists(os.path.dirname(template['minopy.load.metaFile'])):
         if processor == 'isceTops':
-            template['MINOPY.load.metaFile'] = os.path.join(work_dir, 'inputs/reference/IW*.xml')
+            template['minopy.load.metaFile'] = os.path.join(work_dir, 'inputs/reference/IW*.xml')
         else:
-            template['MINOPY.load.metaFile'] = os.path.join(work_dir, 'inputs/reference/referenceShelve/data.dat')
+            template['minopy.load.metaFile'] = os.path.join(work_dir, 'inputs/reference/referenceShelve/data.dat')
 
     return template
 

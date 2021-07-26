@@ -8,6 +8,7 @@ import argparse
 from minopy.defaults import auto_path
 from minopy.defaults.auto_path import autoPath, PathFind
 import minopy
+import mintpy
 import os
 import datetime
 pathObj = PathFind()
@@ -32,14 +33,20 @@ class MinoPyParser:
 
         if self.script == 'load_slc':
             self.parser = self.load_slc_parser()
+        elif self.script == 'crop_images':
+            self.parser = self.crop_images_parser()
         elif self.script == 'phase_inversion':
             self.parser = self.phase_inversion_parser()
         elif self.script == 'generate_interferograms':
             self.parser = self.generate_interferograms_parser()
+        elif self.script == 'generate_mask':
+            self.parser = self.generate_unwrap_mask_parser()
         elif self.script == 'unwrap_minopy':
             self.parser = self.unwrap_parser()
+        elif self.script == 'phase_to_range':
+            self.parser = self.phase_to_range_parser()
         elif self.script == 'minopy_app':
-            self.parser, self.STEP_LIST, self.STEP_JOBS = self.minopy_app_parser()
+            self.parser, self.STEP_LIST, EXAMPLE = self.minopy_app_parser()
 
         inps = self.parser.parse_args(args=self.iargs)
 
@@ -47,7 +54,7 @@ class MinoPyParser:
             inps = self.out_load_slc(inps)
 
         if self.script == 'minopy_app':
-            inps = self.out_minopy_app(inps)
+            inps = self.out_minopy_app(inps, EXAMPLE)
 
         return inps
 
@@ -85,15 +92,14 @@ class MinoPyParser:
 
         return inps
 
-    def out_minopy_app(self, sinps):
+    def out_minopy_app(self, sinps, EXAMPLE):
         inps = sinps
-        STEP_LIST = self.STEP_LIST
-        STEP_JOBS = self.STEP_JOBS
-        template_file = os.path.join(os.path.abspath(os.getenv('MINOPY_HOME')), 'minopy/defaults/minopy_template.cfg')
+        template_file = os.path.join(os.path.dirname(minopy.__file__), 'defaults/minopyApp.cfg')
+        template_file_print = os.path.join(os.path.dirname(minopy.__file__), 'defaults/minopy_mintpy_print.cfg')
 
         # print default template
         if inps.print_template:
-            raise SystemExit(open(template_file, 'r').read(), )
+            raise SystemExit(open(template_file_print, 'r').read(), )
 
         # print software version
         if inps.version:
@@ -103,10 +109,10 @@ class MinoPyParser:
                 and not os.path.isfile(os.path.basename(template_file))
                 and not inps.generate_template):
             self.parser.print_usage()
-            #print(EXAMPLE)
+            print(EXAMPLE)
             msg = "ERROR: no template file found! It requires:"
             msg += "\n  1) input a custom template file, OR"
-            msg += "\n  2) there is a default template 'minopy_template.cfg' in current directory."
+            msg += "\n  2) there is a default template 'minopyApp.cfg' in current directory."
             print(msg)
             raise SystemExit()
 
@@ -115,17 +121,27 @@ class MinoPyParser:
             inps.customTemplateFile = os.path.abspath(inps.customTemplateFile)
             if not os.path.isfile(inps.customTemplateFile):
                 raise FileNotFoundError(inps.customTemplateFile)
-            #elif os.path.basename(inps.customTemplateFile) == os.path.basename(template_file):
-            #    # ignore if minopy_template.cfg is input as custom template
-            #    inps.customTemplateFile = None
+
+            # ignore if minopy_template.cfg is input as custom template
+            if os.path.basename(inps.customTemplateFile) == os.path.basename(template_file):
+                inps.templateFile = inps.customTemplateFile
+                inps.customTemplateFile = None
+
+        # check input --start/end/dostep
+        inps = self.read_inps2run_steps(inps)
+
+        return inps
+
+    def read_inps2run_steps(self, inps):
+        """read/get run_steps from input arguments."""
 
         # check input --start/end/dostep
         for key in ['startStep', 'endStep', 'doStep']:
             value = vars(inps)[key]
-            if value and value not in STEP_LIST:
+            if value and value not in self.STEP_LIST:
                 if not value == 'multilook':
                     msg = 'Input step not found: {}'.format(value)
-                    msg += '\nAvailable steps: {}'.format(STEP_LIST)
+                    msg += '\nAvailable steps: {}'.format(self.STEP_LIST)
                     raise ValueError(msg)
 
         # ignore --start/end input if --dostep is specified
@@ -134,63 +150,54 @@ class MinoPyParser:
             inps.endStep = inps.doStep
 
         # get list of steps to run
-        if not inps.startStep == 'multilook':
-            idx0 = STEP_LIST.index(inps.startStep)
-            idx1 = STEP_LIST.index(inps.endStep)
+        idx0 = self.STEP_LIST.index(inps.startStep)
+        idx1 = self.STEP_LIST.index(inps.endStep)
 
-            if idx0 > idx1:
-                msg = 'input start step "{}" is AFTER input end step "{}"'.format(inps.startStep, inps.endStep)
-                raise ValueError(msg)
+        if idx0 > idx1:
+            msg = 'input start step "{}" is AFTER input end step "{}"'.format(inps.startStep, inps.endStep)
+            raise ValueError(msg)
 
-            if inps.write_job:
-                idx0 = STEP_JOBS.index(inps.startStep)
-                if inps.endStep in STEP_JOBS:
-                    idx1 = STEP_JOBS.index(inps.endStep)
-                else:
-                    idx1 = len(STEP_JOBS)
-                inps.runSteps = STEP_JOBS[idx0:idx1 + 1]
-            else:
-                inps.runSteps = STEP_LIST[idx0:idx1 + 1]
-
-        else:
-            inps.runSteps = ['multilook']
-            idx0 = STEP_LIST.index('ifgrams')
+        inps.run_steps = self.STEP_LIST[idx0:idx1 + 1]
 
         # empty the step list for -g option
         if inps.generate_template:
-            inps.runSteps = []
+            inps.run_steps = []
 
-        # message - software version
-        if len(inps.runSteps) <= 1:
-            print(minopy.version.description)
-        else:
-            print(minopy.version.logo)
-
-        # mssage - processing steps
-        if len(inps.runSteps) > 0:
-            print('--RUN-at-{}--'.format(datetime.datetime.now()))
-            print('Run routine processing with {} on steps: {}'.format(os.path.basename(__file__), inps.runSteps))
-            if inps.doStep:
-                print('Remaining steps: {}'.format(STEP_LIST[idx0 + 1:]))
-                print('--dostep option enabled, disable the plotting at the end of the processing.')
-                inps.plot = False
-
-        path1 = os.path.dirname(inps.customTemplateFile)
-        path2 = path1 + '/minopy'
-
-        if not inps.workDir:
-            if path1.endswith('minopy'):
-                inps.workDir = path1
+        print('-' * 50)
+        # message - processing steps
+        if len(inps.run_steps) > 0:
+            # for single step - compact version info
+            if len(inps.run_steps) == 1:
+                print(minopy.version.release_description)
             else:
-                inps.workDir = path2
+                print(minopy.version.logo)
+            print('--RUN-at-{}--'.format(datetime.datetime.now()))
+            print('Current directory: {}'.format(os.getcwd()))
+            print('Run routine processing with {} on steps: {}'.format(os.path.basename(__file__), inps.run_steps))
+            print('Remaining steps: {}'.format(self.STEP_LIST[idx0 + 1:]))
+
+        if not inps.generate_template:
+            if inps.customTemplateFile:
+                path1 = os.path.dirname(inps.customTemplateFile)
+                path2 = path1 + '/minopy'
+            else:
+                path1 = os.path.dirname(inps.templateFile)
+                path2 = path1
+
+            if not inps.workDir:
+                if path1.endswith('minopy'):
+                    inps.workDir = path1
+                else:
+                    inps.workDir = path2
+
         inps.workDir = os.path.abspath(inps.workDir)
-         
-        inps.project_name = None
-        if inps.customTemplateFile and not os.path.basename(inps.customTemplateFile) == 'minopy_template.cfg':
-            inps.project_name = os.path.splitext(os.path.basename(inps.customTemplateFile))[0]
-            print('Project name:', inps.project_name)
+
+        inps.projectName = None
+        if inps.customTemplateFile and not os.path.basename(inps.customTemplateFile) == 'minopyApp.cfg':
+            inps.projectName = os.path.splitext(os.path.basename(inps.customTemplateFile))[0]
+            print('Project name:', inps.projectName)
         else:
-            inps.project_name = os.path.dirname(inps.workDir)
+            inps.projectName = os.path.basename(os.path.dirname(inps.workDir))
 
         if not os.path.exists(inps.workDir):
             os.mkdir(inps.workDir)
@@ -209,32 +216,32 @@ class MinoPyParser:
         ## no   - save   0% disk usage, fast [default]
         ## lzf  - save ~57% disk usage, relative slow
         ## gzip - save ~62% disk usage, very slow [not recommend]
-        MINOPY.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isce
-        MINOPY.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
-        MINOPY.load.compression    = auto  #[gzip / lzf / no], auto for no.
+        minopy.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isce
+        minopy.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
+        minopy.load.compression    = auto  #[gzip / lzf / no], auto for no.
         ##---------for ISCE only:
-        MINOPY.load.metaFile       = auto  #[path2metadata_file], i.e.: ./reference/IW1.xml, ./referenceShelve/data.dat
-        MINOPY.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
+        minopy.load.metaFile       = auto  #[path2metadata_file], i.e.: ./reference/IW1.xml, ./referenceShelve/data.dat
+        minopy.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
         ##---------slc datasets:
-        MINOPY.load.slcFile        = auto  #[path2slc]
+        minopy.load.slcFile        = auto  #[path2slc]
         ##---------geometry datasets:
-        MINOPY.load.demFile        = auto  #[path2hgt_file]
-        MINOPY.load.lookupYFile    = auto  #[path2lat_file], not required for geocoded data
-        MINOPY.load.lookupXFile    = auto  #[path2lon_file], not required for geocoded data
-        MINOPY.load.incAngleFile   = auto  #[path2los_file], optional
-        MINOPY.load.azAngleFile    = auto  #[path2los_file], optional
-        MINOPY.load.shadowMaskFile = auto  #[path2shadow_file], optional
-        MINOPY.load.waterMaskFile  = auto  #[path2water_mask_file], optional
-        MINOPY.load.bperpFile      = auto  #[path2bperp_file], optional
+        minopy.load.demFile        = auto  #[path2hgt_file]
+        minopy.load.lookupYFile    = auto  #[path2lat_file], not required for geocoded data
+        minopy.load.lookupXFile    = auto  #[path2lon_file], not required for geocoded data
+        minopy.load.incAngleFile   = auto  #[path2los_file], optional
+        minopy.load.azAngleFile    = auto  #[path2los_file], optional
+        minopy.load.shadowMaskFile = auto  #[path2shadow_file], optional
+        minopy.load.waterMaskFile  = auto  #[path2water_mask_file], optional
+        minopy.load.bperpFile      = auto  #[path2bperp_file], optional
         ##---------subset (optional):
         ## if both yx and lalo are specified, use lalo option unless a) no lookup file AND b) dataset is in radar coord
-        mintpy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
-        mintpy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
+        minopy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
+        minopy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
         """
 
         EXAMPLE = """example:
           load_slc.py -t GalapagosSenDT128.tempalte
-          load_slc.py -t minopy_template.cfg
+          load_slc.py -t minopyApp.cfg
           load_slc.py -t GalapagosSenDT128.tempalte --project_dir $SCRATCH/GalapagosSenDT128
           load_slc.py -H #Show example input template for ISCE/ROI_PAC/GAMMA products
         """
@@ -257,12 +264,48 @@ class MinoPyParser:
                             help='Disable the update mode, or skip checking dataset already loaded.')
         parser.add_argument('--compression', choices={'gzip', 'lzf', None}, default=None,
                             help='compress loaded geometry while writing HDF5 file, default: None.')
+        parser.add_argument('--no_metadata_check', dest='no_metadata_check', action='store_true',
+                          help=' do not check for rsc files, when running via minopyApp.py')
 
         parser.add_argument('-o', '--output', type=str, nargs=3, dest='out_file',
                             default=['slcStack.h5',
                                      'geometryRadar.h5',
                                      'geometryGeo.h5'],
                             help='output HDF5 file')
+        return parser
+
+    @staticmethod
+    def crop_images_parser():
+
+        TEMPLATE = """template: 
+                ##---------subset (optional):
+                ## if both yx and lalo are specified, use lalo option unless a) no lookup file AND b) dataset is in radar coord
+                mintpy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
+                mintpy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
+                """
+
+        EXAMPLE = """example:
+              crop_images.py -t GalapagosSenDT128.tempalte --slc_dir ./merged/SLC --geometry_dir ./merged/geom_reference 
+              crop_images.py -t GalapagosSenDT128.tempalte --slc_dir ./merged/SLC --geometry_dir ./merged/geom_reference --output_dir ./merged_crop 
+            """
+
+        parser = argparse.ArgumentParser(description='Crop a subset of all input files and save to output dir given the subset in template file',
+                                         formatter_class=argparse.RawTextHelpFormatter,
+                                         epilog=TEMPLATE + '\n' + EXAMPLE)
+        parser.add_argument('-H', dest='print_example_template', action='store_true',
+                            help='Print/Show the example template file for loading.')
+        parser.add_argument('-t', '--template', type=str, nargs='+',
+                            dest='template_file', help='template file with path info.')
+        parser.add_argument('-s', '--slc_dir', type=str, dest='slc_dir',
+                            default='./merged/SLC', help='Directory of co-registered full SLCs')
+        parser.add_argument('-g', '--geometry_dir', type=str, dest='geometry_dir',
+                            default='./merged/geom_reference', help='Directory of full geometry files')
+        parser.add_argument('--processor', type=str, dest='processor',
+                            choices={'isce', 'gamma', 'roipac'},
+                            help='InSAR processor/software of the file (This version only supports isce)',
+                            default='isce')
+        parser.add_argument('-o', '--output_dir', type=str, dest='out_dir',
+                            default='./merged_crop', help='output directory for cropped files')
         return parser
 
     def phase_inversion_parser(self):
@@ -285,6 +328,42 @@ class MinoPyParser:
 
         return parser
 
+    @staticmethod
+    def generate_unwrap_mask_parser():
+        parser = argparse.ArgumentParser(description='Generate unwrap mask based on shadow mask and input custom mask')
+        parser.add_argument('-g', '--geometry', type=str, dest='geometry_stack', required=True,
+                            help='Geometry stack file with shadowMask in the datasets')
+        parser.add_argument('-m', '--mask', type=str, dest='custom_mask', default=None,
+                            help='Secondary image')
+        parser.add_argument('-o', '--output', type=str, dest='output_mask', default=None,
+                            help='Output binary mask for unwrapping with snaphu')
+        parser.add_argument('-t', '--text_cmd', type=str, dest='text_cmd', default='',
+                            help='Command before calling any script. exp: singularity run dockerimage.sif')
+
+        return parser
+
+    @staticmethod
+    def generate_interferograms_parser():
+
+        parser = argparse.ArgumentParser(description='Generate interferogram')
+        parser.add_argument('-m', '--reference', type=str, dest='reference', required=True,
+                            help='Reference image')
+        parser.add_argument('-s', '--secondary', type=str, dest='secondary', required=True,
+                            help='Secondary image')
+        parser.add_argument('-t', '--stack', type=str, dest='stack_file', required=True,
+                            help='phase series stack file to read from')
+        parser.add_argument('-o', '--output_dir', type=str, dest='out_dir', default='interferograms',
+                            help='Prefix of output int and amp files')
+        parser.add_argument('-a', '--azimuth_looks', type=int, dest='azlooks', default=1,
+                            help='Azimuth looks')
+        parser.add_argument('-r', '--range_looks', type=int, dest='rglooks', default=1,
+                            help='Range looks')
+        parser.add_argument('-f', '--filter_strength', type=float, dest='filter_strength', default=0.5,
+                            help='filtering strength')
+        parser.add_argument('-p', '--stack_prefix', dest='prefix', type=str, default='tops'
+                            , help='ISCE stack processor: options= tops, stripmap -- default = tops')
+
+        return parser
 
     @staticmethod
     def unwrap_parser():
@@ -294,6 +373,8 @@ class MinoPyParser:
         parser.add_argument('-c', '--coherence', dest='input_cor', type=str, required=True,
                             help='input coherence file')
         parser.add_argument('-u', '--unwrapped_ifg', dest='unwrapped_ifg', type=str, required=True,
+                            help='output unwrapped interferogram')
+        parser.add_argument('-m', '--mask', dest='unwrap_mask', type=str, default=None,
                             help='output unwrapped interferogram')
         parser.add_argument('-sw', '--width', dest='ref_width', type=int, default=None,
                             help='Width of Reference .h5 file')
@@ -315,30 +396,15 @@ class MinoPyParser:
         return parser
 
     @staticmethod
-    def generate_interferograms_parser():
-
-        parser = argparse.ArgumentParser(description='Generate interferogram')
-        parser.add_argument('-m', '--reference', type=str, dest='reference', required=True,
-                            help='Reference image')
-        parser.add_argument('-s', '--secondary', type=str, dest='secondary', required=True,
-                            help='Secondary image')
-        parser.add_argument('-t', '--stack', type=str, dest='stack_file', required=True,
-                            help='stack file to read from')
-        parser.add_argument('-o', '--output_dir', type=str, dest='out_dir', default='interferograms',
-                            help='Prefix of output int and amp files')
-        parser.add_argument('-a', '--azimuth_looks', type=int, dest='azlooks', default=1,
-                            help='Azimuth looks')
-        parser.add_argument('-r', '--range_looks', type=int, dest='rglooks', default=1,
-                            help='Range looks')
-        parser.add_argument('-f', '--filter_strength', type=float, dest='filter_strength', default=0.5,
-                            help='filtering strength')
-        parser.add_argument('-p', '--stack_prefix', dest='prefix', type=str, default='tops'
-                            , help='ISCE stack processor: options= tops, stripmap -- default = tops')
-
+    def phase_to_range_parser():
+        parser = argparse.ArgumentParser(description='Convert phase to range time series')
+        parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', required=True,
+                            help='working directory (minopy)')
         return parser
 
     @staticmethod
     def minopy_app_parser():
+
         STEP_LIST = [
             'load_slc',
             'inversion',
@@ -360,10 +426,14 @@ class MinoPyParser:
             'google_earth',
             'hdfeos5']
 
-        STEP_JOBS = ['load_slc',
+        STEP_LIST = [
+            'load_slc',
             'inversion',
             'ifgrams',
             'unwrap',
+            'load_ifg',
+            'correct_unwrap_error',
+            'phase_to_range',
             'mintpy_corrections']
 
 
@@ -392,14 +462,9 @@ class MinoPyParser:
 
         parser.add_argument('customTemplateFile', nargs='?',
                             help='custom template with option settings.\n' +
-                                 "ignored if the default minopy_template.cfg is input.")
-        parser.add_argument('--dir', dest='workDir',
-                            help='specify custom working directory. The default is:\n' +
-                                 'a) current directory, OR\n' +
-                                 'b) $SCRATCHDIR/$projectName/minopy, if:\n' +
-                                 '    1) autoPath == True in $MINOPY_HOME/minopy/defaults/auto_path.py AND\n' +
-                                 '    2) environment variable $SCRATCHDIR exists AND\n' +
-                                 '    3) customTemplateFile is specified (projectName.*)\n')
+                                 "ignored if the default minopyApp.cfg is input.")
+        parser.add_argument('--dir', '--work-dir', dest='workDir', default='./',
+                        help='work directory, (default: %(default)s).')
 
         parser.add_argument('-g', dest='generate_template', action='store_true',
                             help='generate default template (if it does not exist) and exit.')
@@ -407,8 +472,6 @@ class MinoPyParser:
                             help='print the default template file and exit.')
         parser.add_argument('-v', '--version', action='store_true', help='print software version and exit')
 
-        parser.add_argument('--noplot', dest='plot', action='store_false',
-                            help='do not plot results at the end of the processing.')
         parser.add_argument('--walltime', dest='wall_time', default='None',
                              help='walltime for submitting the script as a job')
         parser.add_argument('--queue', dest='queue', default=None, help='Queue name')
@@ -422,8 +485,9 @@ class MinoPyParser:
                           help='run processing at the named step only')
         step.add_argument('--jobfiles', dest='write_job', action='store_true',
                           help=' do not run tasks created in [inversion, ifgrams, unwrap] steps, only write their job')
+        step.add_argument('--runfiles', dest='run_flag', action='store_true', help='Run the tasks created for each step')
 
-        return parser, STEP_LIST, STEP_JOBS
+        return parser, STEP_LIST, EXAMPLE
 
 
 

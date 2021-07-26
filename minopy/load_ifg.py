@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-############################################################
-# Program is part of MintPy                                #
-# Author:  Zhang Yunjun, Heresh Fattahi, Sara Mirzaee      #
-############################################################
+########################################################################
+# Program is part of MiNoPy and a modified version of Mintpy.load_data #
+# Author (Modified by): Sara Mirzaee                                   #
+########################################################################
 
 import os
 import sys
@@ -22,28 +22,28 @@ from mintpy.utils import readfile, ptime, utils as ut
 from mintpy.utils import isce_utils
 from minopy.objects.utils import check_template_auto_value
 from mintpy import subset
-
+import datetime
 
 #################################################################
-datasetName2templateKey = {'unwrapPhase'     : 'MINOPY.load.unwFile',
-                           'coherence'       : 'MINOPY.load.corFile',
-                           'connectComponent': 'MINOPY.load.connCompFile',
-                           'wrapPhase'       : 'MINOPY.load.intFile',
-                           'iono'            : 'MINOPY.load.ionoFile',
-                           'height'          : 'MINOPY.load.demFile',
-                           'latitude'        : 'MINOPY.load.lookupYFile',
-                           'longitude'       : 'MINOPY.load.lookupXFile',
-                           'azimuthCoord'    : 'MINOPY.load.lookupYFile',
-                           'rangeCoord'      : 'MINOPY.load.lookupXFile',
-                           'incidenceAngle'  : 'MINOPY.load.incAngleFile',
-                           'azimuthAngle'    : 'MINOPY.load.azAngleFile',
-                           'shadowMask'      : 'MINOPY.load.shadowMaskFile',
-                           'waterMask'       : 'MINOPY.load.waterMaskFile',
-                           'bperp'           : 'MINOPY.load.bperpFile'
+datasetName2templateKey = {'unwrapPhase'     : 'minopy.load.unwFile',
+                           'coherence'       : 'minopy.load.corFile',
+                           'connectComponent': 'minopy.load.connCompFile',
+                           'wrapPhase'       : 'minopy.load.intFile',
+                           'iono'            : 'minopy.load.ionoFile',
+                           'height'          : 'minopy.load.demFile',
+                           'latitude'        : 'minopy.load.lookupYFile',
+                           'longitude'       : 'minopy.load.lookupXFile',
+                           'azimuthCoord'    : 'minopy.load.lookupYFile',
+                           'rangeCoord'      : 'minopy.load.lookupXFile',
+                           'incidenceAngle'  : 'minopy.load.incAngleFile',
+                           'azimuthAngle'    : 'minopy.load.azAngleFile',
+                           'shadowMask'      : 'minopy.load.shadowMaskFile',
+                           'waterMask'       : 'minopy.load.waterMaskFile',
+                           'bperp'           : 'minopy.load.bperpFile'
                            }
 
 DEFAULT_TEMPLATE = """template:
-########## 1. Load Data (--load to exit after this step)
+########## 1. Load ifgs (--load to exit after this step)
 {}\n
 {}\n
 {}\n
@@ -61,31 +61,31 @@ TEMPLATE = """template:
 ## no   - save   0% disk usage, fast [default]
 ## lzf  - save ~57% disk usage, relative slow
 ## gzip - save ~62% disk usage, very slow [not recommend]
-MINOPY.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isce
-MINOPY.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
-MINOPY.load.compression    = auto  #[gzip / lzf / no], auto for no.
+minopy.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isce
+minopy.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
+minopy.load.compression    = auto  #[gzip / lzf / no], auto for no.
 ##---------for ISCE only:
-MINOPY.load.metaFile       = auto  #[path2metadata_file], i.e.: ./reference/IW1.xml, ./referenceShelve/data.dat
-MINOPY.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
+minopy.load.metaFile       = auto  #[path2metadata_file], i.e.: ./reference/IW1.xml, ./referenceShelve/data.dat
+minopy.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
 ##---------interferogram datasets:
-MINOPY.load.unwFile        = auto  #[path2unw_file]
-MINOPY.load.corFile        = auto  #[path2cor_file]
-MINOPY.load.connCompFile   = auto  #[path2conn_file], optional
-MINOPY.load.intFile        = auto  #[path2int_file], optional
-MINOPY.load.ionoFile       = auto  #[path2iono_file], optional
+minopy.load.unwFile        = auto  #[path2unw_file]
+minopy.load.corFile        = auto  #[path2cor_file]
+minopy.load.connCompFile   = auto  #[path2conn_file], optional
+minopy.load.intFile        = auto  #[path2int_file], optional
+minopy.load.ionoFile       = auto  #[path2iono_file], optional
 ##---------geometry datasets:
-MINOPY.load.demFile        = auto  #[path2hgt_file]
-MINOPY.load.lookupYFile    = auto  #[path2lat_file], not required for geocoded data
-MINOPY.load.lookupXFile    = auto  #[path2lon_file], not required for geocoded data
-MINOPY.load.incAngleFile   = auto  #[path2los_file], optional
-MINOPY.load.azAngleFile    = auto  #[path2los_file], optional
-MINOPY.load.shadowMaskFile = auto  #[path2shadow_file], optional
-MINOPY.load.waterMaskFile  = auto  #[path2water_mask_file], optional
-MINOPY.load.bperpFile      = auto  #[path2bperp_file], optional
+minopy.load.demFile        = auto  #[path2hgt_file]
+minopy.load.lookupYFile    = auto  #[path2lat_file], not required for geocoded data
+minopy.load.lookupXFile    = auto  #[path2lon_file], not required for geocoded data
+minopy.load.incAngleFile   = auto  #[path2los_file], optional
+minopy.load.azAngleFile    = auto  #[path2los_file], optional
+minopy.load.shadowMaskFile = auto  #[path2shadow_file], optional
+minopy.load.waterMaskFile  = auto  #[path2water_mask_file], optional
+minopy.load.bperpFile      = auto  #[path2bperp_file], optional
 ##---------subset (optional):
 ## if both yx and lalo are specified, use lalo option unless a) no lookup file AND b) dataset is in radar coord
-mintpy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
-mintpy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
+minopy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
+minopy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
 """
 
 NOTE = """NOTE:
@@ -95,10 +95,10 @@ NOTE = """NOTE:
 """
 
 EXAMPLE = """example:
-  load_data.py -t GalapagosSenDT128.tempalte
-  load_data.py -t minopy_template.cfg
-  load_data.py -t minopy_template.cfg GalapagosSenDT128.tempalte --project GalapagosSenDT128
-  load_data.py -H #Show example input template for ISCE/ROI_PAC/GAMMA products
+  load_ifg.py -t GalapagosSenDT128.tempalte
+  load_ifg.py -t minopyApp.cfg
+  load_ifg.py -t minopyApp.cfg GalapagosSenDT128.tempalte --project GalapagosSenDT128
+  load_ifg.py -H #Show example input template for ISCE/ROI_PAC/GAMMA products
 """
 
 
@@ -109,8 +109,8 @@ def create_parser():
                                      epilog=TEMPLATE+'\n'+NOTE+'\n'+EXAMPLE)
     parser.add_argument('-H', dest='print_example_template', action='store_true',
                         help='Print/Show the example template file for loading.')
-    parser.add_argument('-t', '--template', type=str, nargs='+',
-                        dest='template_file', help='template file with path info.')
+    parser.add_argument('-t', '--template', type=str, nargs='+', dest='template_file',
+                        help='template file with path info.')
 
     parser.add_argument('--project', type=str, dest='PROJECT_NAME',
                         help='project name of dataset for INSARMAPS Web Viewer')
@@ -155,47 +155,55 @@ def read_inps2dict(inps):
     # Read input info into inpsDict
     inpsDict = vars(inps)
     inpsDict['PLATFORM'] = None
+    auto_template = os.path.join(os.path.dirname(__file__), 'defaults/minopyApp_auto.cfg')
 
     # Read template file
     template = {}
-    for fname in inps.template_file:
+    for fname in list(inps.template_file):
         temp = readfile.read_template(fname)
-        temp = check_template_auto_value(temp)
+        temp = check_template_auto_value(temp, auto_file=auto_template)
         template.update(temp)
     for key, value in template.items():
         inpsDict[key] = value
     if 'processor' in template.keys():
-        template['MINOPY.load.processor'] = template['processor']
+        template['minopy.load.processor'] = template['processor']
 
-    prefix = 'MINOPY.load.'
+    prefix = 'minopy.load.'
     key_list = [i.split(prefix)[1] for i in template.keys() if i.startswith(prefix)]
     for key in key_list:
-        value = template[prefix+key]
-        if key in ['processor', 'updateMode', 'compression']:
-            inpsDict[key] = template[prefix+key]
+        value = template[prefix + key]
+        if key in ['processor', 'updateMode', 'compression', 'autoPath']:
+            inpsDict[key] = template[prefix + key]
+        elif key in ['xstep', 'ystep']:
+            inpsDict[key] = int(template[prefix + key])
         elif value:
-            inpsDict[prefix+key] = template[prefix+key]
+            inpsDict[prefix + key] = template[prefix + key]
 
-    if inpsDict['compression'] == False:
+    if not 'compression' in inpsDict or inpsDict['compression'] == False:
         inpsDict['compression'] = None
 
+    inpsDict['xstep'] = inpsDict.get('xstep', 1)
+    inpsDict['ystep'] = inpsDict.get('ystep', 1)
+
     # PROJECT_NAME --> PLATFORM
-    if not inpsDict['PROJECT_NAME']:
-        cfile = [i for i in list(inps.template_file) if os.path.basename(i) != 'minopy_template.cfg']
+    if not 'PROJECT_NAME' in inpsDict:
+        cfile = [i for i in list(inps.template_file) if os.path.basename(i) != 'minopyApp.cfg']
         inpsDict['PROJECT_NAME'] = sensor.project_name2sensor_name(cfile)[1]
-    inpsDict['PLATFORM'] = str(sensor.project_name2sensor_name(str(inpsDict['PROJECT_NAME']))[0])
-    if inpsDict['PLATFORM']:
-        print('SAR platform/sensor : {}'.format(inpsDict['PLATFORM']))
-    print('processor: {}'.format(inpsDict['processor']))
+
+    msg = 'SAR platform/sensor : '
+    sensor_name = sensor.project_name2sensor_name(str(inpsDict['PROJECT_NAME']))[0]
+    if sensor_name:
+        msg += str(sensor_name)
+        inpsDict['PLATFORM'] = str(sensor_name)
+    else:
+        msg += 'unknown from project name "{}"'.format(inpsDict['PROJECT_NAME'])
+    print(msg)
+    
     # Here to insert code to check default file path for miami user
-    if (auto_path.autoPath
-            and inpsDict['PROJECT_NAME'] is not None
-            and inpsDict['MINOPY.load.unwFile'] == 'auto'):
+    work_dir = os.path.dirname(os.path.dirname(inpsDict['outfile']))
+    if inpsDict.get('autoPath', False):
         print(('check auto path setting for Univ of Miami users'
                ' for processor: {}'.format(inpsDict['processor'])))
-
-        work_dir = os.path.dirname(os.path.dirname(inpsDict['outfile']))
-        
         inpsDict = auto_path.get_auto_path(processor=inpsDict['processor'],
                                            work_dir=work_dir,
                                            template=inpsDict)
@@ -210,8 +218,8 @@ def read_subset_box(inpsDict):
 
     # Grab required info to read input geo_box into pix_box
     try:
-        lookupFile = [glob.glob(str(inpsDict['MINOPY.load.lookupYFile']))[0],
-                      glob.glob(str(inpsDict['MINOPY.load.lookupXFile']))[0]]
+        lookupFile = [glob.glob(str(inpsDict['minopy.load.lookupYFile']))[0],
+                      glob.glob(str(inpsDict['minopy.load.lookupXFile']))[0]]
     except:
         lookupFile = None
 
@@ -242,7 +250,7 @@ def read_subset_box(inpsDict):
         # ONLY IF there is no input subset
         # Use the min bbox if files size are different
         if inpsDict['processor'] == 'snap':
-            fnames = ut.get_file_list(inpsDict['MINOPY.load.unwFile'])
+            fnames = ut.get_file_list(inpsDict['minopy.load.unwFile'])
             pix_box = update_box4files_with_inconsistent_size(fnames)
 
         if not pix_box:
@@ -574,23 +582,23 @@ def prepare_metadata(inpsDict):
     print('prepare metadata files for {} products'.format(processor))
 
     if processor in ['gamma', 'roipac', 'snap']:
-        for key in [i for i in inpsDict.keys() if (i.startswith('MINOPY.load.') and i.endswith('File'))]:
+        for key in [i for i in inpsDict.keys() if (i.startswith('minopy.load.') and i.endswith('File'))]:
             if len(glob.glob(str(inpsDict[key]))) > 0:
                 cmd = '{} {}'.format(script_name, inpsDict[key])
                 print(cmd)
                 os.system(cmd)
 
     elif processor == 'isce':
-        meta_files = sorted(glob.glob(inpsDict['MINOPY.load.metaFile']))
+        meta_files = sorted(glob.glob(inpsDict['minopy.load.metaFile']))
         if len(meta_files) < 1:
-            warnings.warn('No input metadata file found: {}'.format(inpsDict['MINOPY.load.metaFile']))
+            warnings.warn('No input metadata file found: {}'.format(inpsDict['minopy.load.metaFile']))
         try:
             # metadata and auxliary data
             meta_file = meta_files[0]
-            baseline_dir = inpsDict['MINOPY.load.baselineDir']
-            geom_dir = os.path.dirname(inpsDict['MINOPY.load.demFile'])
+            baseline_dir = inpsDict['minopy.load.baselineDir']
+            geom_dir = os.path.dirname(inpsDict['minopy.load.demFile'])
             # observation
-            obs_keys = ['MINOPY.load.unwFile', 'MINOPY.load.azOffFile']
+            obs_keys = ['minopy.load.unwFile', 'minopy.load.azOffFile']
             obs_keys = [i for i in obs_keys if i in inpsDict.keys()]
             obs_paths = [inpsDict[key] for key in obs_keys if inpsDict[key].lower() != 'auto']
             if len(obs_paths) > 0:
@@ -640,8 +648,19 @@ def get_extra_metadata(inpsDict):
 def main(iargs=None):
     inps = cmd_line_parse(iargs)
 
+    dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+
+    if not iargs is None:
+        msg = os.path.basename(__file__) + ' ' + ' '.join(iargs[:])
+        string = dateStr + " * " + msg
+        print(string)
+    else:
+        msg = os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::])
+        string = dateStr + " * " + msg
+        print(string)
+
     work_dir = os.path.dirname(inps.outdir)
-    os.chdir(work_dir)
+    #os.chdir(work_dir)
 
     # read input options
     inpsDict = read_inps2dict(inps)
@@ -668,6 +687,31 @@ def main(iargs=None):
                             box=box,
                             compression=comp,
                             extra_metadata=extraDict)
+
+    # check loading result
+    load_complete, stack_file, geom_file = ut.check_loaded_dataset(work_dir=work_dir, print_msg=True)[0:3]
+
+    # add custom metadata (optional)
+    customTemplate = inps.template_file[0]
+    if customTemplate:
+        print('updating {}, {} metadata based on custom template file: {}'.format(
+            os.path.basename(stack_file),
+            os.path.basename(geom_file),
+            os.path.basename(customTemplate)))
+        # use ut.add_attribute() instead of add_attribute.py because of
+        # better control of special metadata, such as SUBSET_X/YMIN
+        ut.add_attribute(stack_file, inpsDict)
+        ut.add_attribute(geom_file, inpsDict)
+
+    # if not load_complete, plot and raise exception
+    if not load_complete:
+        # go back to original directory
+        print('Go back to directory:', work_dir)
+        os.chdir(work_dir)
+
+        # raise error
+        msg = 'step load_ifgs: NOT all required dataset found, exit.'
+        raise SystemExit(msg)
 
     return inps.outfile
 

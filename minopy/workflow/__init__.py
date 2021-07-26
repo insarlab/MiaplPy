@@ -25,9 +25,11 @@ as_logger.setLevel(logging.WARNING)
 __all__ = [
     'load_slc',
     'generate_interferograms',
+    'generate_unwrap_mask',
     'phase_inversion',
-    'load_int',
+    'load_ifg',
     'unwrap_minopy',
+    'phase_to_range',
     'version',
 ]
 

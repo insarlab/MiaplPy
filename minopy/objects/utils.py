@@ -6,7 +6,6 @@
 import os
 import shutil
 import glob
-#from natsort import natsorted
 from mintpy.objects.coord import coordinate
 import h5py
 from mintpy.utils import readfile
@@ -425,11 +424,15 @@ def read_attribute(fname, datasetName=None, standardize=True, metafile_ext=None)
     return atr
 
 
-def check_template_auto_value(templateDict, auto_file='../defaults/minopy_template_defaults.cfg'):
+def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='../defaults/minopyApp_auto.cfg'):
     """Replace auto value based on the input auto config file."""
     # Read default template value and turn yes/no to True/False
     templateAutoFile = os.path.join(os.path.dirname(__file__), auto_file)
     templateAutoDict = readfile.read_template(templateAutoFile)
+
+    if not mintpyTemplateDict is None:
+        for key, value in mintpyTemplateDict.items():
+            templateDict[key] = value
 
     # Update auto value of input template dict
     for key, value in templateDict.items():
@@ -446,6 +449,7 @@ def check_template_auto_value(templateDict, auto_file='../defaults/minopy_templa
     for key, value in templateDict.items():
         if value in specialValues.keys():
             templateDict[key] = specialValues[value]
+
     return templateDict
 
 

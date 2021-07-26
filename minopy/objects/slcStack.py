@@ -174,7 +174,7 @@ class slcStackDict:
 
         ###############################
         # 1D dataset containing dates of all images
-        dsName = 'dates'
+        dsName = 'date'
         dsDataType = np.string_
         dsShape = (self.numSlc, 1)
         print('create dataset /{d:<{w}} of {t:<25} in size of {s}'.format(d=dsName,
@@ -211,7 +211,7 @@ class slcStackDict:
         if xstep * ystep > 1:
             self.metadata = attr.update_attribute4multilook(self.metadata, ystep, xstep)
 
-        self.metadata['FILE_TYPE'] = 'slc'
+        self.metadata['FILE_TYPE'] = 'timeseries' #'slc'
         for key, value in self.metadata.items():
             f.attrs[key] = value
 
@@ -226,7 +226,7 @@ FILE_STRUCTURE_SLCs = """
 /                Root level
 Attributes       Dictionary for metadata
 /slc             3D array of float32 in size of (n, l, w) in meter.
-/dates            1D array of string  in size of (n,     ) in YYYYMMDD format
+/date            1D array of string  in size of (n,     ) in YYYYMMDD format
 /bperp           1D array of float32 in size of (n,     ) in meter. (optional)
 """
 
@@ -281,7 +281,7 @@ class slcStack:
     def get_metadata(self):
         with h5py.File(self.file, 'r') as f:
             self.metadata = dict(f.attrs)
-            dates = f['dates'][:]
+            dates = f['date'][:]
         for key, value in self.metadata.items():
             try:
                 self.metadata[key] = value.decode('utf8')
@@ -308,7 +308,7 @@ class slcStack:
 
     def get_date_list(self):
         with h5py.File(self.file, 'r') as f:
-            self.dateList = [i.decode('utf8') for i in f['dates'][:]]
+            self.dateList = [i.decode('utf8') for i in f['date'][:]]
         return self.dateList
 
     def read(self, datasetName=None, box=None, print_msg=True):
@@ -325,7 +325,7 @@ class slcStack:
                     data = tsobj.read(box=(100,300,500,800))
         """
         if print_msg:
-            print('reading {} data from file: {} ...'.format(self.name, self.file))
+            print('reading box {} from file: {} ...'.format(box, self.file))
         self.open(print_msg=False)
 
         # convert input datasetName into list of dates
@@ -375,7 +375,7 @@ class slcStack:
 
         # write attributes
         metadata = dict(metadata)
-        metadata['FILE_TYPE'] = self.name
+        metadata['FILE_TYPE'] = 'timeseries' #self.name
         for key in metadata.keys():
             f.attrs[key] = metadata[key]
 
@@ -473,7 +473,7 @@ class slcStack:
         dates = np.array(dates, dtype=np.string_)
         bperp = np.array(bperp, dtype=np.float32)
         metadata = dict(metadata)
-        metadata['FILE_TYPE'] = self.name
+        metadata['FILE_TYPE'] = 'timeseries' #self.name
 
         # 3D dataset - slcStack
         print('create slcStack HDF5 file: {} with w mode'.format(outFile))
@@ -485,7 +485,7 @@ class slcStack:
         f.create_dataset('slc', data=data, chunks=True, compression=compression)
 
         # 1D dataset - date / bperp
-        print('create dataset /dates      of {:<10} in size of {}'.format(str(dates.dtype), dates.shape))
+        print('create dataset /date      of {:<10} in size of {}'.format(str(dates.dtype), dates.shape))
         f.create_dataset('date', data=dates)
 
         if bperp.shape != ():

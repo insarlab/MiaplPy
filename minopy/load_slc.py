@@ -7,6 +7,8 @@ import os
 import glob
 import warnings
 import shutil
+import sys
+import datetime
 from minopy.defaults import auto_path
 from mintpy.objects import (geometryDatasetNames,
                             geometry,
@@ -17,29 +19,28 @@ from minopy.objects.slcStack import (slcDatasetNames,
                                      slcDict)
 from minopy.objects.geometryStack import geometryDict
 from mintpy.utils import readfile, ptime, utils as ut
-from mintpy import subset
 import mintpy.load_data as mld
 from minopy.objects.utils import check_template_auto_value
 from minopy.objects.utils import read_attribute, coord_rev, print_write_setting
 from minopy.objects.arg_parser import MinoPyParser
 
 #################################################################
-datasetName2templateKey = {'slc': 'MINOPY.load.slcFile',
-                           'unwrapPhase': 'MINOPY.load.unwFile',
-                           'coherence': 'MINOPY.load.corFile',
-                           'connectComponent': 'MINOPY.load.connCompFile',
-                           'wrapPhase': 'MINOPY.load.intFile',
-                           'iono': 'MINOPY.load.ionoFile',
-                           'height': 'MINOPY.load.demFile',
-                           'latitude': 'MINOPY.load.lookupYFile',
-                           'longitude': 'MINOPY.load.lookupXFile',
-                           'azimuthCoord': 'MINOPY.load.lookupYFile',
-                           'rangeCoord': 'MINOPY.load.lookupXFile',
-                           'incidenceAngle': 'MINOPY.load.incAngleFile',
-                           'azimuthAngle': 'MINOPY.load.azAngleFile',
-                           'shadowMask': 'MINOPY.load.shadowMaskFile',
-                           'waterMask': 'MINOPY.load.waterMaskFile',
-                           'bperp': 'MINOPY.load.bperpFile'
+datasetName2templateKey = {'slc': 'minopy.load.slcFile',
+                           'unwrapPhase': 'minopy.load.unwFile',
+                           'coherence': 'minopy.load.corFile',
+                           'connectComponent': 'minopy.load.connCompFile',
+                           'wrapPhase': 'minopy.load.intFile',
+                           'iono': 'minopy.load.ionoFile',
+                           'height': 'minopy.load.demFile',
+                           'latitude': 'minopy.load.lookupYFile',
+                           'longitude': 'minopy.load.lookupXFile',
+                           'azimuthCoord': 'minopy.load.lookupYFile',
+                           'rangeCoord': 'minopy.load.lookupXFile',
+                           'incidenceAngle': 'minopy.load.incAngleFile',
+                           'azimuthAngle': 'minopy.load.azAngleFile',
+                           'shadowMask': 'minopy.load.shadowMaskFile',
+                           'waterMask': 'minopy.load.waterMaskFile',
+                           'bperp': 'minopy.load.bperpFile'
                            }
 
 
@@ -50,13 +51,25 @@ def main(iargs=None):
     Parser = MinoPyParser(iargs, script='load_slc')
     inps = Parser.parse()
 
+    dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+
+    if not iargs is None:
+        msg = os.path.basename(__file__) + ' ' + ' '.join(iargs[:])
+        string = dateStr + " * " + msg
+        print(string)
+    else:
+        msg = os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1:-1])
+        string = dateStr + " * " + msg
+        print(string)
+
     os.chdir(inps.work_dir)
 
     # read input options
     iDict = read_inps2dict(inps)
     
     # prepare metadata
-    prepare_metadata(iDict)
+    if not inps.no_metadata_check:
+        prepare_metadata(iDict)
 
     # skip data writing for aria as it is included in prep_aria
     if iDict['processor'] == 'aria':
@@ -109,12 +122,12 @@ def main(iargs=None):
                               compression='lzf')
 
 
-    reference_dir = os.path.dirname(iDict['MINOPY.load.metaFile'])
+    reference_dir = os.path.dirname(iDict['minopy.load.metaFile'])
     out_reference = inps.work_dir + '/inputs/reference'
     if not os.path.exists(out_reference):
         shutil.copytree(reference_dir, out_reference)
 
-    baseline_dir = os.path.abspath(iDict['MINOPY.load.baselineDir'])
+    baseline_dir = os.path.abspath(iDict['minopy.load.baselineDir'])
     out_baseline = inps.work_dir + '/inputs/baselines'
     if not os.path.exists(out_baseline):
         shutil.copytree(baseline_dir, out_baseline)
@@ -130,7 +143,8 @@ def read_inps2dict(inps):
     # Read input info into inpsDict
     inpsDict = vars(inps)
     inpsDict['PLATFORM'] = None
-    auto_template = os.path.join(os.path.dirname(__file__), 'defaults/minopy_template_defaults.cfg')
+    auto_template = os.path.join(os.path.dirname(__file__), 'defaults/minopyApp_auto.cfg')
+
     # Read template file
     template = {}
     for fname in inps.template_file:
@@ -140,16 +154,16 @@ def read_inps2dict(inps):
     for key, value in template.items():
         inpsDict[key] = value
     if 'processor' in template.keys():
-        template['MINOPY.load.processor'] = template['processor']
+        template['minopy.load.processor'] = template['processor']
 
-    prefix = 'MINOPY.load.'
+    prefix = 'minopy.load.'
     key_list = [i.split(prefix)[1] for i in template.keys() if i.startswith(prefix)]
     for key in key_list:
         value = template[prefix + key]
-        if key in ['processor', 'updateMode', 'compression']:
+        if key in ['processor', 'updateMode', 'compression', 'autoPath']:
             inpsDict[key] = template[prefix + key]
         elif key in ['xstep', 'ystep']:
-            inpsDict[key] = int(template[prefix+key])
+            inpsDict[key] = int(template[prefix + key])
         elif value:
             inpsDict[prefix + key] = template[prefix + key]
 
@@ -160,8 +174,8 @@ def read_inps2dict(inps):
     inpsDict['ystep'] = inpsDict.get('ystep', 1)
 
     # PROJECT_NAME --> PLATFORM
-    if not inpsDict['PROJECT_NAME']:
-        cfile = [i for i in list(inps.template_file) if os.path.basename(i) != 'minopy_template.cfg']
+    if not 'PROJECT_NAME' in inpsDict:
+        cfile = [i for i in list(inps.template_file) if os.path.basename(i) != 'minopyApp.cfg']
         inpsDict['PROJECT_NAME'] = sensor.project_name2sensor_name(cfile)[1]
 
     inpsDict['PLATFORM'] = str(sensor.project_name2sensor_name(str(inpsDict['PROJECT_NAME']))[0])
@@ -170,15 +184,12 @@ def read_inps2dict(inps):
     print('processor: {}'.format(inpsDict['processor']))
 
     # Here to insert code to check default file path for miami user
-    work_dir = os.path.dirname(inps.out_dir)
-    if (auto_path.autoPath
-            and 'SCRATCHDIR' in os.environ
-            and inpsDict['PROJECT_NAME'] is not None
-            and inpsDict['MINOPY.load.slcFile'] == 'auto'):
+    #work_dir = os.path.dirname(os.path.dirname(inpsDict['outfile']))
+    if inpsDict.get('autoPath', False):
         print(('check auto path setting for Univ of Miami users'
                ' for processor: {}'.format(inpsDict['processor'])))
         inpsDict = auto_path.get_auto_path(processor=inpsDict['processor'],
-                                           work_dir=work_dir,
+                                           work_dir=inps.work_dir,
                                            template=inpsDict)
     return inpsDict
 
@@ -192,7 +203,7 @@ def prepare_metadata(inpsDict):
     print('-' * 50)
     print('prepare metadata files for {} products'.format(processor))
     if processor in ['gamma', 'roipac', 'snap']:
-        for key in [i for i in inpsDict.keys() if (i.startswith('MINOPY.load.') and i.endswith('File'))]:
+        for key in [i for i in inpsDict.keys() if (i.startswith('minopy.load.') and i.endswith('File'))]:
             if len(glob.glob(str(inpsDict[key]))) > 0:
                 cmd = '{} {}'.format(script_name, inpsDict[key])
                 print(cmd)
@@ -200,15 +211,15 @@ def prepare_metadata(inpsDict):
 
     elif processor == 'isce':
 
-        slc_dir = os.path.dirname(os.path.dirname(inpsDict['MINOPY.load.slcFile']))
-        slc_file = os.path.basename(inpsDict['MINOPY.load.slcFile'])
-        meta_files = sorted(glob.glob(inpsDict['MINOPY.load.metaFile']))
+        slc_dir = os.path.dirname(os.path.dirname(inpsDict['minopy.load.slcFile']))
+        slc_file = os.path.basename(inpsDict['minopy.load.slcFile'])
+        meta_files = sorted(glob.glob(inpsDict['minopy.load.metaFile']))
         if len(meta_files) < 1:
-            warnings.warn('No input metadata file found: {}'.format(inpsDict['MINOPY.load.metaFile']))
+            warnings.warn('No input metadata file found: {}'.format(inpsDict['minopy.load.metaFile']))
         try:
             meta_file = meta_files[0]
-            baseline_dir = inpsDict['MINOPY.load.baselineDir']
-            geom_dir = os.path.dirname(inpsDict['MINOPY.load.demFile'])
+            baseline_dir = inpsDict['minopy.load.baselineDir']
+            geom_dir = os.path.dirname(inpsDict['minopy.load.demFile'])
             cmd = '{s} -s {i} -f {f} -m {m} -b {b} -g {g}'.format(s=script_name,
                                                                   i=slc_dir,
                                                                   f=slc_file,
@@ -223,19 +234,46 @@ def prepare_metadata(inpsDict):
 
 
 #################################################################
+def read_subset_template2box(template_file):
+    """Read minopy.subset.lalo/yx option from template file into box type
+    Return None if not specified.
+    (Modified from mintpy.subsets)
+    """
+    tmpl = readfile.read_template(template_file)
+
+    # subset.lalo -> geo_box
+    try:
+        opts = [i.strip().replace('[','').replace(']','') for i in tmpl['minopy.subset.lalo'].split(',')]
+        lat0, lat1 = sorted([float(i.strip()) for i in opts[0].split(':')])
+        lon0, lon1 = sorted([float(i.strip()) for i in opts[1].split(':')])
+        geo_box = (lon0, lat1, lon1, lat0)
+    except:
+        geo_box = None
+
+    # subset.yx -> pix_box
+    try:
+        opts = [i.strip().replace('[','').replace(']','') for i in tmpl['minopy.subset.yx'].split(',')]
+        y0, y1 = sorted([int(i.strip()) for i in opts[0].split(':')])
+        x0, x1 = sorted([int(i.strip()) for i in opts[1].split(':')])
+        pix_box = (x0, y0, x1, y1)
+    except:
+        pix_box = None
+
+    return pix_box, geo_box
 
 
 def read_subset_box(inpsDict):
     # Read subset info from template
     inpsDict['box'] = None
     inpsDict['box4geo_lut'] = None
-    pix_box, geo_box = subset.read_subset_template2box(inpsDict['template_file'][0])
+
+    pix_box, geo_box = read_subset_template2box(inpsDict['template_file'][0])
 
     # Grab required info to read input geo_box into pix_box
 
     try:
-        lookupFile = [glob.glob(str(inpsDict['MINOPY.load.lookupYFile'] + '.xml'))[0],
-                      glob.glob(str(inpsDict['MINOPY.load.lookupXFile'] + '.xml'))[0]]
+        lookupFile = [glob.glob(str(inpsDict['minopy.load.lookupYFile'] + '.xml'))[0],
+                      glob.glob(str(inpsDict['minopy.load.lookupXFile'] + '.xml'))[0]]
         lookupFile = [x.split('.xml')[0] for x in lookupFile]
     except:
         lookupFile = None
@@ -268,7 +306,7 @@ def read_subset_box(inpsDict):
         # ONLY IF there is no input subset
         # Use the min bbox if files size are different
         if inpsDict['processor'] == 'snap':
-            fnames = ut.get_file_list(inpsDict['MINOPY.load.slcFile'])
+            fnames = ut.get_file_list(inpsDict['minopy.load.slcFile'])
             pix_box = update_box4files_with_inconsistent_size(fnames)
 
         #if not pix_box:
@@ -291,7 +329,7 @@ def read_subset_box(inpsDict):
             box4geo_lut = ut.coordinate(atrLut).bbox_geo2radar(geo_box)
             print('box to read for geocoded lookup file in y/x: {}'.format(box4geo_lut))
 
-    if pix_box in [None, 'None']:
+    if pix_box in [None, 'None'] and 'WIDTH' in atr:
         pix_box = (0, 0, int(atr['WIDTH']), int(atr['LENGTH']))
 
     for key in atr:
@@ -331,7 +369,7 @@ def read_inps_dict2slc_stack_dict_object(inpsDict):
         print('WARNING: No reqired {} data files found!'.format(dsName0))
         return None
 
-    # Check 2: data dimension for unwrapPhase files
+    # Check 2: data dimension for slc files
     dsPathDict = skip_files_with_inconsistent_size(dsPathDict,
                                                    pix_box=inpsDict['box'],
                                                    dsName=dsName0)

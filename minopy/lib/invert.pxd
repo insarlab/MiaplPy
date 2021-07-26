@@ -3,7 +3,7 @@ cimport cython
 
 
 cdef void write_wrapped(list, bytes, int, int, bytes, bytes)
-cdef void write_hdf5_block_3D(object, float complex[:, :, ::1], bytes, list)
+cdef void write_hdf5_block_3D(object, float[:, :, ::1], bytes, list)
 cdef void write_hdf5_block_2D_float(object, float[:, ::1], bytes, list)
 cdef void write_hdf5_block_2D_int(object, int[:, ::1], bytes, list)
 

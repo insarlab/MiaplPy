@@ -7,7 +7,8 @@ import logging
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 import os
-import isce
+import sys
+import datetime
 import isceobj
 from isceobj.Image.IntImage import IntImage
 import numpy as np
@@ -23,6 +24,17 @@ def main(iargs=None):
 
     Parser = MinoPyParser(iargs, script='generate_interferograms')
     inps = Parser.parse()
+
+    dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+
+    if not iargs is None:
+        msg = os.path.basename(__file__) + ' ' + ' '.join(iargs[:])
+        string = dateStr + " * " + msg
+        print(string)
+    else:
+        msg = os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::])
+        string = dateStr + " * " + msg
+        print(string)
 
     os.makedirs(inps.out_dir, exist_ok=True)
 
@@ -51,29 +63,29 @@ def run_interferogram(inps, resampName):
         extention = '.slc'
 
     with h5py.File(inps.stack_file, 'r') as ds:
-        date_list = np.array([x.decode('UTF-8') for x in ds['dates'][:]])
+        date_list = np.array([x.decode('UTF-8') for x in ds['date'][:]])
         ref_ind = np.where(date_list==inps.reference)[0]
         sec_ind = np.where(date_list==inps.secondary)[0]
 
-        slcs =  ds['slc']
-        length = slcs.shape[1]
-        width = slcs.shape[2]
+        phase_series = ds['phase']
+        amplitudes = ds['amplitude']
+        length = phase_series.shape[1]
+        width = phase_series.shape[2]
 
         resampInt = resampName + '.int'
 
-        #ifg_mem = np.zeros([length, width], dtype=np.complex64)
- 
-        ref_image = slcs[ref_ind, :, :].reshape(length, width)
-        sec_image = np.conj(slcs[sec_ind, :, :]).reshape(length, width)
+        #ref_image = slcs[ref_ind, :, :].reshape(length, width)
+        #sec_image = np.conj(slcs[sec_ind, :, :]).reshape(length, width)
+
+        ref_phase = phase_series[ref_ind, :, :].reshape(length, width)
+        sec_phase = phase_series[sec_ind, :, :].reshape(length, width)
+
+        ref_amplitude = amplitudes[ref_ind, :, :].reshape(length, width)
+        sec_amplitude = amplitudes[sec_ind, :, :].reshape(length, width)
 
         ifg = np.memmap(resampInt, dtype=np.complex64, mode='write', shape=(length, width))
-        ifg[:, :] = ref_image * sec_image
-
-        #for kk in range(length):
-        #    ifg[kk, :] = (slcs[ref_ind, kk, :] * np.conj(slcs[sec_ind, kk, :])).reshape(1, -1)
-
-
-        #ifg[:, :] = ifg_mem[:, :]
+        ifg[:, :] = (ref_amplitude * sec_amplitude) * np.exp(1j * (ref_phase - sec_phase))
+        #ifg[:, :] = ref_image * sec_image
 
         obj_int = IntImage()
         obj_int.setFilename(resampInt)
