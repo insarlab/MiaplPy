@@ -27,7 +27,7 @@ examples:
 ```
 - minopyApp.py template_file
 - minopyApp.py template_file --start load_slc --stop unwrap
-- minopyApp.py template_file --dostep ifgrams
+- minopyApp.py template_file --dostep ifgram
 ```
 
 Use `minopyApp.py template_file --runfiles` to create run files, you may then run them one by one manually
