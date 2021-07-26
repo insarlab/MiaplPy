@@ -8,8 +8,11 @@ import shutil
 import glob
 from mintpy.objects.coord import coordinate
 import h5py
+from osgeo import gdal
+import datetime
+import minopy
+from minopy.objects.arg_parser import MinoPyParser
 from mintpy.utils import readfile
-from minopy.minopy_utilities import read_image
 from mintpy.objects import (
     datasetUnitDict,
     geometry,
@@ -147,6 +150,7 @@ class coord_rev(coordinate):
                 self.lut_metadata = read_attribute(self.lookup_file[0], metafile_ext='.xml')
 
     def read_lookup_table(self, print_msg=True):
+
         if 'Y_FIRST' in self.lut_metadata.keys():
             self.lut_y = readfile.read(self.lookup_file[0],
                                        datasetName='azimuthCoord',
@@ -577,6 +581,7 @@ def read_hdf5_file(fname, datasetName=None, box=None):
 
 #########################################################################
 def read_binary_file(fname, datasetName=None, box=None):
+
     """Read data from binary file, such as .unw, .cor, etc.
     Parameters: fname : str, path/name of binary file
                 datasetName : str, dataset name for file with multiple bands of data
@@ -856,3 +861,263 @@ def print_write_setting(iDict):
     print('x/ystep: {}/{}'.format(xyStep[0], xyStep[1]))
 
     return updateMode, comp, box, boxGeo, xyStep, xyStepGeo
+
+############################################################
+
+
+def log_message(logdir, msg):
+    f = open(os.path.join(logdir, 'log'), 'a+')
+    dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+    string = dateStr + " * " + msg
+    print(string)
+    f.write(string + "\n")
+    f.close()
+    return
+
+############################################################
+
+
+def read_image(image_file, box=None, band=1):
+    """ Reads images from isce. """
+
+    ds = gdal.Open(image_file + '.vrt', gdal.GA_ReadOnly)
+    if not box is None:
+        imds = ds.GetRasterBand(band)
+        image = imds.ReadAsArray()[box[1]:box[3], box[0]:box[2]]
+    else:
+        image = ds.GetRasterBand(band).ReadAsArray()
+
+    del ds
+
+    return image
+
+
+def custom_cmap(vmin=0, vmax=1):
+    """ create a custom colormap based on visible portion of electromagnetive wave."""
+
+    from minopy.spectrumRGB import rgb
+    rgb = rgb()
+    import matplotlib as mpl
+    cmap = mpl.colors.ListedColormap(rgb)
+    norm = mpl.colors.Normalize(vmin, vmax)
+
+    return cmap, norm
+
+
+
+def email_minopy(work_dir):
+    """ email mintpy results """
+
+    import subprocess
+    import sys
+
+    email_address = os.getenv('NOTIFICATIONEMAIL')
+
+    textStr = 'email mintpy results'
+
+    cwd = os.getcwd()
+
+    pic_dir = os.path.join(work_dir, 'pic')
+    flist = ['avgPhaseVelocity.png', 'avgSpatialCoh.png', 'geo_maskTempCoh.png', 'geo_temporalCoherence.png',
+             'geo_velocity.png', 'maskConnComp.png', 'Network.pdf', 'BperpHistory.pdf', 'CoherenceMatrix.pdf',
+             'rms_timeseriesResidual_ramp.pdf', 'geo_velocity.kmz']
+
+    file_list = [os.path.join(pic_dir, i) for i in flist]
+    print(file_list)
+
+    attachmentStr = ''
+    i = 0
+    for fileList in file_list:
+        i = i + 1
+        attachmentStr = attachmentStr + ' -a ' + fileList
+
+    mailCmd = 'echo \"' + textStr + '\" | mail -s ' + cwd + ' ' + attachmentStr + ' ' + email_address
+    command = 'ssh pegasus.ccs.miami.edu \"cd ' + cwd + '; ' + mailCmd + '\"'
+    print(command)
+    status = subprocess.Popen(command, shell=True).wait()
+    if status is not 0:
+        sys.exit('Error in email_minopy')
+
+    return
+
+
+
+def get_latest_template_minopy(work_dir):
+    from minopy.objects.read_template import Template
+
+    """Get the latest version of default template file.
+    If an obsolete file exists in the working directory, the existing option values are kept.
+    """
+    lfile = os.path.join(os.path.dirname(__file__), '../defaults/minopyApp.cfg')  # latest version
+    cfile = os.path.join(work_dir, 'minopyApp.cfg')  # current version
+    if not os.path.isfile(cfile):
+        print('copy default template file {} to work directory'.format(lfile))
+        shutil.copy2(lfile, work_dir)
+    else:
+        # read custom template from file
+        cdict = Template(cfile).options
+        ldict = Template(lfile).options
+
+        if any([key not in cdict.keys() for key in ldict.keys()]):
+            print('obsolete default template detected, update to the latest version.')
+            shutil.copy2(lfile, work_dir)
+            orig_dict = Template(cfile).options
+            for key, value in orig_dict.items():
+                if key in cdict.keys() and cdict[key] != value:
+                    update = True
+                else:
+                    update = False
+            if not update:
+                print('No new option value found, skip updating ' + cfile)
+                return cfile
+
+            # Update template_file with new value from extra_dict
+            tmp_file = cfile + '.tmp'
+            f_tmp = open(tmp_file, 'w')
+            for line in open(cfile, 'r'):
+                c = [i.strip() for i in line.strip().split('=', 1)]
+                if not line.startswith(('%', '#')) and len(c) > 1:
+                    key = c[0]
+                    value = str.replace(c[1], '\n', '').split("#")[0].strip()
+                    if key in cdict.keys() and cdict[key] != value:
+                        line = line.replace(value, cdict[key], 1)
+                        print('    {}: {} --> {}'.format(key, value, cdict[key]))
+                f_tmp.write(line)
+            f_tmp.close()
+
+            # Overwrite exsting original template file
+            mvCmd = 'mv {} {}'.format(tmp_file, cfile)
+            os.system(mvCmd)
+    return cfile
+
+
+
+def update_or_skip_inversion(inverted_date_list, slc_dates):
+
+    with open(inverted_date_list, 'r') as f:
+        inverted_dates = f.readlines()
+
+    inverted_dates = [date.split('\n')[0] for date in inverted_dates]
+    new_slc_dates = list(set(slc_dates) - set(inverted_dates))
+    all_date_list = new_slc_dates + inverted_dates
+
+    updated_index = None
+    if inverted_dates == slc_dates:
+        print(('All date exists in file {} with same size as required,'
+               ' no need to update inversion.'.format(os.path.basename(inverted_date_list))))
+    elif len(slc_dates) < 10 + len(inverted_dates):
+        print('Number of new images is less than 10 --> wait until at least 10 images are acquired')
+
+    else:
+        updated_index = len(inverted_dates)
+
+    return updated_index, all_date_list
+
+
+def read_initial_info(work_dir, templateFile):
+    from minopy.objects.slcStack import slcStack
+    import minopy.workflow
+
+    slc_file = os.path.join(work_dir, 'inputs/slcStack.h5')
+
+    if os.path.exists(slc_file):
+        slcObj = slcStack(slc_file)
+        slcObj.open(print_msg=False)
+        date_list = slcObj.get_date_list()
+        metadata = slcObj.get_metadata()
+        num_pixels = int(metadata['LENGTH']) * int(metadata['WIDTH'])
+    else:
+        scp_args = '--template {}'.format(templateFile)
+        scp_args += ' --project_dir {}'.format(os.path.dirname(work_dir))
+
+        Parser_LoadSlc = MinoPyParser(scp_args.split(), script='load_slc')
+        inps_loadSlc = Parser_LoadSlc.parse()
+
+        iDict = minopy.load_slc.read_inps2dict(inps_loadSlc)
+        minopy.load_slc.prepare_metadata(iDict)
+        metadata = minopy.load_slc.read_subset_box(iDict)
+        box = metadata['box']
+        num_pixels = (box[2] - box[0]) * (box[3] - box[1])
+        stackObj = minopy.load_slc.read_inps_dict2slc_stack_dict_object(iDict)
+        date_list = stackObj.get_date_list()
+
+    return date_list, num_pixels, metadata
+
+
+def multilook(infile, outfile, rlks, alks, multilook_tool='gdal'):
+    from mroipac.looks.Looks import Looks
+    import isceobj
+
+    if multilook_tool == "gdal":
+
+        print(infile)
+        ds = gdal.Open(infile + ".vrt", gdal.GA_ReadOnly)
+
+        xSize = ds.RasterXSize
+        ySize = ds.RasterYSize
+
+        outXSize = xSize / int(rlks)
+        outYSize = ySize / int(alks)
+
+        gdalTranslateOpts = gdal.TranslateOptions(format="ENVI", width=outXSize, height=outYSize)
+
+        gdal.Translate(outfile, ds, options=gdalTranslateOpts)
+        ds = None
+
+        ds = gdal.Open(outfile, gdal.GA_ReadOnly)
+        gdal.Translate(outfile + ".vrt", ds, options=gdal.TranslateOptions(format="VRT"))
+        ds = None
+
+    else:
+
+        print('Multilooking {0} ...'.format(infile))
+
+        inimg = isceobj.createImage()
+        inimg.load(infile + '.xml')
+
+        lkObj = Looks()
+        lkObj.setDownLooks(alks)
+        lkObj.setAcrossLooks(rlks)
+        lkObj.setInputImage(inimg)
+        lkObj.setOutputFilename(outfile)
+        lkObj.looks()
+
+    return outfilie
+
+def ks_lut(N1, N2, alpha=0.05):
+    N = (N1 * N2) / float(N1 + N2)
+    distances = np.arange(0.01, 1, 1/1000)
+    lamda = distances*(np.sqrt(N) + 0.12 + 0.11/np.sqrt(N))
+    alpha_c = np.zeros([len(distances)])
+    for value in lamda:
+        n = np.ogrid[1:101]
+        pvalue = 2*np.sum(((-1)**(n-1))*np.exp(-2*(value**2)*(n**2)))
+        pvalue = np.amin(np.amax(pvalue, initial=0), initial=1)
+        alpha_c[lamda == value] = pvalue
+    critical_distance = distances[alpha_c <= (alpha)]
+    return np.min(critical_distance)
+
+
+
+def est_corr(CCGsam):
+    """ Estimate Correlation matrix from an ensemble."""
+
+    CCGS = np.matrix(CCGsam)
+
+    cov_mat = np.matmul(CCGS, CCGS.getH()) / CCGS.shape[1]
+
+    corr_matrix = cov2corr(cov_mat)
+
+    #corr_matrix = np.multiply(cov2corr(np.abs(cov_mat)), np.exp(1j * np.angle(cov_mat)))
+
+    return corr_matrix
+
+
+def cov2corr(cov_matrix):
+    """ Converts covariance matrix to correlation/coherence matrix. """
+
+    D = LA.pinv(np.diagflat(np.sqrt(np.diag(cov_matrix))))
+    y = np.matmul(D, cov_matrix)
+    corr_matrix = np.matmul(y, np.transpose(D))
+
+    return corr_matrix
