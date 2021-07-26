@@ -30,7 +30,7 @@ __all__ = [
     'generate_interferograms',
     'generate_unwrap_mask',
     'phase_inversion',
-    'load_ifg',
+    'load_ifgram',
     'unwrap_minopy',
     'phase_to_range',
     'version',
