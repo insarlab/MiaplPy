@@ -3,21 +3,16 @@
 # Copyright(c) 2017, Sara Mirzaee                          #
 ############################################################
 
-import os,sys
+import os
 import numpy as np
-from matplotlib import pyplot as plt, ticker
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from numpy import linalg as LA
+from matplotlib import pyplot as plt
+
 import minopy_utilities as mnp
-import cmath
-import pandas as pd
 import time
 import argparse
 
-from mintpy.utils import ptime, utils as ut, network as pnet, plot as pp
-
-#displacement = 1mm/y = (1 mm *4pi / lambda(mm)) rad/y  --> 6 day = 4pi*6/lambda*365
-#displacement = lambda*phi/ 4*pi.
+# displacement = 1mm/y = (1 mm *4pi / lambda(mm)) rad/y  --> 6 day = 4pi*6/lambda*365
+# displacement = lambda*phi/ 4*pi.
 
 def create_parser():
     """ Creates command line argument parser object. """

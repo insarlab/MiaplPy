@@ -3,19 +3,22 @@
 # Program is part of MiNoPy                                #
 # Author:  Sara Mirzaee                                    #
 ############################################################
+import logging
+import warnings
+
+warnings.filterwarnings("ignore")
+
+mpl_logger = logging.getLogger('matplotlib')
+mpl_logger.setLevel(logging.WARNING)
+
 import os
 import datetime
-import isce
-import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
 from osgeo import gdal
-from minopy.defaults import auto_path
 import numpy as np
-#from mintpy.utils import readfile, ptime, utils as ut
 from mintpy import subset
 from minopy.objects.utils import read_attribute, coord_rev
 from minopy.objects.arg_parser import MinoPyParser
-
 #################################################################
 datasetName2templateKey = {'slc': 'MINOPY.load.slcFile',
                            'height': 'MINOPY.load.demFile',

@@ -15,6 +15,9 @@ warnings.filterwarnings("ignore")
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 
+fi_logger = logging.getLogger('fiona._env')
+fi_logger.setLevel(logging.DEBUG)
+
 sg_logger = logging.getLogger('shapely.geos')
 sg_logger.setLevel(logging.WARNING)
 

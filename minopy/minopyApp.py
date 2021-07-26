@@ -13,21 +13,12 @@ mpl_logger.setLevel(logging.WARNING)
 import os
 import sys
 import time
-import datetime
 import shutil
-import h5py
-import re
-import math
 
-import minopy
-import minopy.workflow
 from mintpy.utils import writefile, readfile, utils as ut
-
-import mintpy
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 import minopy.minopy_utilities as mut
 from minopy.objects.arg_parser import MinoPyParser
-from minopy.objects.slcStack import slcStack
 from minopy.defaults.auto_path import autoPath, PathFind
 from minopy.objects.utils import check_template_auto_value
 
@@ -193,6 +184,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """ Loading images using load_slc.py script and crop is subsets are given.
         """
         run_file_load_slc = os.path.join(self.run_dir, RUN_FILES[sname])
+        print('Generate {}'.format(run_file_load_slc))
 
         if self.template['minopy.subset.lalo'] == 'None' and self.template['minopy.subset.yx'] == 'None':
             print('WARNING: No crop area given in mintpy.subset, the whole image is going to be used.')
@@ -201,7 +193,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         scp_args = '--template {}'.format(self.templateFile)
         scp_args += ' --project_dir {}'.format(os.path.dirname(self.workDir))
 
-        print('{} load_slc.py '.format(self.text_cmd.strip("'")), scp_args)
         run_commands = ['{} load_slc.py {} --no_metadata_check\n'.format(self.text_cmd.strip("'"), scp_args)]
         run_commands = [cmd.lstrip() for cmd in run_commands]
 
@@ -218,6 +209,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """ Non-Linear phase inversion.
         """
         run_inversion = os.path.join(self.run_dir, RUN_FILES[sname])
+        print('Generate {}'.format(run_inversion))
 
         scp_args = '--work_dir {a0} --range_window {a1} --azimuth_window {a2} --method {a3} --test {a4} ' \
                    '--patch_size {a5} --num_worker {a6}'.format(a0=self.workDir,
@@ -249,6 +241,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """ Export single reference interferograms
         """
         run_ifgs = os.path.join(self.run_dir, RUN_FILES[sname])
+        print('Generate {}'.format(run_ifgs))
 
         ifgram_dir = os.path.join(self.workDir, 'inverted/interferograms')
         if not self.template['minopy.interferograms.list'] in [None, 'None', 'auto']:
@@ -356,6 +349,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """ Unwrapps single reference interferograms
         """
         run_file_unwrap = os.path.join(self.run_dir, RUN_FILES[sname])
+        print('Generate {}'.format(run_file_unwrap))
 
         length = int(self.metadata['LENGTH'])
         width = int(self.metadata['WIDTH'])
@@ -460,6 +454,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """
 
         run_file_load_ifg = os.path.join(self.run_dir, RUN_FILES[sname])
+        print('Generate {}'.format(run_file_load_ifg))
 
         # 1) copy aux files (optional)
         super()._copy_aux_file()
@@ -489,6 +484,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
     def run_correct_unwrap_error(self, sname, job_obj):
 
         run_file_correct_unwrap = os.path.join(self.run_dir, RUN_FILES[sname])
+        print('Generate {}'.format(run_file_correct_unwrap))
 
         run_commands = ['{} smallbaselineApp.py {} '.format(self.text_cmd.strip("'"), self.templateFile_mintpy) +
                         '--start reference_point --stop correct_unwrap_error --dir {}\n'.format(self.workDir)]
@@ -507,6 +503,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
     def run_phase_to_range(self, sname, job_obj):
 
         run_file_phase_to_range = os.path.join(self.run_dir, RUN_FILES[sname])
+        print('Generate {}'.format(run_file_phase_to_range))
 
         run_commands = ['{} phase_to_range.py --work_dir {}\n'.format(self.text_cmd.strip("'"), self.workDir)]
         run_commands = run_commands[0].lstrip()
@@ -523,6 +520,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
     def run_write_correction_job(self, sname, job_obj):
         run_file_corrections = os.path.join(self.run_dir, RUN_FILES[sname])
+        print('Generate {}'.format(run_file_corrections))
 
         run_commands = ['{} smallbaselineApp.py {} --start correct_LOD --dir {}\n'.format(self.text_cmd.strip("'"),
                                                                                           self.templateFile_mintpy,

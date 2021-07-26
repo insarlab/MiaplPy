@@ -23,10 +23,10 @@ class MinoPyParser:
         self.script = script
         self.parser = argparse.ArgumentParser(description='MiNoPy scripts parser')
         commonp = self.parser.add_argument_group('General options:')
-        commonp.add_argument('-v', '--version', action='store_true', help='print software version and exit')
-        commonp.add_argument('--walltime', dest='wall_time', default='None',
-                            help='walltime for submitting the script as a job')
-        commonp.add_argument('--queue', dest='queue', default=None, help='Queue name')
+        commonp.add_argument('-v', '--version', action='store_true', help='Print software version and exit')
+        #commonp.add_argument('--walltime', dest='wall_time', default='None',
+        #                    help='Walltime for submitting the script as a job')
+        #commonp.add_argument('--queue', dest='queue', default=None, help='Queue name')
         #commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
 
     def parse(self):
@@ -252,10 +252,10 @@ class MinoPyParser:
         parser.add_argument('-H', dest='print_example_template', action='store_true',
                             help='Print/Show the example template file for loading.')
         parser.add_argument('-t', '--template', type=str, nargs='+',
-                            dest='template_file', help='template file with path info.')
+                            dest='template_file', help='Template file with path info.')
 
         parser.add_argument('--project_dir', type=str, dest='project_dir',
-                            help='project directory of SLC dataset to read from')
+                            help='Project directory of SLC dataset to read from')
         parser.add_argument('--processor', type=str, dest='processor',
                             choices={'isce', 'gamma', 'roipac'},
                             help='InSAR processor/software of the file (This version only supports isce)',
@@ -263,15 +263,15 @@ class MinoPyParser:
         parser.add_argument('--enforce', '-f', dest='updateMode', action='store_false',
                             help='Disable the update mode, or skip checking dataset already loaded.')
         parser.add_argument('--compression', choices={'gzip', 'lzf', None}, default=None,
-                            help='compress loaded geometry while writing HDF5 file, default: None.')
+                            help='Compress loaded geometry while writing HDF5 file, default: None.')
         parser.add_argument('--no_metadata_check', dest='no_metadata_check', action='store_true',
-                          help=' do not check for rsc files, when running via minopyApp.py')
+                          help='Do not check for rsc files, when running via minopyApp.py')
 
         parser.add_argument('-o', '--output', type=str, nargs=3, dest='out_file',
                             default=['slcStack.h5',
                                      'geometryRadar.h5',
                                      'geometryGeo.h5'],
-                            help='output HDF5 file')
+                            help='Output HDF5 file')
         return parser
 
     @staticmethod
@@ -295,7 +295,7 @@ class MinoPyParser:
         parser.add_argument('-H', dest='print_example_template', action='store_true',
                             help='Print/Show the example template file for loading.')
         parser.add_argument('-t', '--template', type=str, nargs='+',
-                            dest='template_file', help='template file with path info.')
+                            dest='template_file', help='Template file with path info.')
         parser.add_argument('-s', '--slc_dir', type=str, dest='slc_dir',
                             default='./merged/SLC', help='Directory of co-registered full SLCs')
         parser.add_argument('-g', '--geometry_dir', type=str, dest='geometry_dir',
@@ -305,23 +305,23 @@ class MinoPyParser:
                             help='InSAR processor/software of the file (This version only supports isce)',
                             default='isce')
         parser.add_argument('-o', '--output_dir', type=str, dest='out_dir',
-                            default='./merged_crop', help='output directory for cropped files')
+                            default='./merged_crop', help='Output directory for cropped files')
         return parser
 
     def phase_inversion_parser(self):
         parser = self.parser
         patch = parser.add_argument_group('Phase inversion option')
-        patch.add_argument('-w', '--work_dir', type=str, dest='work_dir', help='minopy directory')
+        patch.add_argument('-w', '--work_dir', type=str, dest='work_dir', help='Working directory (minopy)')
         patch.add_argument('-r', '--range_window', type=str, dest='range_window', default=15,
-                           help='range window size for shp finding')
+                           help='Range window size for shp finding')
         patch.add_argument('-a', '--azimuth_window', type=str, dest='azimuth_window', default=15,
-                           help='azimuth window size for shp finding')
+                           help='Azimuth window size for shp finding')
         patch.add_argument('-m', '--method', type=str, dest='inversion_method', default='EMI',
-                           help='inversion method (EMI, EVD, PTA, sequential_EMI, ...)')
+                           help='Inversion method (EMI, EVD, PTA, sequential_EMI, ...)')
         patch.add_argument('-t', '--test', type=str, dest='shp_test', default='ks',
-                           help='shp statistical test (ks, ad, ttest)')
+                           help='Shp statistical test (ks, ad, ttest)')
         patch.add_argument('-p', '--patch_size', type=str, dest='patch_size', default=200,
-                           help='azimuth window size for shp finding')
+                           help='Azimuth window size for shp finding')
         patch.add_argument('-s', '--slc_stack', type=str, dest='slc_stack', help='SLC stack file')
         patch.add_argument('-n', '--num_worker', dest='num_worker', type=str, default='1',
                            help='Number of parallel tasks (default: 1)')
@@ -351,7 +351,7 @@ class MinoPyParser:
         parser.add_argument('-s', '--secondary', type=str, dest='secondary', required=True,
                             help='Secondary image')
         parser.add_argument('-t', '--stack', type=str, dest='stack_file', required=True,
-                            help='phase series stack file to read from')
+                            help='Phase series stack file to read from')
         parser.add_argument('-o', '--output_dir', type=str, dest='out_dir', default='interferograms',
                             help='Prefix of output int and amp files')
         parser.add_argument('-a', '--azimuth_looks', type=int, dest='azlooks', default=1,
@@ -369,25 +369,25 @@ class MinoPyParser:
     def unwrap_parser():
         parser = argparse.ArgumentParser(description='Unwrap using snaphu')
         parser.add_argument('-f', '--ifg', dest='input_ifg', type=str, required=True,
-                            help='input wrapped interferogram')
+                            help='Input wrapped interferogram')
         parser.add_argument('-c', '--coherence', dest='input_cor', type=str, required=True,
-                            help='input coherence file')
+                            help='Input coherence file')
         parser.add_argument('-u', '--unwrapped_ifg', dest='unwrapped_ifg', type=str, required=True,
-                            help='output unwrapped interferogram')
+                            help='Output unwrapped interferogram')
         parser.add_argument('-m', '--mask', dest='unwrap_mask', type=str, default=None,
-                            help='output unwrapped interferogram')
+                            help='Output unwrapped interferogram')
         parser.add_argument('-sw', '--width', dest='ref_width', type=int, default=None,
                             help='Width of Reference .h5 file')
         parser.add_argument('-sl', '--length', dest='ref_length', type=int, default=None,
                             help='Length of .h5 file')
         parser.add_argument('-w', '--wavelength', dest='wavelength', type=str, default=None,
-                            help='wavelength')
+                            help='Wavelength')
         parser.add_argument('-ht', '--height', dest='height', type=str, default=None,
                             help='Altitude of satellite')
         parser.add_argument('-er', '--earth_radius', dest='earth_radius', type=str, default=None,
                             help='Earth Radius')
         parser.add_argument('-i', '--init_method', dest='init_method', type=str, default='MST',
-                            help='unwrap initialization algorithm (MST, MCF)')
+                            help='Unwrap initialization algorithm (MST, MCF)')
         parser.add_argument('-d', '--max_discontinuity', dest='defo_max', type=float, default=1.2,
                             help='Maximum abrupt phase discontinuity (cycles)')
         parser.add_argument('-nt', '--num_tiles', dest='num_tiles', type=int, default=1,
@@ -399,32 +399,11 @@ class MinoPyParser:
     def phase_to_range_parser():
         parser = argparse.ArgumentParser(description='Convert phase to range time series')
         parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', required=True,
-                            help='working directory (minopy)')
+                            help='Working directory (minopy)')
         return parser
 
     @staticmethod
     def minopy_app_parser():
-
-        STEP_LIST = [
-            'load_slc',
-            'inversion',
-            'ifgrams',
-            'unwrap',
-            'load_int',
-            'reference_point',
-            'quick_overview',
-            'correct_unwrap_error',
-            'write_to_timeseries',
-            'correct_SET',
-            'correct_troposphere',
-            'deramp',
-            'correct_topography',
-            'residual_RMS',
-            'reference_date',
-            'velocity',
-            'geocode',
-            'google_earth',
-            'hdfeos5']
 
         STEP_LIST = [
             'load_slc',
@@ -448,44 +427,44 @@ class MinoPyParser:
         """.format(STEP_LIST[0:7], STEP_LIST[7:14], STEP_LIST[14:])
 
         EXAMPLE = """example: 
-              minopyApp.py  <custom_template_file>              # run with default and custom templates
+              minopyApp.py  <custom_template_file>            # run with default and custom templates
               minopyApp.py  -h / --help                       # help 
               minopyApp.py  -H                                # print    default template options
               # Run with --start/stop/step options
               minopyApp.py GalapagosSenDT128.template --dostep  load_slc       # run the step 'download' only
               minopyApp.py GalapagosSenDT128.template --start load_slc         # start from the step 'download' 
-              minopyApp.py GalapagosSenDT128.template --stop  unwrap       # end after step 'interferogram'
+              minopyApp.py GalapagosSenDT128.template --stop  unwrap           # end after step 'interferogram'
               """
         parser = argparse.ArgumentParser(description='Routine Time Series Analysis for MiNoPy',
                                          formatter_class=argparse.RawTextHelpFormatter,
                                          epilog=EXAMPLE)
 
         parser.add_argument('customTemplateFile', nargs='?',
-                            help='custom template with option settings.\n' +
+                            help='Custom template with option settings.\n' +
                                  "ignored if the default minopyApp.cfg is input.")
         parser.add_argument('--dir', '--work-dir', dest='workDir', default='./',
-                        help='work directory, (default: %(default)s).')
+                        help='Work directory, (default: %(default)s).')
 
         parser.add_argument('-g', dest='generate_template', action='store_true',
-                            help='generate default template (if it does not exist) and exit.')
+                            help='Generate default template (if it does not exist) and exit.')
         parser.add_argument('-H', dest='print_template', action='store_true',
-                            help='print the default template file and exit.')
-        parser.add_argument('-v', '--version', action='store_true', help='print software version and exit')
+                            help='Print the default template file and exit.')
+        parser.add_argument('-v', '--version', action='store_true', help='Print software version and exit')
 
-        parser.add_argument('--walltime', dest='wall_time', default='None',
-                             help='walltime for submitting the script as a job')
-        parser.add_argument('--queue', dest='queue', default=None, help='Queue name')
+        #parser.add_argument('--walltime', dest='wall_time', default='None',
+        #                     help='walltime for submitting the script as a job')
+        #parser.add_argument('--queue', dest='queue', default=None, help='Queue name')
 
         step = parser.add_argument_group('steps processing (start/end/dostep)', STEP_HELP)
         step.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
-                          help='start processing at the named step, default: {}'.format(STEP_LIST[0]))
+                          help='Start processing at the named step, default: {}'.format(STEP_LIST[0]))
         step.add_argument('--end', '--stop', dest='endStep', metavar='STEP', default=STEP_LIST[-1],
-                          help='end processing at the named step, default: {}'.format(STEP_LIST[-1]))
+                          help='End processing at the named step, default: {}'.format(STEP_LIST[-1]))
         step.add_argument('--dostep', dest='doStep', metavar='STEP',
-                          help='run processing at the named step only')
+                          help='Run processing at the named step only')
         step.add_argument('--jobfiles', dest='write_job', action='store_true',
-                          help=' do not run tasks created in [inversion, ifgrams, unwrap] steps, only write their job')
-        step.add_argument('--runfiles', dest='run_flag', action='store_true', help='Run the tasks created for each step')
+                          help='Do not run the tasks, only write job files')
+        step.add_argument('--runfiles', dest='run_flag', action='store_true', help='Create run files for all steps')
 
         return parser, STEP_LIST, EXAMPLE
 
