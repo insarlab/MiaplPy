@@ -408,9 +408,9 @@ class MinoPyParser:
         STEP_LIST = [
             'load_slc',
             'inversion',
-            'ifgrams',
+            'ifgram',
             'unwrap',
-            'load_ifg',
+            'load_ifgram',
             'correct_unwrap_error',
             'phase_to_range',
             'mintpy_corrections']
@@ -451,9 +451,9 @@ class MinoPyParser:
                             help='Print the default template file and exit.')
         parser.add_argument('-v', '--version', action='store_true', help='Print software version and exit')
 
-        #parser.add_argument('--walltime', dest='wall_time', default='None',
-        #                     help='walltime for submitting the script as a job')
-        #parser.add_argument('--queue', dest='queue', default=None, help='Queue name')
+        parser.add_argument('--walltime', dest='wall_time', default=None,
+                             help='walltime for submitting the script as a job')
+        parser.add_argument('--queue', dest='queue', default=None, help='Queue name')
 
         step = parser.add_argument_group('steps processing (start/end/dostep)', STEP_HELP)
         step.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
