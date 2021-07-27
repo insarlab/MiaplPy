@@ -4,12 +4,12 @@ In this workflow, you need to create jobs and then run them in order
 
 To create jobs, run:
 ```
-minopyApp.py $PWD/PichinchaSenAT18.template --dir minopy --jobfiles
+minopyApp.py $PWD/PichinchaSenDT142.template --dir minopy --jobfiles
 ```
 After the jobs are created, you may run them with one of the appropriate submit commands:
 ```
-submit_jobs.bash $PWD/PichinchaSenAT18.template --minopy
-submit_jobs.bash $PWD/PichinchaSenAT18.template --dostep minopy
+submit_jobs.bash $PWD/PichinchaSenDT142.template --minopy
+(submit_jobs.bash $PWD/PichinchaSenDT142.template --dostep minopy)
 ```
 This uses the `sbatch_conditional.bash` commmand, that can be used for individual run_files:
 
