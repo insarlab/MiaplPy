@@ -14,11 +14,13 @@ import os
 import sys
 import time
 import shutil
+import math
 
 from mintpy.utils import writefile, readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.defaults.auto_path import autoPath, PathFind
+from minopy.find_short_baselines import find_baselines
 from minopy.objects.utils import (check_template_auto_value,
                                   log_message, get_latest_template_minopy,
                                   read_initial_info)
@@ -101,8 +103,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.projectName = self.inps.projectName
 
         self.run_dir = os.path.join(self.workDir, pathObj.rundir)
-        # self.patch_dir = os.path.join(self.workDir, pathObj.patchdir)
-        self.ifgram_dir = os.path.join(self.workDir, pathObj.intdir)
+        os.makedirs(self.run_dir, exist_ok=True)
+        #self.ifgram_dir = os.path.join(self.workDir, pathObj.intdir)
 
         self.azimuth_look = 1
         self.range_look = 1
@@ -120,6 +122,20 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if not self.inps.generate_template:
             self.date_list, self.num_pixels, self.metadata = read_initial_info(self.workDir, self.templateFile)
+            self.num_images = len(self.date_list)
+            self.date_list_text = os.path.join(self.workDir, 'inputs/date_list.txt')
+            with open(self.date_list_text, 'w+') as fr:
+                fr.write("\n".join(self.date_list))
+
+            if 'box' in self.metadata:
+                self.metadata['LENGTH'] = self.metadata['box'][3] - self.metadata['box'][1]
+                self.metadata['WIDTH'] = self.metadata['box'][2] - self.metadata['box'][0]
+            else:
+                self.metadata['LENGTH'] = int(self.metadata['LENGTH'])
+                self.metadata['WIDTH'] = int(self.metadata['WIDTH'])
+
+            self.ifgram_dir, self.pairs = self.get_interferogram_pairs()
+
         os.chdir(self.workDir)
         return
 
@@ -150,7 +166,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         print('read default template file:', self.templateFile)
         self.template = readfile.read_template(self.templateFile)
         auto_template_file = os.path.join(os.path.dirname(__file__), 'defaults/minopyApp_auto.cfg')
-        self.template = check_template_auto_value(self.template, self.template_mintpy, auto_file=auto_template_file)
+        self.template = check_template_auto_value(self.template, self.template_mintpy, auto_file=auto_template_file,
+                                                  templateFile=self.templateFile)
 
         return
 
@@ -166,6 +183,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 inps.custom_template_file = self.templateFile
             inps.work_dir = self.run_dir
             inps.out_dir = self.run_dir
+            inps.num_data = self.num_images
             job_obj = JOB_SUBMIT(inps)
         else:
             job_obj = None
@@ -212,6 +230,22 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_inversion = os.path.join(self.run_dir, RUN_FILES[sname])
         print('Generate {}'.format(run_inversion))
 
+        num_length_patch = math.ceil(self.metadata['LENGTH'] / int(self.template['minopy.inversion.patchSize']))
+        num_width_patch = math.ceil(self.metadata['WIDTH'] / int(self.template['minopy.inversion.patchSize']))
+        num_patches = num_length_patch * num_width_patch
+        print('Total number of PATCHES: {}'.format(num_patches))
+        number_of_nodes = math.ceil(num_patches / self.num_workers)
+        print('Number of Nodes: {}'.format(number_of_nodes))
+        num_bursts = self.num_pixels // 40000 // self.num_workers
+
+        slc_stack = os.path.join(self.workDir, 'inputs/slcStack.h5')
+        if self.write_job:
+            tmp_slc_stack = '/tmp/slcStack.h5'
+        else:
+            tmp_slc_stack = slc_stack
+
+        run_commands = []
+
         scp_args = '--work_dir {a0} --range_window {a1} --azimuth_window {a2} --method {a3} --test {a4} ' \
                    '--patch_size {a5} --num_worker {a6}'.format(a0=self.workDir,
                                                               a1=self.template['minopy.inversion.rangeWindow'],
@@ -220,54 +254,70 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                               a4=self.template['minopy.inversion.shpTest'],
                                                               a5=self.template['minopy.inversion.patchSize'],
                                                               a6=self.num_workers)
+        if self.write_job and number_of_nodes > 1:
+            for i in range(number_of_nodes):
+                scp_args1 = scp_args + ' --index {}'.format(i)
+                command_line = '{a} phase_inversion.py {b} --slc_stack {c}\n'.format(a=self.text_cmd.strip("'"),
+                                                                                     b=scp_args1,
+                                                                                     c=tmp_slc_stack)
+                run_commands.append(command_line)
+        else:
+            command_line = '{a} phase_inversion.py {b} --slc_stack {c}\n'.format(a=self.text_cmd.strip("'"),
+                                                                                 b=scp_args,
+                                                                                 c=tmp_slc_stack)
+            run_commands.append(command_line)
 
-        command_line1 = '{} phase_inversion.py {}'.format(self.text_cmd.strip("'"), scp_args)
+        #command_line = 'cp {a} /tmp; unset LD_PRELOAD; '.format(a=os.path.join(self.workDir, 'inputs/slcStack.h5'))
+        #command_line += '{a} --slc_stack {b}; '.format(a=command_line1, b='/tmp/slcStack.h5')
+        #command_line += 'rm /tmp/slcStack.h5\n'
 
-        command_line = 'cp {a} /tmp; unset LD_PRELOAD; '.format(a=os.path.join(self.workDir, 'inputs/slcStack.h5'))
-        command_line += '{a} --slc_stack {b}; '.format(a=command_line1, b='/tmp/slcStack.h5')
-        command_line += 'rm /tmp/slcStack.h5\n'
-
-        run_commands = [command_line]
+        #run_commands = [command_line]
 
         with open(run_inversion, 'w+') as frun:
             frun.writelines(run_commands)
 
         if self.write_job or not job_obj is None:
-            job_obj.num_bursts = self.num_pixels // 40000 // self.num_workers
-            job_obj.write_batch_jobs(batch_file=run_inversion)
+            job_obj.num_bursts = num_bursts
+            job_obj.write_batch_jobs(batch_file=run_inversion, num_cores_per_task=self.num_workers,
+                                     distribute=slc_stack)
 
         return
 
-    def run_interferogram(self, sname, job_obj):
-        """ Export single reference interferograms
-        """
-        run_ifgs = os.path.join(self.run_dir, RUN_FILES[sname])
-        print('Generate {}'.format(run_ifgs))
+    def get_interferogram_pairs(self):
+        ifg_dir_names = {'single_reference': 'single_reference',
+                         'sequential': 'sequential',
+                         'single_reference+sequential': 'single_reference_sequential',
+                         'short_baselines': 'short_baselines'}
 
         ifgram_dir = os.path.join(self.workDir, 'inverted/interferograms')
+
         if not self.template['minopy.interferograms.list'] in [None, 'None', 'auto']:
             ifgram_dir = ifgram_dir + '_list'
         else:
-            ifgram_dir = ifgram_dir + '_{}'.format(self.template['minopy.interferograms.type'])
+            ifgram_dir = ifgram_dir + '_{}'.format(ifg_dir_names[self.template['minopy.interferograms.type']])
 
         os.makedirs(ifgram_dir, exist_ok='True')
-
-        if 'sensor_type' in self.metadata:
-            sensor_type = self.metadata['sensor_type']
-        else:
-            sensor_type = 'tops'
 
         if self.template['minopy.interferograms.referenceDate']:
             reference_date = self.template['minopy.interferograms.referenceDate']
         else:
-            reference_date = self.date_list[0]
+            index = int(self.num_images // 2)
+            reference_date = self.date_list[index]
 
-        if self.template['minopy.interferograms.type'] == 'sequential':
-            reference_ind = None
-        elif self.template['minopy.interferograms.type'] == 'combine':
-            reference_ind = 'multi'
-        else:
-            reference_ind = self.date_list.index(reference_date)
+        if self.template['minopy.interferograms.type'] == 'short_baselines' and \
+                self.template['minopy.interferograms.list'] in [None, 'None']:
+            baseline_dir = self.template['minopy.load.baselineDir']
+            if not os.path.exists(baseline_dir):
+                baseline_dir = os.path.join(self.workDir, 'inputs/baselines')
+            short_baseline_ifgs = os.path.join(self.workDir, 'short_baseline_ifgs.txt')
+            if not os.path.exists(short_baseline_ifgs):
+                print('short_baseline_ifgs.txt does not exists in {}, Creating ...'.format(self.workDir))
+                scp_args = ' -b {} -o {} --date_list {}'.format(baseline_dir, short_baseline_ifgs, self.date_list_text)
+                find_baselines(scp_args.split())
+                print('Successfully created short_baseline_ifgs.txt ')
+            else:
+                print('short_baseline_ifgs.txt exists in {}'.format(self.workDir))
+            self.template['minopy.interferograms.list'] = short_baseline_ifgs
 
         pairs = []
         if not self.template['minopy.interferograms.list'] in [None, 'None']:
@@ -276,22 +326,29 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             for line in lines:
                 pairs.append((line.split('_')[0], line.split('\n')[0].split('_')[1]))
         else:
-            if reference_ind == 'multi':
+            if 'single_reference' in self.template['minopy.interferograms.type']:
                 indx = self.date_list.index(reference_date)
                 for i in range(0, len(self.date_list)):
                     if not indx == i:
                         pairs.append((self.date_list[indx], self.date_list[i]))
+            if 'sequential' in self.template['minopy.interferograms.type']:
+                for i in range(0, len(self.date_list)):
                     if not i == 0:
                         pairs.append((self.date_list[i - 1], self.date_list[i]))
-            else:
-                for i in range(0, len(self.date_list)):
-                    if not reference_ind is None:
-                        if not reference_ind == i:
-                            pairs.append((self.date_list[reference_ind], self.date_list[i]))
-                    else:
-                        if not i == 0:
-                            pairs.append((self.date_list[i - 1], self.date_list[i]))
-        pairs = list(set(pairs))
+
+        return ifgram_dir, pairs
+
+
+    def run_interferogram(self, sname, job_obj):
+        """ Export single reference interferograms
+        """
+        run_ifgs = os.path.join(self.run_dir, RUN_FILES[sname])
+        print('Generate {}'.format(run_ifgs))
+
+        if 'sensor_type' in self.metadata:
+            sensor_type = self.metadata['sensor_type']
+        else:
+            sensor_type = 'tops'
 
         #  command for generating unwrap mask
         cmd_generate_unwrap_mask = '{} generate_unwrap_mask.py --geometry {} '.format(
@@ -307,8 +364,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         phase_series = os.path.join(self.workDir, 'inverted/phase_series.h5')
         num_cpu = os.cpu_count()
         num_lin = 0
-        for pair in pairs:
-            out_dir = os.path.join(ifgram_dir, pair[0] + '_' + pair[1])
+        for pair in self.pairs:
+            out_dir = os.path.join(self.ifgram_dir, pair[0] + '_' + pair[1])
             os.makedirs(out_dir, exist_ok='True')
 
             scp_args = '--reference {a1} --secondary {a2} --output_dir {a3} --azimuth_looks {a4} ' \
@@ -358,47 +415,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         earth_radius = self.metadata['EARTH_RADIUS']
         height = self.metadata['HEIGHT']
 
-        if self.template['minopy.interferograms.referenceDate']:
-            reference_date = self.template['minopy.interferograms.referenceDate']
-        else:
-            reference_date = self.date_list[0]
-
-        if self.template['minopy.interferograms.type'] == 'sequential':
-            reference_ind = None
-        elif self.template['minopy.interferograms.type'] == 'combine':
-            reference_ind = 'multi'
-        else:
-            reference_ind = self.date_list.index(reference_date)
-
-        pairs = []
-        if not self.template['minopy.interferograms.list'] in [None, 'None']:
-            with open(self.template['minopy.interferograms.list'], 'r') as f:
-                lines = f.readlines()
-            for line in lines:
-                pairs.append((line.split('_')[0], line.split('\n')[0].split('_')[1]))
-        else:
-            if reference_ind == 'multi':
-                indx = self.date_list.index(reference_date)
-                for i in range(0, len(self.date_list)):
-                    if not indx == i:
-                        pairs.append((self.date_list[indx], self.date_list[i]))
-                    if not i == 0:
-                        pairs.append((self.date_list[i - 1], self.date_list[i]))
-            else:
-                for i in range(0, len(self.date_list)):
-                    if not reference_ind is None:
-                        if not reference_ind == i:
-                            pairs.append((self.date_list[reference_ind], self.date_list[i]))
-                    else:
-                        if not i == 0:
-                            pairs.append((self.date_list[i - 1], self.date_list[i]))
-        pairs = list(set(pairs))
-
-        if not self.template['minopy.interferograms.list'] in [None, 'None', 'auto']:
-            self.ifgram_dir = self.ifgram_dir + '_list'
-        else:
-            self.ifgram_dir = self.ifgram_dir + '_{}'.format(self.template['minopy.interferograms.type'])
-
         run_commands = []
         num_cpu = os.cpu_count()
         ntiles = self.num_pixels // 4000000
@@ -411,7 +427,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         corr_file = os.path.join(self.workDir, 'inverted/quality') + '_msk'
         unwrap_mask = os.path.join(self.workDir, 'inverted/mask_unwrap')
 
-        for pair in pairs:
+        for pair in self.pairs:
             out_dir = os.path.join(self.ifgram_dir, pair[0] + '_' + pair[1])
             os.makedirs(out_dir, exist_ok='True')
 
