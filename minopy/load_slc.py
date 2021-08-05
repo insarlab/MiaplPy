@@ -120,18 +120,6 @@ def main(iargs=None):
                               xstep=xyStepGeo[0],
                               ystep=xyStepGeo[1],
                               compression='lzf')
-
-
-    reference_dir = os.path.dirname(iDict['minopy.load.metaFile'])
-    out_reference = inps.work_dir + '/inputs/reference'
-    if not os.path.exists(out_reference):
-        shutil.copytree(reference_dir, out_reference)
-
-    baseline_dir = os.path.abspath(iDict['minopy.load.baselineDir'])
-    out_baseline = inps.work_dir + '/inputs/baselines'
-    if not os.path.exists(out_baseline):
-        shutil.copytree(baseline_dir, out_baseline)
-
     return inps.out_file
 
 
@@ -191,6 +179,17 @@ def read_inps2dict(inps):
         inpsDict = auto_path.get_auto_path(processor=inpsDict['processor'],
                                            work_dir=inps.work_dir,
                                            template=inpsDict)
+
+    reference_dir = os.path.dirname(inpsDict['minopy.load.metaFile'])
+    out_reference = inps.work_dir + '/inputs/reference'
+    if not os.path.exists(out_reference):
+        shutil.copytree(reference_dir, out_reference)
+
+    baseline_dir = os.path.abspath(inpsDict['minopy.load.baselineDir'])
+    out_baseline = inps.work_dir + '/inputs/baselines'
+    if not os.path.exists(out_baseline):
+        shutil.copytree(baseline_dir, out_baseline)
+
     return inpsDict
 
 
@@ -240,7 +239,6 @@ def read_subset_template2box(template_file):
     (Modified from mintpy.subsets)
     """
     tmpl = readfile.read_template(template_file)
-
     # subset.lalo -> geo_box
     try:
         opts = [i.strip().replace('[','').replace(']','') for i in tmpl['minopy.subset.lalo'].split(',')]
