@@ -10,6 +10,7 @@ from mintpy.objects.coord import coordinate
 import h5py
 from osgeo import gdal
 import datetime
+import re
 import minopy
 from minopy.objects.arg_parser import MinoPyParser
 from mintpy.utils import readfile
@@ -428,7 +429,8 @@ def read_attribute(fname, datasetName=None, standardize=True, metafile_ext=None)
     return atr
 
 
-def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='../defaults/minopyApp_auto.cfg'):
+def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='../defaults/minopyApp_auto.cfg',
+                              templateFile=None):
     """Replace auto value based on the input auto config file."""
     # Read default template value and turn yes/no to True/False
     templateAutoFile = os.path.join(os.path.dirname(__file__), auto_file)
@@ -453,6 +455,36 @@ def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='
     for key, value in templateDict.items():
         if value in specialValues.keys():
             templateDict[key] = specialValues[value]
+
+    if not mintpyTemplateDict is None:
+        status = 'skip'
+        if not templateDict['minopy.subset.lalo'] and not templateDict['minopy.subset.yx']:
+            if mintpyTemplateDict['mintpy.subset.lalo']:
+                templateDict['minopy.subset.lalo'] = mintpyTemplateDict['mintpy.subset.lalo']
+                status = 'run'
+            if mintpyTemplateDict['mintpy.subset.yx']:
+                templateDict['minopy.subset.yx'] = mintpyTemplateDict['mintpy.subset.yx']
+                status = 'run'
+
+            if status == 'run':
+                tmp_file = templateFile + '.tmp'
+                f_tmp = open(tmp_file, 'w')
+                for line in open(templateFile, 'r'):
+                    c = [i.strip() for i in line.strip().split('=', 1)]
+                    if not line.startswith(('%', '#')) and len(c) > 1:
+                        key = c[0]
+                        if key in ['minopy.subset.lalo', 'minopy.subset.yx'] and templateDict[key]:
+                            new_value_str = '= ' + templateDict[key]
+                            value = str.replace(c[1], '\n', '').split("#")[0].strip()
+                            value = value.replace('*', '\*')  # interpret * as character
+                            old_value_str = re.findall('=' + '[\s]*' + value, line)[0]
+                            line = line.replace(old_value_str, new_value_str, 1)
+                            print('    {}: {} --> {}'.format(key, value, templateDict[key]))
+                    f_tmp.write(line)
+                f_tmp.close()
+
+                # Overwrite exsting original template file
+                shutil.move(tmp_file, templateFile)
 
     return templateDict
 
@@ -986,8 +1018,9 @@ def get_latest_template_minopy(work_dir):
             f_tmp.close()
 
             # Overwrite exsting original template file
-            mvCmd = 'mv {} {}'.format(tmp_file, cfile)
-            os.system(mvCmd)
+            shutil.move(tmp_file, cfile)
+            #mvCmd = 'mv {} {}'.format(tmp_file, cfile)
+            #os.system(mvCmd)
     return cfile
 
 
@@ -1032,7 +1065,6 @@ def read_initial_info(work_dir, templateFile):
 
         Parser_LoadSlc = MinoPyParser(scp_args.split(), script='load_slc')
         inps_loadSlc = Parser_LoadSlc.parse()
-
         iDict = minopy.load_slc.read_inps2dict(inps_loadSlc)
         minopy.load_slc.prepare_metadata(iDict)
         metadata = minopy.load_slc.read_subset_box(iDict)
