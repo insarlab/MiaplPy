@@ -33,6 +33,7 @@ __all__ = [
     'load_ifgram',
     'unwrap_minopy',
     'phase_to_range',
+    'find_short_baselines',
     'version',
 ]
 
