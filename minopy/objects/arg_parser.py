@@ -323,8 +323,11 @@ class MinoPyParser:
         patch.add_argument('-p', '--patch_size', type=str, dest='patch_size', default=200,
                            help='Azimuth window size for shp finding')
         patch.add_argument('-s', '--slc_stack', type=str, dest='slc_stack', help='SLC stack file')
-        patch.add_argument('-n', '--num_worker', dest='num_worker', type=str, default='1',
+        patch.add_argument('-n', '--num_worker', dest='num_worker', type=int, default=1,
                            help='Number of parallel tasks (default: 1)')
+        patch.add_argument('-i', '--index', dest='sub_index', type=str, default=None,
+                           help='The list containing patches of i*num_worker:(i+1)*num_worker')
+
 
         return parser
 
