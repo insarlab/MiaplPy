@@ -11,6 +11,7 @@ from scipy.optimize import minimize
 from skimage.measure._ccomp import label_cython as clabel
 from scipy.stats import anderson_ksamp, ttest_ind
 from mintpy.utils import ptime
+import time
 
 
 cdef extern from "complex.h":
@@ -854,6 +855,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef object prog_bar
     cdef bytes out_folder
     cdef int index = box[4]
+    cdef float time0 = time.time()
 
     out_folder = out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
     os.makedirs(out_folder.decode('UTF-8'), exist_ok=True)
@@ -867,7 +869,6 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
             m += 1
 
     num_points = m
-
     prog_bar = ptime.progressBar(maxValue=num_points)
     p = 0
     for i in range(num_points):
@@ -917,6 +918,8 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     np.save(out_folder.decode('UTF-8') + '/phase_ref.npy', rslc_ref)
     np.save(out_folder.decode('UTF-8') + '/shp.npy', SHP)
     np.save(out_folder.decode('UTF-8') + '/quality.npy', quality)
+
+    print('    Phase invertion of PATCH_{} is Completed in {} s\n'.format(index, time.time()-time0))
 
     return
 
