@@ -46,7 +46,7 @@ Area: Pichincha volcano, Ecuador\
 Dataset: Sentinel-1 Descending Track 142, 20 acquisitions, 2016.04.19 - 2017.12.28\
 Size: ~318 Mb\
 ```
-wget https://zenodo.org/record/5167298/files/PichinchaSenD142.zip
+wget https://zenodo.org/record/5167298/files/PichinchaSenDT142.zip
 unzip PichinchaSenD142.zip
 cd PichinchaSenD142
 minopyApp.py PichinchaSenD142.template --dir ./minopy
