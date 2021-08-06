@@ -59,7 +59,7 @@ conda activate minopy
 Or run the following in your terminal to install the dependencies to your custom environment, the default is base:
 
 ```
-conda install --yes -c conda-forge --file ~/tools/MiNoPy/docs/conda.txt
+conda install --yes -c conda-forge --file ~/tools/MiNoPy/docs/requirements.txt
 $CONDA_PREFIX/bin/pip install git+https://github.com/insarlab/PySolid.git
 $CONDA_PREFIX/bin/pip install git+https://github.com/tylere/pykml.git
 ```
