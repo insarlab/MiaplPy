@@ -43,13 +43,13 @@ Inversion step may take long time depending on the number of pixels in the subse
 **Example:** Here is an example of SAR stack pre-processed using ISCE:
 
 Area: Pichincha volcano, Ecuador\
-Dataset: Sentinel-1 Descending Track 142, 20 acquisitions, 2016.04.19 - 2017.12.28\
+Dataset: Sentinel-1 Descending Track 142, 46 acquisitions, 2016.04.19 - 2017.12.28\
 Size: ~318 Mb\
 ```
 wget https://zenodo.org/record/5167298/files/PichinchaSenDT142.zip
-unzip PichinchaSenD142.zip
-cd PichinchaSenD142
-minopyApp.py PichinchaSenD142.template --dir ./minopy
+unzip PichinchaSenDT142.zip
+cd PichinchaSenDT142
+minopyApp.py PichinchaSenDT142.template --dir ./minopy
 ```
 
 [Guide for University of Miami HPC users](./HPC_Users.md)
