@@ -65,10 +65,22 @@ $CONDA_PREFIX/bin/pip install git+https://github.com/tylere/pykml.git
 ```
 
 #### 4. Setup MiNoPy
-```
-bash $MINOPY_HOME/docs/install
-```
 
+I. Compile
+```
+cd $MINOPY_HOME/minopy/lib;
+python setup.py
+```
+II. Install [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/) 
+```
+cd $MINOPY_HOME;
+wget --no-check-certificate  https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/snaphu-v2.0.4.tar.gz
+tar -xvf snaphu-v2.0.4.tar.gz
+mv snaphu-v2.0.4 snaphu;
+rm snaphu-v2.0.4.tar.gz;
+sed -i 's/\/usr\/local/$(MINOPY_HOME)\/snaphu/g' snaphu/src/Makefile
+cd snaphu/src; make
+```
 
 ### Notes
 Please read notes on [PyAPS](https://github.com/yunjunz/PyAPS) and [PySolid](https://github.com/insarlab/PySolid) from [GitHub/MintPy](https://github.com/insarlab/MintPy/blob/main/docs/installation.md) 

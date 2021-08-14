@@ -11,7 +11,17 @@ warnings.filterwarnings("ignore")
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 
-import os
+import os, sys
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+blockPrint()
 import datetime
 from isceobj.Util.ImageUtil import ImageLib as IML
 from osgeo import gdal
@@ -19,6 +29,8 @@ import numpy as np
 from mintpy import subset
 from minopy.objects.utils import read_attribute, coord_rev
 from minopy.objects.arg_parser import MinoPyParser
+enablePrint()
+
 #################################################################
 datasetName2templateKey = {'slc': 'MINOPY.load.slcFile',
                            'height': 'MINOPY.load.demFile',

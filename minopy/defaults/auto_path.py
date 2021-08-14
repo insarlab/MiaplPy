@@ -191,7 +191,8 @@ def get_auto_path(processor, work_dir, template=dict()):
     """
     project_dir = os.path.dirname(work_dir)
 
-    input_h5 = glob.glob(os.path.join(work_dir, 'inputs/*.h5'))
+    input_h5 = [os.path.join(work_dir, 'inputs/slcStack.h5'), os.path.join(work_dir, 'inputs/geometryRadar.h5')]
+    input_h5 = [x for x in input_h5 if os.path.exists(x)]
     var_dict = {}
 
     # read auto_path_dict

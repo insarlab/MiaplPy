@@ -5,6 +5,7 @@
 ############################################################
 # Modified from prep4timeseries.py in ISCE-2.2.0/contrib/stack/topsStack
 
+import os, sys
 import warnings
 import logging
 warnings.filterwarnings("ignore")
@@ -12,16 +13,24 @@ warnings.filterwarnings("ignore")
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+blockPrint()
 import isce
 from isceobj.Planet.Planet import Planet
-import os
 import glob
 import shelve
 import argparse
 import numpy as np
 from minopy.objects.utils import read_attribute, read
 from mintpy.utils import isce_utils, ptime, readfile, writefile, utils as ut
-
+enablePrint()
 
 
 EXAMPLE = """example:

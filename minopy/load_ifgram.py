@@ -54,50 +54,31 @@ DEFAULT_TEMPLATE = """template:
            auto_path.gammaAutoPath)
 
 TEMPLATE = """template:
-########## 1. Load Data
+########## 1. Load interferograms
 ## auto - automatic path pattern for Univ of Miami file structure
 ## load_data.py -H to check more details and example inputs.
 ## compression to save disk usage for ifgramStack.h5 file:
 ## no   - save   0% disk usage, fast [default]
 ## lzf  - save ~57% disk usage, relative slow
 ## gzip - save ~62% disk usage, very slow [not recommend]
-minopy.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isce
+
+minopy.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isceTops
 minopy.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
 minopy.load.compression    = auto  #[gzip / lzf / no], auto for no.
-##---------for ISCE only:
-minopy.load.metaFile       = auto  #[path2metadata_file], i.e.: ./reference/IW1.xml, ./referenceShelve/data.dat
-minopy.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
+minopy.load.autoPath       = auto    # [yes, no] auto for no
+
 ##---------interferogram datasets:
 minopy.load.unwFile        = auto  #[path2unw_file]
 minopy.load.corFile        = auto  #[path2cor_file]
 minopy.load.connCompFile   = auto  #[path2conn_file], optional
 minopy.load.intFile        = auto  #[path2int_file], optional
 minopy.load.ionoFile       = auto  #[path2iono_file], optional
-##---------geometry datasets:
-minopy.load.demFile        = auto  #[path2hgt_file]
-minopy.load.lookupYFile    = auto  #[path2lat_file], not required for geocoded data
-minopy.load.lookupXFile    = auto  #[path2lon_file], not required for geocoded data
-minopy.load.incAngleFile   = auto  #[path2los_file], optional
-minopy.load.azAngleFile    = auto  #[path2los_file], optional
-minopy.load.shadowMaskFile = auto  #[path2shadow_file], optional
-minopy.load.waterMaskFile  = auto  #[path2water_mask_file], optional
-minopy.load.bperpFile      = auto  #[path2bperp_file], optional
-##---------subset (optional):
-## if both yx and lalo are specified, use lalo option unless a) no lookup file AND b) dataset is in radar coord
-minopy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
-minopy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
-"""
-
-NOTE = """NOTE:
-  unwrapPhase is required, the other dataset are optional, including coherence, connectComponent, wrapPhase, etc.
-  The unwrapPhase metadata file requires DATE12 attribute in YYMMDD-YYMMDD format.
-  All path of data file must contain the reference and secondary date, either in file name or folder name.
 """
 
 EXAMPLE = """example:
-  load_ifgram.py -t GalapagosSenDT128.tempalte
+  load_ifgram.py -t PichinchaSenDT142.tempalte
   load_ifgram.py -t minopyApp.cfg
-  load_ifgram.py -t minopyApp.cfg GalapagosSenDT128.tempalte --project GalapagosSenDT128
+  load_ifgram.py -t minopyApp.cfg PichinchaSenDT142.template --project PichinchaSenDT142
   load_ifgram.py -H #Show example input template for ISCE/ROI_PAC/GAMMA products
 """
 
@@ -106,7 +87,7 @@ def create_parser():
     """Create command line parser."""
     parser = argparse.ArgumentParser(description='Saving a stack of Interferograms to an HDF5 file',
                                      formatter_class=argparse.RawTextHelpFormatter,
-                                     epilog=TEMPLATE+'\n'+NOTE+'\n'+EXAMPLE)
+                                     epilog=TEMPLATE+'\n'+EXAMPLE)
     parser.add_argument('-H', dest='print_example_template', action='store_true',
                         help='Print/Show the example template file for loading.')
     parser.add_argument('-t', '--template', type=str, nargs='+', dest='template_file',
@@ -575,7 +556,6 @@ def update_object(outFile, inObj, box, updateMode=True):
 
 
 def prepare_metadata(inpsDict):
-
     processor = inpsDict['processor']
     script_name = 'prep_{}.py'.format(processor)
     print('-'*50)

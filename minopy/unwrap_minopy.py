@@ -8,6 +8,16 @@
 
 import os
 import sys
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+blockPrint()
 import multiprocessing
 import isce
 from isceobj.Util.ImageUtil import ImageLib as IML
@@ -17,9 +27,7 @@ from osgeo import gdal
 import subprocess
 import time
 import datetime
-
-CONFIG_FILE = os.path.dirname(os.path.abspath(__file__)) + '/defaults/conf.full'
-
+enablePrint()
 
 def main(iargs=None):
     """
@@ -38,6 +46,7 @@ def main(iargs=None):
         msg = os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::])
         string = dateStr + " * " + msg
         print(string)
+
 
     unwObj = Snaphu(inps)
     do_tiles, metadata = unwObj.need_to_split_tiles()
@@ -58,6 +67,9 @@ def main(iargs=None):
         print('3')
         runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
 
+    # unfiltered_ifg = os.path.join(os.path.dirname(inps.input_ifg), 'fine.int')
+    # remove_filter(unfiltered_ifg, inps.input_ifg, inps.unwrapped_ifg)
+    # update_connect_component_mask(inps.unwrapped_ifg, inps.input_cor)
 
     print('Time spent: {} m'.format((time.time() - time0)/60))
     return
@@ -68,8 +80,8 @@ class Snaphu:
     def __init__(self, inps):
 
         work_dir = os.path.dirname(inps.input_ifg)
-        if os.path.exists(work_dir + '/filt_fine.unw.conncomp.vrt'):
-            sys.exit(1)
+        #if os.path.exists(work_dir + '/filt_fine.unw.conncomp.vrt'):
+        #    sys.exit(1)
         self.config_file = os.path.join(work_dir, 'config_all')
         LENGTH = inps.ref_length
         WIDTH = inps.ref_width
@@ -90,6 +102,9 @@ class Snaphu:
                          'azlooks': azlooks,
                          'rglooks': rglooks}
 
+        CONFIG_FILE = os.path.dirname(os.path.dirname(inps.input_cor)) + '/conf.full'
+        if not os.path.exists(CONFIG_FILE):
+            CONFIG_FILE = os.path.dirname(os.path.abspath(__file__)) + '/defaults/conf.full'
 
         with open(CONFIG_FILE, 'r') as f:
             self.config_default = f.readlines()
@@ -259,6 +274,67 @@ def runUnwrap(infile, outfile, corfile, config):
         connImage.renderHdr()
         connImage.renderVRT()
     #   connImage.finalizeImage()
+
+    return
+
+
+def update_connect_component_mask(unwrapped_file, temporal_coherence):
+
+    ds_unw = gdal.Open(unwrapped_file + '.vrt', gdal.GA_ReadOnly)
+    phas = ds_unw.GetRasterBand(2).ReadAsArray()
+
+    ds_conn = gdal.Open(unwrapped_file + '.conncomp.vrt', gdal.GA_ReadOnly)
+    conn_comp = ds_conn.GetRasterBand(1).ReadAsArray()
+
+    factor_2pi = np.round(phas / (2 * np.pi)).astype(np.int) + conn_comp
+    factor_2pi = factor_2pi - np.min(factor_2pi) + 1
+    mask = conn_comp > 0
+
+    if not temporal_coherence is None:
+        ds_tcoh = gdal.Open(temporal_coherence.split('_msk')[0] + '.vrt', gdal.GA_ReadOnly)
+        tcoh = ds_tcoh.GetRasterBand(1).ReadAsArray()
+        mask2 = tcoh > 0.5
+        mask *= mask2
+
+    new_conn_comp = factor_2pi * mask
+    length = new_conn_comp.shape[0]
+    width = new_conn_comp.shape[1]
+    out_connComp = np.memmap(unwrapped_file + '.conncomp', dtype=np.byte, mode='write', shape=(length, width))
+    out_connComp[:, :] = new_conn_comp[:, :]
+
+    del out_connComp
+
+    return
+
+
+def remove_filter(intfile, filtfile, unwfile):
+
+    ds_unw = gdal.Open(unwfile + ".vrt", gdal.GA_ReadOnly)
+    unwphas = ds_unw.GetRasterBand(2).ReadAsArray()
+    unwamp = ds_unw.GetRasterBand(1).ReadAsArray()
+    width = ds_unw.RasterXSize
+    length = ds_unw.RasterYSize
+    del ds_unw
+
+    ds_fifg = gdal.Open(filtfile + ".vrt", gdal.GA_ReadOnly)
+    fifgphas = np.angle(ds_fifg.GetRasterBand(1).ReadAsArray())
+    del ds_fifg
+
+    integer_jumps = unwphas - fifgphas
+
+    ds_ifg = gdal.Open(intfile + ".vrt", gdal.GA_ReadOnly)
+    ifgphas = np.angle(ds_ifg.GetRasterBand(1).ReadAsArray())
+    del ds_ifg
+
+    unwphas = integer_jumps + ifgphas
+    del ifgphas, fifgphas
+
+    ifg = np.memmap(unwfile, dtype=np.float32, mode='write', shape=(2, length, width))
+    ifg[0, :, :] = unwamp
+    ifg[1, :, :] = unwphas
+    del ifg
+
+    IML.renderISCEXML(unwfile, bands=2, nyy=length, nxx=width, datatype='float32', scheme='BSQ')
 
     return
 

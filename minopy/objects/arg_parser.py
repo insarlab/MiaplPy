@@ -211,19 +211,21 @@ class MinoPyParser:
         TEMPLATE = """template:
         ########## 1. Load Data
         ## auto - automatic path pattern for Univ of Miami file structure
-        ## load_data.py -H to check more details and example inputs.
+        ## load_slc.py -H to check more details and example inputs.
         ## compression to save disk usage for slcStack.h5 file:
         ## no   - save   0% disk usage, fast [default]
         ## lzf  - save ~57% disk usage, relative slow
         ## gzip - save ~62% disk usage, very slow [not recommend]
-        minopy.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isce
+        
+        minopy.load.processor      = auto  #[isce,snap,gamma,roipac], auto for isceTops
         minopy.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
         minopy.load.compression    = auto  #[gzip / lzf / no], auto for no.
+        minopy.load.autoPath       = auto    # [yes, no] auto for no
+        
+        minopy.load.slcFile        = auto  #[path2slc_file]
         ##---------for ISCE only:
         minopy.load.metaFile       = auto  #[path2metadata_file], i.e.: ./reference/IW1.xml, ./referenceShelve/data.dat
         minopy.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
-        ##---------slc datasets:
-        minopy.load.slcFile        = auto  #[path2slc]
         ##---------geometry datasets:
         minopy.load.demFile        = auto  #[path2hgt_file]
         minopy.load.lookupYFile    = auto  #[path2lat_file], not required for geocoded data
@@ -233,16 +235,17 @@ class MinoPyParser:
         minopy.load.shadowMaskFile = auto  #[path2shadow_file], optional
         minopy.load.waterMaskFile  = auto  #[path2water_mask_file], optional
         minopy.load.bperpFile      = auto  #[path2bperp_file], optional
+        
         ##---------subset (optional):
         ## if both yx and lalo are specified, use lalo option unless a) no lookup file AND b) dataset is in radar coord
-        minopy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
-        minopy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
+        minopy.subset.yx           = auto    #[y0:y1,x0:x1 / no], auto for no
+        minopy.subset.lalo         = auto    #[S:N,W:E / no], auto for no
         """
 
         EXAMPLE = """example:
-          load_slc.py -t GalapagosSenDT128.tempalte
+          load_slc.py -t PichinchaSenDT142.template
           load_slc.py -t minopyApp.cfg
-          load_slc.py -t GalapagosSenDT128.tempalte --project_dir $SCRATCH/GalapagosSenDT128
+          load_slc.py -t PichinchaSenDT142.template --project_dir $SCRATCH/PichinchaSenDT142
           load_slc.py -H #Show example input template for ISCE/ROI_PAC/GAMMA products
         """
 
@@ -322,6 +325,8 @@ class MinoPyParser:
                            help='Shp statistical test (ks, ad, ttest)')
         patch.add_argument('-p', '--patch_size', type=str, dest='patch_size', default=200,
                            help='Azimuth window size for shp finding')
+        patch.add_argument('-ms', '--mini_stack_size', type=int, dest='ministack_size', default=10,
+                           help='Number of images in each mini stack')
         patch.add_argument('-s', '--slc_stack', type=str, dest='slc_stack', help='SLC stack file')
         patch.add_argument('-n', '--num_worker', dest='num_worker', type=int, default=1,
                            help='Number of parallel tasks (default: 1)')
@@ -422,21 +427,20 @@ class MinoPyParser:
         STEP_HELP = """Command line options for steps processing with names are chosen from the following list:
         {}
         {}
-        {}
 
         In order to use either --start or --step, it is necessary that a
         previous run was done using one of the steps options to process at least
         through the step immediately preceding the starting step of the current run.
-        """.format(STEP_LIST[0:7], STEP_LIST[7:14], STEP_LIST[14:])
+        """.format(STEP_LIST[0:4], STEP_LIST[4::])
 
         EXAMPLE = """example: 
               minopyApp.py  <custom_template_file>            # run with default and custom templates
               minopyApp.py  -h / --help                       # help 
               minopyApp.py  -H                                # print    default template options
               # Run with --start/stop/step options
-              minopyApp.py GalapagosSenDT128.template --dostep  load_slc       # run the step 'download' only
-              minopyApp.py GalapagosSenDT128.template --start load_slc         # start from the step 'download' 
-              minopyApp.py GalapagosSenDT128.template --stop  unwrap           # end after step 'interferogram'
+              minopyApp.py PichinchaSenDT142.template --dostep  load_slc       # run the step 'download' only
+              minopyApp.py PichinchaSenDT142.template --start load_slc         # start from the step 'download' 
+              minopyApp.py PichinchaSenDT142.template --stop  unwrap           # end after step 'interferogram'
               """
         parser = argparse.ArgumentParser(description='Routine Time Series Analysis for MiNoPy',
                                          formatter_class=argparse.RawTextHelpFormatter,

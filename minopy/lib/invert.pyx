@@ -93,7 +93,7 @@ cdef class CPhaseLink:
         self.box_list, self.num_box = self.patch_slice()
 
         # default number of images in each ministack
-        self.mini_stack_default_size = 10
+        self.mini_stack_default_size = inps.ministack_size
 
         if b'sequential' == self.phase_linking_method[0:10]:
             self.total_num_mini_stacks = self.n_image // self.mini_stack_default_size

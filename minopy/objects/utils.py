@@ -445,6 +445,47 @@ def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='
         if value == 'auto' and key in templateAutoDict.keys():
             templateDict[key] = templateAutoDict[key]
 
+    common_keys = ['load.autoPath', 'load.processor', 'load.updateMode', 'load.compression']
+
+    if not mintpyTemplateDict is None:
+        status = 'skip'
+
+        if not templateDict['minopy.subset.lalo'] and not templateDict['minopy.subset.yx']:
+            if mintpyTemplateDict['mintpy.subset.lalo']:
+                templateDict['minopy.subset.lalo'] = mintpyTemplateDict['mintpy.subset.lalo']
+                status = 'run'
+            if mintpyTemplateDict['mintpy.subset.yx']:
+                templateDict['minopy.subset.yx'] = mintpyTemplateDict['mintpy.subset.yx']
+                status = 'run'
+
+        for key in common_keys:
+            if not templateDict['minopy.' + key]:
+                if mintpyTemplateDict['mintpy.' + key]:
+                    templateDict['minopy.' + key] = mintpyTemplateDict['mintpy.' + key]
+                    status = 'run'
+
+        common_keys = ['minopy.' + key for key in common_keys] + ['minopy.subset.lalo', 'minopy.subset.yx']
+
+        if status == 'run':
+            tmp_file = templateFile + '.tmp'
+            f_tmp = open(tmp_file, 'w')
+            for line in open(templateFile, 'r'):
+                c = [i.strip() for i in line.strip().split('=', 1)]
+                if not line.startswith(('%', '#')) and len(c) > 1:
+                    key = c[0]
+                    if key in common_keys and templateDict[key]:
+                        new_value_str = '= ' + templateDict[key]
+                        value = str.replace(c[1], '\n', '').split("#")[0].strip()
+                        value = value.replace('*', '\*')  # interpret * as character
+                        old_value_str = re.findall('=' + '[\s]*' + value, line)[0]
+                        line = line.replace(old_value_str, new_value_str, 1)
+                        print('    {}: {} --> {}'.format(key, value, templateDict[key]))
+                f_tmp.write(line)
+            f_tmp.close()
+
+            # Overwrite exsting original template file
+            shutil.move(tmp_file, templateFile)
+
     # Change yes --> True and no --> False
     specialValues = {'yes': True,
                      'True': True,
@@ -455,36 +496,6 @@ def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='
     for key, value in templateDict.items():
         if value in specialValues.keys():
             templateDict[key] = specialValues[value]
-
-    if not mintpyTemplateDict is None:
-        status = 'skip'
-        if not templateDict['minopy.subset.lalo'] and not templateDict['minopy.subset.yx']:
-            if mintpyTemplateDict['mintpy.subset.lalo']:
-                templateDict['minopy.subset.lalo'] = mintpyTemplateDict['mintpy.subset.lalo']
-                status = 'run'
-            if mintpyTemplateDict['mintpy.subset.yx']:
-                templateDict['minopy.subset.yx'] = mintpyTemplateDict['mintpy.subset.yx']
-                status = 'run'
-
-            if status == 'run':
-                tmp_file = templateFile + '.tmp'
-                f_tmp = open(tmp_file, 'w')
-                for line in open(templateFile, 'r'):
-                    c = [i.strip() for i in line.strip().split('=', 1)]
-                    if not line.startswith(('%', '#')) and len(c) > 1:
-                        key = c[0]
-                        if key in ['minopy.subset.lalo', 'minopy.subset.yx'] and templateDict[key]:
-                            new_value_str = '= ' + templateDict[key]
-                            value = str.replace(c[1], '\n', '').split("#")[0].strip()
-                            value = value.replace('*', '\*')  # interpret * as character
-                            old_value_str = re.findall('=' + '[\s]*' + value, line)[0]
-                            line = line.replace(old_value_str, new_value_str, 1)
-                            print('    {}: {} --> {}'.format(key, value, templateDict[key]))
-                    f_tmp.write(line)
-                f_tmp.close()
-
-                # Overwrite exsting original template file
-                shutil.move(tmp_file, templateFile)
 
     return templateDict
 

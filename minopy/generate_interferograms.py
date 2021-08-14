@@ -3,18 +3,25 @@
 # Copyright(c) 2017, Sara Mirzaee                          #
 ############################################################
 
-import logging
-mpl_logger = logging.getLogger('matplotlib')
-mpl_logger.setLevel(logging.WARNING)
 import os
 import sys
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+blockPrint()
 import datetime
 import isceobj
 from isceobj.Image.IntImage import IntImage
 import numpy as np
 from minopy.objects.arg_parser import MinoPyParser
-from osgeo import gdal
 import h5py
+enablePrint()
 
 
 def main(iargs=None):
