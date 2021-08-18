@@ -27,6 +27,7 @@ minopy.subset.lalo         = -0.199:-0.142,-78.612:-78.578
 
 # MiNoPy options
 minopy.compute.numWorker   = 40
+minopy.interferograms.type = single_reference
 
 ## Mintpy options
 mintpy.compute.cluster     = local  # if dask is not available, set this option to no
