@@ -342,7 +342,7 @@ class MinoPyParser:
         parser.add_argument('-g', '--geometry', type=str, dest='geometry_stack', required=True,
                             help='Geometry stack file with shadowMask in the datasets')
         parser.add_argument('-m', '--mask', type=str, dest='custom_mask', default=None,
-                            help='Secondary image')
+                            help='Custom mask in HDF5 format')
         parser.add_argument('-o', '--output', type=str, dest='output_mask', default=None,
                             help='Output binary mask for unwrapping with snaphu')
         parser.add_argument('-t', '--text_cmd', type=str, dest='text_cmd', default='',
