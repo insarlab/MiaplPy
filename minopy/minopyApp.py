@@ -339,8 +339,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 indx = self.date_list.index(reference_date)
                 for i in range(0, len(self.date_list)):
                     if not indx == i:
-                        ind1.append(index)
-                        ind2.append(i)
                         pairs.append((self.date_list[indx], self.date_list[i]))
            
             if self.template['minopy.interferograms.type'] == 'mini_stacks':
@@ -355,11 +353,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                     #indx_ref_0 = (last_ind - indx_ref) // 2 + indx_ref
                     for t in range(indx_ref, last_ind):
                         if t != indx_ref_0:
-                            ind1.append(indx_ref_0)
-                            ind2.append(t)
                             pairs.append((self.date_list[indx_ref], self.date_list[t]))
 
-            plot_baselines(ind1=ind1, ind2=ind2, dates=self.date_list, baseline_dir=baseline_dir, out_dir=self.workDir)
+        for pair in pairs:
+            ind1.append(self.date_list.index(pair[0]))
+            ind2.append(self.date_list.index(pair[1]))
+        plot_baselines(ind1=ind1, ind2=ind2, dates=self.date_list, baseline_dir=baseline_dir, out_dir=self.workDir)
 
         return ifgram_dir, pairs
 
