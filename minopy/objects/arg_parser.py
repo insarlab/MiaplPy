@@ -415,9 +415,9 @@ class MinoPyParser:
 
         STEP_LIST = [
             'load_slc',
-            'inversion',
-            'ifgram',
-            'unwrap',
+            'phase_inversion',
+            'generate_ifgram',
+            'unwrap_ifgram',
             'load_ifgram',
             'correct_unwrap_error',
             'phase_to_range',
@@ -440,7 +440,7 @@ class MinoPyParser:
               # Run with --start/stop/step options
               minopyApp.py PichinchaSenDT142.template --dostep  load_slc       # run the step 'download' only
               minopyApp.py PichinchaSenDT142.template --start load_slc         # start from the step 'download' 
-              minopyApp.py PichinchaSenDT142.template --stop  unwrap           # end after step 'interferogram'
+              minopyApp.py PichinchaSenDT142.template --stop  unwrap_ifgram    # end after step 'interferogram'
               """
         parser = argparse.ArgumentParser(description='Routine Time Series Analysis for MiNoPy',
                                          formatter_class=argparse.RawTextHelpFormatter,

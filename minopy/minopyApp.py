@@ -29,18 +29,18 @@ pathObj = PathFind()
 ###########################################################################################
 STEP_LIST = [
     'load_slc',
-    'inversion',
-    'ifgram',
-    'unwrap',
+    'phase_inversion',
+    'generate_ifgram',
+    'unwrap_ifgram',
     'load_ifgram',
     'correct_unwrap_error',
     'phase_to_range',
     'mintpy_corrections']
 
 RUN_FILES = {'load_slc': 'run_01_minopy_load_slc',
-             'inversion': 'run_02_minopy_inversion',
-             'ifgram': 'run_03_minopy_ifgram',
-             'unwrap': 'run_04_minopy_unwrap',
+             'phase_inversion': 'run_02_minopy_phase_inversion',
+             'generate_ifgram': 'run_03_minopy_generate_ifgram',
+             'unwrap_ifgram': 'run_04_minopy_unwrap_ifgram',
              'load_ifgram': 'run_05_minopy_load_ifgram',
              'correct_unwrap_error': 'run_06_mintpy_correct_unwrap_error',
              'phase_to_range': 'run_07_minopy_phase_to_range',
@@ -197,9 +197,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         else:
             job_obj = None
         self.run_load_slc('load_slc', job_obj)
-        self.run_phase_inversion('inversion', job_obj)
-        self.run_interferogram('ifgram', job_obj)
-        self.run_unwrap('unwrap', job_obj)
+        self.run_phase_inversion('phase_inversion', job_obj)
+        self.run_interferogram('generate_ifgram', job_obj)
+        self.run_unwrap('unwrap_ifgram', job_obj)
         self.run_load_ifg('load_ifgram', job_obj)
         self.run_correct_unwrap_error('correct_unwrap_error', job_obj)
         self.run_phase_to_range('phase_to_range', job_obj)
@@ -274,12 +274,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                                                  b=scp_args,
                                                                                  c=tmp_slc_stack)
             run_commands.append(command_line)
-
-        #command_line = 'cp {a} /tmp; unset LD_PRELOAD; '.format(a=os.path.join(self.workDir, 'inputs/slcStack.h5'))
-        #command_line += '{a} --slc_stack {b}; '.format(a=command_line1, b='/tmp/slcStack.h5')
-        #command_line += 'rm /tmp/slcStack.h5\n'
-
-        #run_commands = [command_line]
 
         with open(run_inversion, 'w+') as frun:
             frun.writelines(run_commands)
@@ -402,7 +396,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                            a7=sensor_type,
                                                            a8=phase_series)
 
-            cmd = '{} generate_interferograms.py {}'.format(self.text_cmd.strip("'"), scp_args)
+            cmd = '{} generate_ifgram.py {}'.format(self.text_cmd.strip("'"), scp_args)
             cmd = cmd.lstrip()
 
             if not self.write_job:
@@ -465,7 +459,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                              a5=self.template['minopy.unwrap.initMethod'],
                                                              a6=length, a7=width, a8=height, a9=ntiles,
                                                              a10=earth_radius, a11=wavelength, a12=unwrap_mask)
-            cmd = '{} unwrap_minopy.py {}'.format(self.text_cmd.strip("'"), scp_args)
+            cmd = '{} unwrap_ifgram.py {}'.format(self.text_cmd.strip("'"), scp_args)
             cmd = cmd.lstrip()
 
             if not self.write_job:
@@ -587,12 +581,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             job_obj = None
             if sname == 'load_slc':
                 self.run_load_slc('load_slc', job_obj)
-            elif sname == 'inversion':
-                self.run_phase_inversion('inversion', job_obj)
-            elif sname == 'ifgram':
-                self.run_interferogram('ifgram', job_obj)
-            elif sname == 'unwrap':
-                self.run_unwrap('unwrap', job_obj)
+            elif sname == 'phase_inversion':
+                self.run_phase_inversion('phase_inversion', job_obj)
+            elif sname == 'generate_ifgram':
+                self.run_interferogram('generate_ifgram', job_obj)
+            elif sname == 'unwrap_ifgram':
+                self.run_unwrap('unwrap_ifgram', job_obj)
             elif sname == 'load_ifgram':
                 self.run_load_ifg('load_ifgram', job_obj)
             elif sname == 'correct_unwrap_error':

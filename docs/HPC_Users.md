@@ -14,12 +14,12 @@ submit_jobs.bash $PWD/PichinchaSenDT142.template --minopy
 This uses the `sbatch_conditional.bash` commmand, that can be used for individual run_files:
 
 ```
-sbatch_conditional.bash minopy/run_files/run_01_minopy_load_slc 
-sbatch_conditional.bash minopy/run_files/run_02_minopy_inversion
-sbatch_conditional.bash minopy/run_files/run_03_minopy_ifgram
-sbatch_conditional.bash minopy/run_files/run_04_minopy_unwrap
-sbatch_conditional.bash minopy/run_files/run_05_minopy_load_ifgram
-sbatch_conditional.bash minopy/run_files/run_06_mintpy_correct_unwrap_error 
-sbatch_conditional.bash minopy/run_files/run_07_minopy_phase_to_range
-sbatch_conditional.bash minopy/run_files/run_08_mintpy_corrections
+sbatch_jobs.bash minopy/run_files/run_01_minopy_load_slc 
+submit_jobs.bash minopy/run_files/run_02_minopy_phase_inversion
+submit_jobs.bash minopy/run_files/run_03_minopy_generate_ifgram
+submit_jobs.bash minopy/run_files/run_04_minopy_unwrap_ifgram
+submit_jobs.bash minopy/run_files/run_05_minopy_load_ifgram
+submit_jobs.bash minopy/run_files/run_06_mintpy_correct_unwrap_error 
+submit_jobs.bash minopy/run_files/run_07_minopy_phase_to_range
+submit_jobs.bash minopy/run_files/run_08_mintpy_corrections
 ```
