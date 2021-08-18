@@ -295,7 +295,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         ifg_dir_names = {'mini_stacks': 'mini_stacks',
                          'single_reference': 'single_reference',
-                         'short_baselines': 'short_baselines'}
+                         'delaunay': 'delaunay'}
 
         ifgram_dir = os.path.join(self.workDir, 'inverted/interferograms')
         baseline_dir = self.template['minopy.load.baselineDir']
@@ -316,9 +316,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             index = int(self.num_images // 2)
             reference_date = self.date_list[index]
 
-        if self.template['minopy.interferograms.type'] == 'short_baselines' and \
+        if self.template['minopy.interferograms.type'] == 'delaunay' and \
             self.template['minopy.interferograms.list'] in [None, 'None']:
-            scp_args = ' -b {} -o {} --date_list {}'.format(baseline_dir, short_baseline_ifgs, self.date_list_text)
+            scp_args = ' -b {} -o {} --temporalBaseline {} --perpBaseline {} --date_list {}'.format(
+                baseline_dir, short_baseline_ifgs, self.template['minopy.interferograms.delaunayTempThresh'],
+                self.template['minopy.interferograms.delaunayPerpThresh'], self.date_list_text)
             find_baselines(scp_args.split())
             print('Successfully created short_baseline_ifgs.txt ')
             self.template['minopy.interferograms.list'] = short_baseline_ifgs
