@@ -20,8 +20,9 @@ cdef extern from "complex.h":
     float crealf(float complex z)
     float cimagf(float complex z)
     float cabsf(float complex z)
+    float sqrtf(float z)
     float complex clogf(float complex z)
-    float complex csqrtf(float complex z)
+    #float complex csqrtf(float complex z)
     float cargf(float complex z)
     float fmaxf(float x, float y)
     float fminf(float x, float y)
@@ -268,17 +269,23 @@ cdef inline float complex[::1] PTA_L_BFGS_cy(float complex[:, ::1] coh0, float[:
 
     return vec
 
-
-cdef inline float complex[:,::1] outer_product(float complex[::1] x, float complex[::1] y):
+cdef inline float[:,::1] outer_product_float(float [::1] x, float [::1] y):
     cdef cnp.intp_t i, t, n = x.shape[0]
-    cdef float complex[:, ::1] out = np.zeros((n, n), dtype=np.complex64)
+    cdef float [:, ::1] out = np.zeros((n, n), dtype=np.float32)
     for i in range(n):
         for t in range(n):
             out[i, t] = x[i] * y[t]
     return out
 
+#cdef inline float complex[:,::1] outer_product(float complex[::1] x, float complex[::1] y):
+#    cdef cnp.intp_t i, t, n = x.shape[0]
+#    cdef float complex[:, ::1] out = np.zeros((n, n), dtype=np.complex64)
+#    for i in range(n):
+#        for t in range(n):
+#            out[i, t] = x[i] * y[t]
+#    return out
 
-cdef inline float complex[:,::1] divide_elementwise(float complex[:, ::1] x, float complex[:, ::1] y):
+cdef inline float complex[:,::1] divide_elementwise_float(float complex[:, ::1] x, float [:, ::1] y):
     cdef cnp.intp_t i, t
     cdef cnp.intp_t n1 = x.shape[0]
     cdef cnp.intp_t n2 = x.shape[1]
@@ -288,21 +295,35 @@ cdef inline float complex[:,::1] divide_elementwise(float complex[:, ::1] x, flo
             if x[i, t] == 0:
                 out[i, t] = 0
             else:
-                out[i, t] = x[i, t] / y[i, t]
+                out[i, t] = (cabsf(x[i, t]) / y[i, t]) * cexpf(1j * cargf(x[i, t]))
     return out
+
+#cdef inline float complex[:,::1] divide_elementwise(float complex[:, ::1] x, float complex[:, ::1] y):
+#    cdef cnp.intp_t i, t
+#    cdef cnp.intp_t n1 = x.shape[0]
+#    cdef cnp.intp_t n2 = x.shape[1]
+#    cdef float complex[:, ::1] out = np.zeros((n1, n2), dtype=np.complex64)
+#    for i in range(n1):
+#        for t in range(n2):
+#            if x[i, t] == 0:
+#                out[i, t] = 0
+#            else:
+#                out[i, t] = x[i, t] / y[i, t]
+#    return out
 
 cdef inline float complex[:, ::1] cov2corr_cy(float complex[:,::1] cov_matrix):
     """ Converts covariance matrix to correlation/coherence matrix. """
     cdef cnp.intp_t i, n = cov_matrix.shape[0]
-    cdef float complex[::1] v = np.zeros(n, dtype=np.complex64)
-    cdef float complex[:, ::1] outer_v, corr_matrix
+    cdef float [::1] v = np.zeros(n, dtype=np.float32)
+    cdef float [:, ::1] outer_v
+    cdef float complex[:, ::1] corr_matrix
 
     for i in range(n):
-        v[i] = csqrtf(cov_matrix[i, i])
+        v[i] = sqrtf(cabsf(cov_matrix[i, i]))
 
-    outer_v = outer_product(v, v)
+    outer_v = outer_product_float(v, v)
 
-    corr_matrix = divide_elementwise(cov_matrix, outer_v)
+    corr_matrix = divide_elementwise_float(cov_matrix, outer_v)
 
     return corr_matrix
 
