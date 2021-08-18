@@ -7,8 +7,7 @@ You need to have a template with the options for each step like the [sample](htt
 Run `minopyApp.py -h` for a quick help on steps.
 For more details refer to the [example](https://nbviewer.jupyter.org/github/geodesymiami/MiNoPy/blob/main/tutorial/minopyApp.ipynb) tutorial.
 
-1. The first step is to read/load the coregistered SLC data and geometry files in full resolution. For that, it is recommended to set the options with `minopy.load.*` in your template. The ones related to interferograms are not required at this step. You only need SLC and geometry files. If your directory is set up following ISCE convention, you may set `minopy.load.autoPath` to `yes` and it will automatically read the data. Also you need to set subset area by specifying bounding box in `minopy.subset.lalo`. Processing time would be a matter if large subset is selected.
-
+1. The first step is to read/load the coregistered SLC data and geometry files in full resolution. For that, it is recommended to set the options with `minopy.load.*` in your template. The ones related to interferograms are not required at this step. You only need SLC and geometry files. If your directory is set up following ISCE convention, you may set `minopy.load.autoPath` to `yes` and it will automatically read the data. Also you need to set subset area by specifying bounding box in `minopy.subset.lalo`. Processing time would be a matter if large subset is selected. 
 After setting up your template file, run following command to load data:
 ```
 minopyApp.py $PWD/PichinchaSenDT142.template --dostep load_slc --dir $PWD/minopy
