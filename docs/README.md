@@ -54,7 +54,9 @@ minopyApp.py PichinchaSenDT142.template --dir ./minopy
 
 #### Example tutorial in jupyter notebook [nbviewer](https://nbviewer.jupyter.org/github/geodesymiami/MiNoPy/blob/main/tutorial/minopyApp.ipynb)
 
-[Guide for University of Miami HPC users](./HPC_Users.md)
+#### [Brief description of the steps](https://github.com/geodesymiami/MiNoPy/blob/main/docs/steps_guide.md)
+
+#### [Guide for University of Miami HPC users](./HPC_Users.md)
 
 ### 3. Contribution ###
 Please follow the [guidelines](./CONTRIBUTING.md) for contributing to the code
