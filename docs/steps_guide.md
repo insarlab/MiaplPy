@@ -1,4 +1,4 @@
-### Brief description of steps: ###
+### Brief description of the steps: ###
 
 minopyApp.py runs 8 steps sequentially from reading data to time series analysis. It uses [ISCE](https://github.com/isce-framework/isce2), [MintPy](https://github.com/insarlab/MintPy) and [PyAPS](https://github.com/AngeliqueBenoit/pyaps3) as extrenal modules and for correction steps, it uses MintPy.
 
