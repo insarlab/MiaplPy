@@ -4,22 +4,23 @@
 import os
 import numpy as np
 import argparse
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import minimum_spanning_tree
-
+#from scipy.sparse import csr_matrix
+#from scipy.sparse.csgraph import minimum_spanning_tree
+from datetime import datetime
+from scipy.spatial import Delaunay
 
 def cmd_line_parse(iargs=None):
     parser = argparse.ArgumentParser(description='find the minimum number of connected good interferograms')
     parser.add_argument('-b', '--baselineDir', dest='baseline_dir', type=str, help='Baselines directory')
     parser.add_argument('-o', '--outFile', dest='out_file', type=str, default='./bestints.txt', help='Output text file')
-    parser.add_argument('-t', '--temporalBaseline', dest='t_threshold', default=2, type=int,
-                        help='Number of sequential interferograms to consider')
+    parser.add_argument('-t', '--temporalBaseline', dest='t_threshold', default=60, type=int,
+                        help='Temporal baseline threshold')
     parser.add_argument('-p', '--perpBaseline', dest='p_threshold', default=200, type=int,
                         help='Perpendicular baseline threshold')
     parser.add_argument('-d', '--date_list', dest='date_list', default=None, type=str,
                         help='Text file having existing SLC dates')
-    parser.add_argument('--MinSpanTree', dest='min_span_tree', action='store_true',
-                          help='Keep minimum spanning tree pairs')
+    #parser.add_argument('--MinSpanTree', dest='min_span_tree', action='store_true',
+    #                      help='Keep minimum spanning tree pairs')
 
     inps = parser.parse_args(args=iargs)
     return inps
@@ -39,32 +40,50 @@ def find_baselines(iargs=None):
 
     dates = np.sort(dates)
 
+    days = [(datetime.strptime(date, '%Y%m%d') - datetime.strptime(dates[0], '%Y%m%d')).days for date in dates]
+
+    pairtr = []
+    for i, date in enumerate(dates):
+        pairtr.append([days[i], baselines[date]])
+
+    pairtr = np.array(pairtr)
+    tri = Delaunay(pairtr, incremental=False)
+
     q = np.zeros([len(dates), len(dates)])
 
-    for i, ds in enumerate(dates):
-        t = np.arange(i - inps.t_threshold, i + inps.t_threshold)
-        t = t[t >= 0]
-        t = t[t < len(dates)]
-        if len(t) > 0:
-            for m in range(t[0], t[-1] + 1):
-                q[i, m] = np.abs(baselines[dates[i]] - baselines[dates[m]])
-                q[m, i] = q[i, m]
-
-        #if len(t) > 3:
-        #    ss = np.where(q[i, :] == np.max(q[i, :]))[0]
-        #    q[i,ss]=0
+    for trp in pairtr[tri.simplices]:
+        x1 = int(trp[0][0])
+        x2 = int(trp[1][0])
+        x3 = int(trp[2][0])
+        b1 = trp[0][1]
+        b2 = trp[1][1]
+        b3 = trp[2][1]
+        if np.abs(x1 - x2) <= inps.t_threshold:
+            q[days.index(x1), days.index(x2)] = np.abs(b1 - b2)
+            q[days.index(x2), days.index(x1)] = np.abs(b1 - b2)
+        if np.abs(x2 - x3) <= inps.t_threshold:
+            q[days.index(x2), days.index(x3)] = np.abs(b2 - b3)
+            q[days.index(x3), days.index(x2)] = np.abs(b2 - b3)
+        if np.abs(x1 - x3) <= inps.t_threshold:
+            q[days.index(x1), days.index(x3)] = np.abs(b1 - b3)
+            q[days.index(x3), days.index(x1)] = np.abs(b1 - b3)
 
     q[q > inps.p_threshold] = 0
 
-    if inps.min_span_tree:
-        X = csr_matrix(q)
-        Tcsr = minimum_spanning_tree(X)
-        A = Tcsr.toarray()
-    else:
-        for i in range(len(dates)):
-            if len(np.nonzero(q[i, :])[0]) <= 1:
-                q[i, :] = 0
-        A = np.triu(q)
+    #if inps.min_span_tree:
+    #    X = csr_matrix(q)
+    #    Tcsr = minimum_spanning_tree(X)
+    #    A = Tcsr.toarray()
+    #else:
+    #    for i in range(len(dates)):
+    #        if len(np.nonzero(q[i, :])[0]) <= 1:
+    #            q[i, :] = 0
+    #    A = np.triu(q)
+
+    for i in range(len(dates)):
+        if len(np.nonzero(q[i, :])[0]) <= 1:
+            q[i, :] = 0
+    A = np.triu(q)
 
     ind1, ind2 = np.where(A > 0)
     ifgdates = ['{}_{}\n'.format(dates[g], dates[h]) for g, h in zip(ind1, ind2)]
@@ -108,7 +127,6 @@ def get_baselines_dict(baseline_dir):
 
 def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baseline_dir=None):
     import matplotlib.pyplot as plt
-    from datetime import datetime
     import matplotlib.dates as mdates
     
     years = mdates.YearLocator()
