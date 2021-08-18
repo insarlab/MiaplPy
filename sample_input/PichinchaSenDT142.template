@@ -2,7 +2,7 @@
 minopy.load.processor      = isce  #[isce,snap,gamma,roipac], auto for isceTops
 minopy.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
 minopy.load.compression    = auto  #[gzip / lzf / no], auto for no.
-minopy.load.autoPath       = yes    # [yes, no] auto for no
+minopy.load.autoPath       = auto    # [yes, no] auto for no
 
 minopy.load.slcFile        = ../merged/SLC/*/*.slc.full  #[path2slc_file]
 ##---------for ISCE only:
