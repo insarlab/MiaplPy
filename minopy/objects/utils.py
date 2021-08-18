@@ -445,24 +445,29 @@ def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='
         if value == 'auto' and key in templateAutoDict.keys():
             templateDict[key] = templateAutoDict[key]
 
-    common_keys = ['load.autoPath', 'load.processor', 'load.updateMode', 'load.compression']
+    common_keys = ['load.autoPath', 'load.compression']
 
     if not mintpyTemplateDict is None:
         status = 'skip'
 
-        if not templateDict['minopy.subset.lalo'] and not templateDict['minopy.subset.yx']:
-            if mintpyTemplateDict['mintpy.subset.lalo']:
+        if templateDict['minopy.subset.lalo'] == 'no' and templateDict['minopy.subset.yx'] == 'no':
+            if not mintpyTemplateDict['mintpy.subset.lalo'] == 'no':
                 templateDict['minopy.subset.lalo'] = mintpyTemplateDict['mintpy.subset.lalo']
                 status = 'run'
-            if mintpyTemplateDict['mintpy.subset.yx']:
+            if not mintpyTemplateDict['mintpy.subset.yx'] == 'no':
                 templateDict['minopy.subset.yx'] = mintpyTemplateDict['mintpy.subset.yx']
                 status = 'run'
 
         for key in common_keys:
-            if not templateDict['minopy.' + key]:
-                if mintpyTemplateDict['mintpy.' + key]:
+            if templateDict['minopy.' + key] == 'no':
+                if not mintpyTemplateDict['mintpy.' + key] == 'no':
                     templateDict['minopy.' + key] = mintpyTemplateDict['mintpy.' + key]
                     status = 'run'
+
+        if not templateDict['minopy.load.processor'] == mintpyTemplateDict['mintpy.load.processor']:
+            if templateDict['minopy.load.processor'] == 'isce':
+                templateDict['minopy.load.processor'] = mintpyTemplateDict['mintpy.load.processor']
+            status = 'run'
 
         common_keys = ['minopy.' + key for key in common_keys] + ['minopy.subset.lalo', 'minopy.subset.yx']
 
