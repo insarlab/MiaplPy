@@ -9,7 +9,10 @@ import datetime
 from minopy.objects.arg_parser import MinoPyParser
 import h5py
 import mintpy
+from mintpy.utils import readfile, writefile
 import mintpy.workflow
+from osgeo import gdal
+import numpy as np
 
 def main(iargs=None):
     """
@@ -37,10 +40,11 @@ def main(iargs=None):
 
     mintpy.generate_mask.main(args_shm.split())
 
+
     if inps.custom_mask in ['None', None]:
         h5_mask = shadow_mask
     else:
-        h5_mask = os.path.join(minopy_dir, 'mask_unwrap.h5')
+        h5_mask = inps.custom_mask
         args_shm = '{} -m {} -o {} --fill 0'.format(inps.custom_mask,
                                                     shadow_mask, h5_mask)
         mintpy.mask.main(args_shm.split())
@@ -51,14 +55,47 @@ def main(iargs=None):
                                                  corr_file + '_msk')
     mintpy.mask.main(mask_arg.split())
 
+    with h5py.File(h5_mask, 'r') as f:
+        mask_sh1 = f['mask'][:, :]
+
+    fq = gdal.Open(corr_file + '.vrt', gdal.GA_ReadOnly)
+    quality = fq.GetRasterBand(1).ReadAsArray()
+    del fq
+
+    mask = (quality > 0.5) * mask_sh1
+
+    mask[mask == 0] = np.nan
+
     if not inps.output_mask is None:
         unwrap_mask = inps.output_mask
     else:
         unwrap_mask = os.path.join(minopy_dir, 'inverted/mask_unwrap')
 
-    save_cmd = '{} save_roipac.py {} -o {}'.format(inps.text_cmd, h5_mask, unwrap_mask)
-    save_cmd = save_cmd.lstrip()
-    os.system(save_cmd)
+    atr = readfile.read_attribute(h5_mask)
+
+    atr['FILE_TYPE'] = '.msk'
+
+    atr_in = {}
+    for key, value in atr.items():
+        atr_in[key] = str(value)
+
+    # drop the following keys
+    key_list = ['width', 'Width', 'samples', 'length', 'lines',
+                'SUBSET_XMIN', 'SUBSET_XMAX', 'SUBSET_YMIN', 'SUBSET_YMAX',
+                ]
+    for key in key_list:
+        if key in atr_in.keys():
+            atr_in.pop(key)
+
+    # drop all keys that are not all UPPER_CASE
+    key_list = list(atr_in.keys())
+    for key in key_list:
+        if not key.isupper():
+            atr_in.pop(key)
+
+    atr_in['FILE_LENGTH'] = atr_in['LENGTH']
+
+    writefile.write(mask, out_file=unwrap_mask, metadata=atr)
 
     return
 
