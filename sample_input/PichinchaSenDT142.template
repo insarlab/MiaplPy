@@ -1,0 +1,37 @@
+################
+minopy.load.processor      = isce  #[isce,snap,gamma,roipac], auto for isceTops
+minopy.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
+minopy.load.compression    = auto  #[gzip / lzf / no], auto for no.
+minopy.load.autoPath       = yes    # [yes, no] auto for no
+
+minopy.load.slcFile        = ../merged/SLC/*/*.slc.full  #[path2slc_file]
+##---------for ISCE only:
+minopy.load.metaFile       = ../reference/IW*.xml
+minopy.load.baselineDir    = ../baselines
+##---------geometry datasets:
+minopy.load.demFile          = ../merged/geom_reference/hgt.rdr.full
+minopy.load.lookupYFile      = ../merged/geom_reference/lat.rdr.full
+minopy.load.lookupXFile      = ../merged/geom_reference/lon.rdr.full
+minopy.load.incAngleFile     = ../merged/geom_reference/los.rdr.full
+minopy.load.azAngleFile      = ../merged/geom_reference/los.rdr.full
+minopy.load.shadowMaskFile   = ../merged/geom_reference/shadowMask.rdr.full
+minopy.load.waterMaskFile    = None
+##---------interferogram datasets:
+minopy.load.unwFile        = ./inverted/interferograms_single_reference/*/*fine*.unw
+minopy.load.corFile        = ./inverted/interferograms_single_reference/*/*fine*.cor
+minopy.load.connCompFile   = ./inverted/interferograms_single_reference/*/*.unw.conncomp
+
+##---------subset (optional):
+## if both yx and lalo are specified, use lalo option unless a) no lookup file AND b) dataset is in radar coord
+minopy.subset.lalo         = -0.199:-0.142,-78.612:-78.578
+
+# MiNoPy options
+minopy.compute.numWorker   = 40
+
+## Mintpy options
+mintpy.compute.cluster     = local  # if dask is not available, set this option to no
+mintpy.compute.numWorker   = 8
+
+mintpy.reference.lalo     = -0.1786, -78.5933
+mintpy.unwrapError.method          = bridging
+mintpy.troposphericDelay.method = no
