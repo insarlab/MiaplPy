@@ -13,7 +13,7 @@ are not required at this step. You only need SLC and geometry files. If your dir
 convention, you may set `minopy.load.autoPath` to `yes` and it will automatically read the data. 
 Also you need to set subset area by specifying bounding box in `minopy.subset.lalo`. 
 Processing time would be a matter if large subset is selected. 
-After setting up your template file, run following command to load data:
+After setting up your template file, run following command to load data. It will call the `load_slc.py` script. 
 ```
 minopyApp.py $PWD/PichinchaSenDT142.template --dostep load_slc --dir $PWD/minopy
 ```
@@ -27,44 +27,45 @@ your processing system availability which will be the number of parallel jobs.
 All options begining with `minopy.inversion.*` are used in this step. Patch size is the dimension
 of your patches, for example 200 by 200 as default. ministack size is the number of images used for inverting 
 each mini stack. Range and Azimuth window are the size of searching window to find SHPs. 
-Statistical test to find SHPs can be selected among KS (default), AD and ttest.
+Statistical test to find SHPs can be selected among KS (default), AD and ttest. Following command will call `phase_inversion.py` script
 
 ```
 minopyApp.py $PWD/PichinchaSenDT142.template --dostep phase_inversion --dir $PWD/minopy
 ```
 
-3. After inversion you have the inverted single reference interferograms in a stack called `phase_series.h5`. You need to unwrap the interferograms for time series analysis but unwrapping is not easy specially when you have large temporal baselines. We like to unwrap minimum number of interferograms but the most correlated ones. In MiNoPy you can select which pairs to unwrap and for that you write selected pairs from the stack to separate ifgram directories. Use options starting with `minopy.interferograms.*` in template to select your network of interferograms to unwrap. The available options are: single reference, mini_stacks and delaunay (triangles). You may also write your own selected list in a text file and set the path to `minopy.interferograms.list`. For delaunay pairs, you can later perform both `bridging` and `phase_closure` unwrap error corrections of MintPy but for other pair networks you may only run `bridging`.
+3. After inversion you have the inverted single reference interferograms in a stack called `phase_series.h5`. You need to unwrap the interferograms for time series analysis but unwrapping is not easy specially when you have large temporal baselines. We like to unwrap minimum number of interferograms but the most correlated ones. In MiNoPy you can select which pairs to unwrap and for that you write selected pairs from the stack to separate ifgram directories. Use options starting with `minopy.interferograms.*` in template to select your network of interferograms to unwrap. The available options are: single reference, mini_stacks and delaunay (triangles). You may also write your own selected list in a text file and set the path to `minopy.interferograms.list`. For delaunay pairs, you can later perform both `bridging` and `phase_closure` unwrap error corrections of MintPy but for other pair networks you may only run `bridging`. Following command will call `generate_ifgram.py` script.
 
 ```
 minopyApp.py $PWD/PichinchaSenDT142.template --dostep generate_ifgram --dir $PWD/minopy
 ```
 
-4. The next step would be to unwrap the selected pairs. We use [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/) for unwrapping and you can set some options starting with `minopy.unwrap.*` in template.
+4. The next step would be to unwrap the selected pairs. We use [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/) for unwrapping and you can set some options starting with `minopy.unwrap.*` in template. Following command will call `unwrap_ifgram.py` script.
 
 ```
 minopyApp.py $PWD/PichinchaSenDT142.template --dostep unwrap_ifgram --dir $PWD/minopy
 ```
 
 5. After unwrapping, The interferograms will be loaded to a stack in HDF5 format to be ready for mintpy time series analysis and correction steps.
-You can now use `minopy.load.*` options in template specified for interferograms or set `minopy.load.autoPath = yes` to read them automatically.
+You can now use `minopy.load.*` options in template specified for interferograms or set `minopy.load.autoPath = yes` to read them automatically. Following command will call `load_ifgram.py` script.
 
 ```
 minopyApp.py $PWD/PichinchaSenDT142.template --dostep load_ifgram --dir $PWD/minopy
 ```
 
-6. At this step you will run the reference point selection and correct unwrap error using MintPy. Use the corresponding mintpy template options `mintpy.unwrapError.*`
+6. At this step you will run the reference point selection and correct unwrap error using MintPy. Use the corresponding mintpy template options `mintpy.unwrapError.*`. Following command will call `smallbaselineApp.py` script from MintPy.
 
 ```
 minopyApp.py $PWD/PichinchaSenDT142.template --dostep correct_unwrap_error --dir $PWD/minopy
 ```
 
-7. Now you need to convert phase to range change (time series). The temporal coherence threshold can be set for this step using `minopy.timeseries.minTempCoh` and you can use water mask by setting `minopy.timeseries.waterMask`
+7. Now you need to convert phase to range change (time series). The temporal coherence threshold can be set for this step using `minopy.timeseries.minTempCoh` and you can use water mask by setting `minopy.timeseries.waterMask`. Following command will call `phase_to_range.py` script.
 
 ```
 minopyApp.py $PWD/PichinchaSenDT142.template --dostep phase_to_range --dir $PWD/minopy
 ```
 
-8. Finally, the time series is ready for different corrections including, tropospheric and topographic corrections. At this step you can use MintPy starting `correct_LOD` or run the following:
+8. Finally, the time series is ready for different corrections including, tropospheric and topographic corrections. At this step you can use MintPy starting `correct_LOD` or run the following. It will call `smallbaselineApp.py` script from MintPy.
+
 
 ```
 minopyApp.py $PWD/PichinchaSenDT142.template --dostep mintpy_corrections --dir $PWD/minopy
