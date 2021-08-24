@@ -11,7 +11,7 @@ After the jobs are created, you may run them with one of the appropriate submit 
 submit_jobs.bash $PWD/PichinchaSenDT142.template --minopy
 (submit_jobs.bash $PWD/PichinchaSenDT142.template --dostep minopy)
 ```
-This uses the `sbatch_conditional.bash` commmand, that can be used for individual run_files:
+`submit_jobs.bash` commmand can be used for running individual jobs in run_files:
 
 ```
 sbatch_jobs.bash minopy/run_files/run_01_minopy_load_slc 
