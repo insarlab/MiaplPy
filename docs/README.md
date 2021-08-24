@@ -56,7 +56,7 @@ minopyApp.py PichinchaSenDT142.template --dir ./minopy
 
 #### [Brief description of the steps](https://github.com/geodesymiami/MiNoPy/blob/main/docs/steps_guide.md)
 
-#### [Guide for University of Miami HPC users](./HPC_Users.md)
+#### [Guide for HPC users](./HPC_Users.md)
 
 ### 3. Contribution ###
 Please follow the [guidelines](./CONTRIBUTING.md) for contributing to the code
