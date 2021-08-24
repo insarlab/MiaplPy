@@ -19,7 +19,7 @@ from mintpy.objects.stackDict import (geometryDict,
                                       ifgramStackDict,
                                       ifgramDict)
 from mintpy.utils import readfile, ptime, utils as ut
-from mintpy.utils import isce_utils
+#from mintpy.utils import isce_utils
 from minopy.objects.utils import check_template_auto_value
 from mintpy import subset
 import datetime
@@ -649,6 +649,12 @@ def main(iargs=None):
     inpsDict = read_subset_box(inpsDict)
     extraDict = get_extra_metadata(inpsDict)
 
+    if not 'PLATFORM' in inpsDict:
+        slcStack = os.path.join(inps.outdir, 'slcStack.h5')
+        atr = readfile.read_attribute(slcStack)
+        if 'PLATFORM' in atr:
+            inpsDict['PLATFORM'] = atr['PLATFORM']
+
     # initiate objects
     stackObj = read_inps_dict2ifgram_stack_dict_object(inpsDict)
 
@@ -682,6 +688,8 @@ def main(iargs=None):
         # better control of special metadata, such as SUBSET_X/YMIN
         ut.add_attribute(stack_file, inpsDict)
         ut.add_attribute(geom_file, inpsDict)
+
+    ut.add_attribute(stack_file, extraDict)
 
     # if not load_complete, plot and raise exception
     if not load_complete:
