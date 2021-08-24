@@ -5,7 +5,7 @@ import os
 import numpy as np
 import argparse
 import h5py
-from mintpy.utils import readfile
+from mintpy.utils import readfile, writefile, utils as ut
 
 def cmd_line_parse(iargs=None):
     parser = argparse.ArgumentParser(description='Correct for geolocation shift caused by DEM error')
@@ -21,43 +21,74 @@ def cmd_line_parse(iargs=None):
 def main(iargs=None):
     inps = cmd_line_parse(iargs)
 
-    key  = 'geolocation_corrected'
+    key = 'geolocation_corrected'
 
-    f = h5py.File(inps.geometry_file, 'r+')
-    keys = f.attrs.keys()
+    with h5py.File(inps.geometry_file, 'r') as f:
+        keys = f.attrs.keys()
+        latitude = f['latitude'][:, :]
+        longitude = f['longitude'][:, :]
 
-    if not key in keys or f.attrs[key] == 'no':
-        status = 'run'
-        print('Run geolocation correction ...')
-    else:
-        status = 'skip'
-        print('Geolocation is already done, you may reverse it using --reverse. skip ...')
+        atr = readfile.read(inps.geometry_file, datasetName='azimuthAngle')[1]
 
-    if inps.reverse:
-        if key in keys and f.attrs[key] == 'yes':
+        if not key in keys or atr[key] == 'no':
             status = 'run'
-            print('Run reversing geolocation correction ...')
+            print('Run geolocation correction ...')
         else:
             status = 'skip'
-            print('The file is not corrected for geolocation. skip ...')
+            print('Geolocation is already done, you may reverse it using --reverse. skip ...')
+
+        if inps.reverse:
+            if key in keys and atr[key] == 'yes':
+                status = 'run'
+                print('Run reversing geolocation correction ...')
+            else:
+                status = 'skip'
+                print('The file is not corrected for geolocation. skip ...')
 
     if status == 'run':
+
         az_angle = np.deg2rad(readfile.read(inps.geometry_file, datasetName='azimuthAngle')[0])
         inc_angle = np.deg2rad(readfile.read(inps.geometry_file, datasetName='incidenceAngle')[0])
 
         dem_error = readfile.read(inps.dem_error_file, datasetName='dem')[0]
 
-        dx = dem_error * (1/np.tan(inc_angle)) * np.cos(az_angle) / 1110000  # converted to degree
-        dy = dem_error * (1/np.tan(inc_angle)) * np.sin(az_angle) / 1110000  # converted to degree
+        dx = dem_error * (1/np.tan(inc_angle)) * np.cos(az_angle) / 111000  # converted to degree
+        dy = dem_error * (1/np.tan(inc_angle)) * np.sin(az_angle) / 111000  # converted to degree
+
 
         if inps.reverse:
-            f['latitude'][:, :] = f['latitude'][:, :] - dy
-            f['longitude'][:, :] = f['longitude'][:, :] - dx
-            f.attrs[key] = 'no'
+
+            latitude -= dy
+            longitude -= dx
+            atr[key] = 'no'
+            block = [0, latitude.shape[0], 0, latitude.shape[1]]
+            writefile.write_hdf5_block(inps.geometry_file,
+                                       data=latitude,
+                                       datasetName='latitude',
+                                       block=block)
+
+            writefile.write_hdf5_block(inps.geometry_file,
+                                       data=longitude,
+                                       datasetName='longitude',
+                                       block=block)
+
+            ut.add_attribute(inps.geometry_file, atr_new=atr)
+
+
         else:
-            f['latitude'][:, :] = f['latitude'][:, :] + dy
-            f['longitude'][:, :] = f['longitude'][:, :] + dx
-            f.attrs[key] = 'yes'
+            latitude += dy
+            longitude += dx
+            atr[key] = 'yes'
+            block = [0, latitude.shape[0], 0, latitude.shape[1]]
+            writefile.write_hdf5_block(inps.geometry_file,
+                                       data=latitude,
+                                       datasetName='latitude',
+                                       block=block)
+            writefile.write_hdf5_block(inps.geometry_file,
+                                       data=longitude,
+                                       datasetName='longitude',
+                                       block=block)
+            ut.add_attribute(inps.geometry_file, atr_new=atr)
 
     f.close()
 
