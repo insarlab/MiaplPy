@@ -7,6 +7,7 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy import linalg as LA
+from minopy.lib.utils import est_corr_py, sequential_phase_linking_py, phase_linking_process_py
 import time
 import argparse
 
@@ -259,8 +260,8 @@ def plot_simulated(inps):
     CCGsam_Sterm_v = simulate_neighborhood_stack(coh_sim_S_v, neighborSamples=inps.n_shp)
     CCGsam_Lterm_v = simulate_neighborhood_stack(coh_sim_L_v, neighborSamples=inps.n_shp)
 
-    coh_est_S_v = est_corr(CCGsam_Sterm_v)
-    coh_est_L_v = est_corr(CCGsam_Lterm_v)
+    coh_est_S_v = np.array(est_corr_py(CCGsam_Sterm_v))
+    coh_est_L_v = np.array(est_corr_py(CCGsam_Lterm_v))
 
     Ip_S_v = np.angle(coh_est_S_v)
     Ip_L_v = np.angle(coh_est_L_v)
@@ -327,8 +328,8 @@ def plot_simulated(inps):
     CCGsam_Sterm = simulate_neighborhood_stack(coh_sim_S, neighborSamples=inps.n_shp)
     CCGsam_Lterm = simulate_neighborhood_stack(coh_sim_L, neighborSamples=inps.n_shp)
 
-    coh_est_S = est_corr(CCGsam_Sterm)
-    coh_est_L = est_corr(CCGsam_Lterm)
+    coh_est_S = np.array(est_corr_py(CCGsam_Sterm))
+    coh_est_L = np.array(est_corr_py(CCGsam_Lterm))
 
     Ip_S = np.angle(coh_est_S)
     Ip_L = np.angle(coh_est_L)
@@ -414,43 +415,55 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname):
 
         time0 = time.time()
         ####
-        ph_EVD,la = phase_linking_process(CCGsam_Sterm, 0, 'EVD', squeez=False)
-        EVD_est_resS[:, t:t + 1] = ph_EVD - phas
+        #ph_EVD,la = phase_linking_process(CCGsam_Sterm, 0, 'EVD', squeez=False)
+        ph_EVD, noval, temp_quality = phase_linking_process_py(CCGsam_Sterm, 0, b'EVD', False)
+        EVD_est_resS[:, t:t + 1] = np.angle(np.array(ph_EVD)).reshape(-1, 1) - phas
         time1 = time.time()
-        ph_EVD,la = phase_linking_process(CCGsam_Lterm, 0, 'EVD', squeez=False)
-        EVD_est_resL[:, t:t + 1] = ph_EVD - phas
+        #ph_EVD,la = phase_linking_process(CCGsam_Lterm, 0, 'EVD', squeez=False)
+        ph_EVD, noval, temp_quality = phase_linking_process_py(CCGsam_Lterm, 0, b'EVD', False)
+        EVD_est_resL[:, t:t + 1] = np.angle(np.array(ph_EVD)).reshape(-1, 1) - phas
         time2 = time.time()
 
         ####
-        ph_EMI,la = phase_linking_process(CCGsam_Sterm, 0, 'EMI', squeez=False)
-        EMI_est_resS[:, t:t + 1] = ph_EMI - phas
+        #ph_EMI,la = phase_linking_process(CCGsam_Sterm, 0, 'EMI', squeez=False)
+        ph_EMI, noval, temp_quality = phase_linking_process_py(CCGsam_Sterm, 0, b'EMI', False)
+        EMI_est_resS[:, t:t + 1] = np.angle(np.array(ph_EMI)).reshape(-1, 1) - phas
         time3 = time.time()
-        ph_EMI,la = phase_linking_process(CCGsam_Lterm, 0, 'EMI', squeez=False)
-        EMI_est_resL[:, t:t + 1] = ph_EMI - phas
+        #ph_EMI,la = phase_linking_process(CCGsam_Lterm, 0, 'EMI', squeez=False)
+        ph_EMI, noval, temp_quality = phase_linking_process_py(CCGsam_Lterm, 0, b'EMI', False)
+        EMI_est_resL[:, t:t + 1] = np.angle(np.array(ph_EMI)).reshape(-1, 1) - phas
         time4 = time.time()
 
         ####
-        ph_PTA, la = phase_linking_process(CCGsam_Sterm, 0, 'PTA', squeez=False)
-        PTA_est_resS[:, t:t + 1] = ph_PTA - phas
+        #ph_PTA, la = phase_linking_process(CCGsam_Sterm, 0, 'PTA', squeez=False)
+        ph_PTA, noval, temp_quality = phase_linking_process_py(CCGsam_Sterm, 0, b'PTA', False)
+        PTA_est_resS[:, t:t + 1] = np.angle(np.array(ph_PTA)).reshape(-1, 1) - phas
         time5 = time.time()
-        ph_PTA, la = phase_linking_process(CCGsam_Lterm, 0, 'PTA', squeez=False)
-        PTA_est_resL[:, t:t + 1] = ph_PTA - phas
+        #ph_PTA, la = phase_linking_process(CCGsam_Lterm, 0, 'PTA', squeez=False)
+        ph_PTA, noval, temp_quality = phase_linking_process_py(CCGsam_Lterm, 0, b'PTA', False)
+        PTA_est_resL[:, t:t + 1] = np.angle(np.array(ph_PTA)).reshape(-1, 1) - phas
         time6 = time.time()
 
 
-
         ####
-        EVD_seq_est_resS[:, t:t + 1] = sequential_phase_linking(CCGsam_Sterm, 'EVD') - phas
+        num_seq = np.int(n_img // 10)
+        ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Sterm, b'EVD', 10, num_seq)
+        EVD_seq_est_resS[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time7 = time.time()
-        EVD_seq_est_resL[:, t:t + 1] = sequential_phase_linking(CCGsam_Lterm, 'EVD') - phas
+        ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Lterm, b'EVD', 10, num_seq)
+        EVD_seq_est_resL[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time8 = time.time()
-        EMI_seq_est_resS[:, t:t + 1] = sequential_phase_linking(CCGsam_Sterm, 'EMI') - phas
+        ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Sterm, b'EMI', 10, num_seq)
+        EMI_seq_est_resS[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time9 = time.time()
-        EMI_seq_est_resL[:, t:t + 1] = sequential_phase_linking(CCGsam_Lterm, 'EMI') - phas
+        ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Lterm, b'EMI', 10, num_seq)
+        EMI_seq_est_resL[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time10 = time.time()
-        PTA_seq_est_resS[:, t:t + 1] = sequential_phase_linking(CCGsam_Sterm, 'PTA') - phas
+        ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Sterm, b'PTA', 10, num_seq)
+        PTA_seq_est_resS[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time11 = time.time()
-        PTA_seq_est_resL[:, t:t + 1] = sequential_phase_linking(CCGsam_Lterm, 'PTA') - phas
+        ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Lterm, b'PTA', 10, num_seq)
+        PTA_seq_est_resL[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time12 = time.time()
 
     rmsemat_est = np.zeros([n_img, 12])
@@ -487,7 +500,7 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname):
     np.save(outname, rmsemat_est)
     np.save(outname.split('.npy')[0]+'_time.npy', rmsemat_est_time)
 
-    return none
+    return
 
 ###################################################3
 
@@ -495,7 +508,7 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname):
 def phase_linking_process(ccg_sample, stepp, method, squeez=True):
     """Inversion of phase based on a selected method among PTA, EVD and EMI """
 
-    coh_mat = est_corr(ccg_sample)
+    coh_mat = np.array(est_corr_py(ccg_sample))
 
     if 'PTA' in method:
         res = PTA_L_BFGS(coh_mat)
@@ -620,6 +633,15 @@ def gam_pta(ph_filt, vec_refined):
 
     return temp_coh
 
+def CRLB_cov(gama, L):
+    """ Estimates the Cramer Rao Lowe Bound based on coherence=gam and ensemble size = L """
+
+    B_theta = np.zeros([len(gama), len(gama) - 1])
+    B_theta[1::, :] = np.identity(len(gama) - 1)
+    X = 2 * L * (np.multiply(np.abs(gama), LA.pinv(np.abs(gama))) - np.identity(len(gama)))
+    cov_out = LA.pinv(np.matmul(np.matmul(B_theta.T, (X + np.identity(len(X)))), B_theta))
+
+    return cov_out
 ####################################
 
 

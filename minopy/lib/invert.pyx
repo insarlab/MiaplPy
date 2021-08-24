@@ -10,10 +10,10 @@ from libc.stdio cimport printf
 from minopy.objects.slcStack import slcStack
 import h5py
 import time
-from mintpy.objects import cluster
+#from mintpy.objects import cluster
 from isceobj.Util.ImageUtil import ImageLib as IML
-import multiprocessing as mp
-from functools import partial
+#import multiprocessing as mp
+#from functools import partial
 
 
 cdef void write_wrapped(list date_list, bytes out_dir, int width, int length, bytes RSLCfile, bytes date):

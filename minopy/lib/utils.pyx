@@ -353,6 +353,20 @@ cdef inline float complex[:,::1] est_corr_cy(float complex[:,::1] ccg):
 
     return corr_matrix
 
+cpdef float complex[:,::1] est_corr_py(float complex[:,::1] ccg):
+    """ Estimate Correlation matrix from an ensemble."""
+    cdef cnp.intp_t i, t
+    cdef float complex[:,::1] cov_mat, corr_matrix
+
+    cov_mat = multiplymat22(ccg,  conjmat2(transposemat2(ccg)))
+
+    for i in range(cov_mat.shape[0]):
+        for t in range(cov_mat.shape[1]):
+            cov_mat[i, t] /= ccg.shape[1]
+    corr_matrix = cov2corr_cy(cov_mat)
+
+    return corr_matrix
+
 
 cdef inline float sum1d(float[::1] x):
     cdef cnp.intp_t i, n = x.shape[0]
@@ -496,6 +510,44 @@ cdef inline tuple phase_linking_process_cy(float complex[:, ::1] ccg_sample, int
         return res, 0, quality
 
 
+cpdef tuple phase_linking_process_py(float complex[:, ::1] ccg_sample, int stepp, bytes method, bint squeez):
+    """Inversion of phase based on a selected method among PTA, EVD and EMI """
+
+    cdef float complex[:, ::1] coh_mat
+    cdef float[:, ::1] abscoh
+    cdef float complex[::1] res
+    cdef cnp.intp_t n1 = ccg_sample.shape[1]
+    cdef float complex[::1] squeezed
+    cdef float quality
+    cdef int status
+
+    coh_mat = est_corr_cy(ccg_sample)
+
+    if method.decode('utf-8') == 'PTA' or method.decode('utf-8') == 'sequential_PTA':
+        status, abscoh = regularize_matrix_cy(absmat2(coh_mat))
+        if status == 0:
+            res = PTA_L_BFGS_cy(coh_mat, abscoh)
+        else:
+            res = EVD_phase_estimation_cy(coh_mat)
+    elif method.decode('utf-8') == 'EMI' or method.decode('utf-8') == 'sequential_EMI':
+        status, abscoh = regularize_matrix_cy(absmat2(coh_mat))
+        if status == 0:
+            res = EMI_phase_estimation_cy(coh_mat, abscoh)
+        else:
+            res = EVD_phase_estimation_cy(coh_mat)
+    else:
+        res = EVD_phase_estimation_cy(coh_mat)
+
+    quality = gam_pta_c(angmat2(coh_mat), res)
+
+    if squeez:
+        squeezed = squeeze_images(res, ccg_sample, stepp)
+
+        return res, squeezed, quality
+    else:
+        return res, 0, quality
+
+
 cdef inline tuple sequential_phase_linking_cy(float complex[:,::1] full_stack_complex_samples,
                                         bytes method, int mini_stack_default_size,
                                         int total_num_mini_stacks):
@@ -557,6 +609,70 @@ cdef inline tuple sequential_phase_linking_cy(float complex[:,::1] full_stack_co
     quality = quality / total_num_mini_stacks
 
     return vec_refined, squeezed_images, quality
+
+
+cpdef tuple sequential_phase_linking_py(float complex[:,::1] full_stack_complex_samples,
+                                        bytes method, int mini_stack_default_size,
+                                        int total_num_mini_stacks):
+    """ phase linking of each pixel sequentially and applying a datum shift at the end """
+
+    cdef int i, t, sstep, first_line, last_line, num_lines
+    cdef int a1, a2, ns = full_stack_complex_samples.shape[1]
+    cdef cnp.intp_t n_image = full_stack_complex_samples.shape[0]
+    cdef float complex[::1] vec_refined = np.zeros((n_image), dtype=np.complex64)
+    cdef float complex[:, ::1] mini_stack_complex_samples
+    cdef float complex[::1] res, squeezed_images_0
+    cdef float quality, temp_quality
+    cdef float complex[:, ::1] squeezed_images = np.zeros((total_num_mini_stacks,
+                                                           full_stack_complex_samples.shape[1]),
+                                                           dtype=np.complex64)
+
+    quality = 0
+    temp_quality = 0
+
+    for sstep in range(total_num_mini_stacks):
+
+        first_line = sstep * mini_stack_default_size
+        if sstep == total_num_mini_stacks - 1:
+            last_line = n_image
+        else:
+            last_line = first_line + mini_stack_default_size
+        num_lines = last_line - first_line
+
+        if sstep == 0:
+
+            mini_stack_complex_samples = np.zeros((num_lines, ns), dtype=np.complex64)
+
+            for i in range(ns):
+                for t in range(num_lines):
+                    mini_stack_complex_samples[t, i] = full_stack_complex_samples[t, i]
+
+            res, squeezed_images_0, temp_quality = phase_linking_process_cy(mini_stack_complex_samples, sstep, method, True)
+        else:
+
+            mini_stack_complex_samples = np.zeros((sstep + num_lines, ns), dtype=np.complex64)
+
+            for i in range(ns):
+                for t in range(sstep):
+                    mini_stack_complex_samples[t, i] = squeezed_images[t, i]
+                for t in range(num_lines):
+                    mini_stack_complex_samples[t + sstep, i] = full_stack_complex_samples[first_line + t, i]
+
+            res, squeezed_images_0, temp_quality = phase_linking_process_cy(mini_stack_complex_samples, sstep, method, True)
+
+        #quality = fminf(temp_quality, quality)
+        quality = quality + temp_quality
+
+        for i in range(num_lines):
+            vec_refined[first_line + i] = res[sstep + i]
+
+        for i in range(squeezed_images_0.shape[0]):
+                squeezed_images[sstep, i] = squeezed_images_0[i]
+
+    quality = quality / total_num_mini_stacks
+
+    return vec_refined, squeezed_images, quality
+
 
 
 cdef inline float complex[::1] datum_connect_cy(float complex[:, ::1] squeezed_images,

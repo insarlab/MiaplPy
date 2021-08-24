@@ -11,7 +11,7 @@ import h5py
 from osgeo import gdal
 import datetime
 import re
-import minopy
+import numpy as np
 from minopy.objects.arg_parser import MinoPyParser
 from mintpy.utils import readfile
 from mintpy.objects import (
