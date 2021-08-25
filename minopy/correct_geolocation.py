@@ -47,7 +47,7 @@ def main(iargs=None):
 
     if status == 'run':
 
-        az_angle = np.deg2rad(readfile.read(inps.geometry_file, datasetName='azimuthAngle')[0])
+        az_angle = np.deg2rad(np.float(atr['HEADING']))
         inc_angle = np.deg2rad(readfile.read(inps.geometry_file, datasetName='incidenceAngle')[0])
 
         dem_error = readfile.read(inps.dem_error_file, datasetName='dem')[0]
@@ -58,8 +58,8 @@ def main(iargs=None):
 
         if inps.reverse:
 
-            latitude -= dy
-            longitude -= dx
+            latitude += dy
+            longitude += dx
             atr[key] = 'no'
             block = [0, latitude.shape[0], 0, latitude.shape[1]]
             writefile.write_hdf5_block(inps.geometry_file,
@@ -76,8 +76,8 @@ def main(iargs=None):
 
 
         else:
-            latitude += dy
-            longitude += dx
+            latitude -= dy
+            longitude -= dx
             atr[key] = 'yes'
             block = [0, latitude.shape[0], 0, latitude.shape[1]]
             writefile.write_hdf5_block(inps.geometry_file,
