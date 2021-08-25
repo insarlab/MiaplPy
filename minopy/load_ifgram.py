@@ -649,11 +649,11 @@ def main(iargs=None):
     inpsDict = read_subset_box(inpsDict)
     extraDict = get_extra_metadata(inpsDict)
 
-    if not 'PLATFORM' in inpsDict:
+    if not 'PLATFORM' in extraDict:
         slcStack = os.path.join(inps.outdir, 'slcStack.h5')
         atr = readfile.read_attribute(slcStack)
         if 'PLATFORM' in atr:
-            inpsDict['PLATFORM'] = atr['PLATFORM']
+            extraDict['PLATFORM'] = atr['PLATFORM']
 
     # initiate objects
     stackObj = read_inps_dict2ifgram_stack_dict_object(inpsDict)
