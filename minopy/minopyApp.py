@@ -248,9 +248,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         num_bursts = int(self.template['minopy.inversion.patchSize'])**2 // 40000
 
         slc_stack = os.path.join(self.workDir, 'inputs/slcStack.h5')
-        if self.write_job:
-            tmp_slc_stack = '/tmp/slcStack.h5'
-        else:
+        tmp_slc_stack = '/tmp/slcStack.h5'
+        if not self.write_job:
             tmp_slc_stack = slc_stack
 
         run_commands = []
@@ -380,6 +379,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_commands.append(cmd_generate_unwrap_mask)
 
         phase_series = os.path.join(self.workDir, 'inverted/phase_series.h5')
+        tmp_phase_series = '/tmp/phase_series.h5'
+        if not self.write_job:
+            tmp_phase_series = phase_series
         num_cpu = os.cpu_count()
         num_lin = 0
         for pair in self.pairs:
@@ -394,7 +396,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                            a5=self.range_look,
                                                            a6=self.template['minopy.interferograms.filterStrength'],
                                                            a7=sensor_type,
-                                                           a8=phase_series)
+                                                           a8=tmp_phase_series)
 
             cmd = '{} generate_ifgram.py {}'.format(self.text_cmd.strip("'"), scp_args)
             cmd = cmd.lstrip()
@@ -417,7 +419,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.write_job or not job_obj is None:
             job_obj.num_bursts = self.num_pixels // 30000000
-            job_obj.write_batch_jobs(batch_file=run_ifgs)
+            job_obj.write_batch_jobs(batch_file=run_ifgs, distribute=phase_series)
 
         return
 
