@@ -64,8 +64,6 @@ def main(iargs=None):
 
     mask = (quality > 0.5) * mask_sh1
 
-    mask[mask == 0] = np.nan
-
     if not inps.output_mask is None:
         unwrap_mask = inps.output_mask
     else:
