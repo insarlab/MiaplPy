@@ -52,9 +52,16 @@ def main(iargs=None):
 
         dem_error = readfile.read(inps.dem_error_file, datasetName='dem')[0]
 
-        dx = dem_error * (1/np.tan(inc_angle)) * np.cos(az_angle) / 111000  # converted to degree
-        dy = dem_error * (1/np.tan(inc_angle)) * np.sin(az_angle) / 111000  # converted to degree
+        rad_latitude = np.deg2rad(latitude)
 
+        one_degree_latitude = 111132.92 - 559.82 * np.cos(2*rad_latitude) + \
+                              1.175 * np.cos(4 * rad_latitude) - 0.0023 * np.cos(6 * rad_latitude)
+
+        one_degree_longitude = 111412.84 * np.cos(rad_latitude) - \
+                               93.5 * np.cos(3 * rad_latitude) + 0.118 * np.cos(5 * rad_latitude)
+
+        dx = dem_error * (np.cos(inc_angle)/np.sin(inc_angle)) * np.cos(az_angle) / one_degree_longitude  # converted to degree
+        dy = dem_error * (np.cos(inc_angle)/np.sin(inc_angle)) * np.sin(az_angle) / one_degree_latitude  # converted to degree
 
         if inps.reverse:
 
