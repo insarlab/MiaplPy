@@ -153,7 +153,8 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
                 factor = (A + B * np.cos(2 * np.pi * t[ii] / 180)) * (A + B * np.cos(2 * np.pi * t[jj] / 180))
             #gamma = factor*((gamma0-gammaf)*np.exp(-np.abs((t[ii] - t[jj])/Tau0))+gammaf)
             gamma = factor * (np.exp((t[ii] - t[jj]) / Tau0)) + gammaf
-            C[ii, jj] = gamma * np.exp(1j * (ph[ii] - ph[jj]))
+            ph0 = ph[ii] - ph[jj]
+            C[ii, jj] = gamma * np.exp(1j * ph0)
             C[jj, ii] = np.conj(C[ii, jj])
 
     return C
@@ -200,7 +201,7 @@ def sequential_phase_linking(CCG, method, numsq=1):
         if stepp == 0:
 
             ccg_sample = CCG[first_line:last_line, :]
-            res, La, squeezed_pixels = phase_linking_process(ccg_sample, 0, method, squeez=True)
+            res, La, squeezed_pixels = phase_linking_process_py(ccg_sample, 0, method, squeez=True)
             ph_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
 
         else:
@@ -209,18 +210,18 @@ def sequential_phase_linking(CCG, method, numsq=1):
                 ccg_sample = np.zeros([1 + num_lines, CCG.shape[1]]) + 1j
                 ccg_sample[0:1, :] = np.complex64(squeezed_pixels[-1, :])
                 ccg_sample[1::, :] = CCG[first_line:last_line, :]
-                res, La, squeezed_p = phase_linking_process(ccg_sample, 1, method, squeez=True)
+                res, La, squeezed_p = phase_linking_process_py(ccg_sample, 1, method, squeez=True)
                 ph_ref[first_line:last_line, 0:1] = res[1::].reshape(num_lines, 1)
                 squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
             else:
                 ccg_sample = np.zeros([stepp + num_lines, CCG.shape[1]]) + 1j
                 ccg_sample[0:stepp, :] = np.complex64(squeezed_pixels[0:stepp, :])
                 ccg_sample[stepp::, :] = CCG[first_line:last_line, :]
-                res, La, squeezed_p = phase_linking_process(ccg_sample, stepp, method, squeez=True)
+                res, La, squeezed_p = phase_linking_process_py(ccg_sample, stepp, method, squeez=True)
                 ph_ref[first_line:last_line, 0:1] = res[stepp::].reshape(num_lines, 1)
                 squeezed_pixels = np.complex64(np.vstack([squeezed_pixels, squeezed_p]))
         Laq = np.max([La, Laq])
-    res_d, Lad = phase_linking_process(squeezed_pixels, 0, 'EMI', squeez=False)
+    res_d, Lad = phase_linking_process_py(squeezed_pixels, 0, 'EMI', squeez=False)
 
     for stepp in range(0, len(res_d)):
         first_line = stepp * 10
@@ -503,34 +504,23 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname):
     return
 
 ###################################################3
+def regularize_matrix(M):
+    """ Regularizes a matrix to make it positive semi definite. """
 
+    sh = np.shape(M)
+    N = np.zeros([sh[0], sh[1]])
+    N[:, :] = M[:, :]
+    en = 1e-6
+    t = 0
+    while t < 500:
+        if is_semi_pos_def_chol(N):
+            return N
+        else:
+            N[:, :] = N[:, :] + en*np.identity(len(N))
+            en = 2*en
+            t = t+1
 
-def phase_linking_process(ccg_sample, stepp, method, squeez=True):
-    """Inversion of phase based on a selected method among PTA, EVD and EMI """
-
-    coh_mat = np.array(est_corr_py(ccg_sample))
-
-    if 'PTA' in method:
-        res = PTA_L_BFGS(coh_mat)
-    elif 'EMI' in method:
-        res = EMI_phase_estimation(coh_mat)
-    else:
-        res = EVD_phase_estimation(coh_mat)
-
-    res = res.reshape(len(res), 1)
-
-    print(gam_pta_c(np.angle(coh_mat), res))
-
-    if squeez:
-
-        vm = np.exp(1j * np.angle(np.matrix(res[stepp::, :])))
-        vm = np.matrix(vm / LA.norm(vm))
-        squeezed = np.matmul(vm.getH(), ccg_sample[stepp::, :])
-
-        return res, squeezed
-    else:
-        return res
-
+    return 0
 
 ###############################################################################
 
@@ -638,10 +628,17 @@ def CRLB_cov(gama, L):
 
     B_theta = np.zeros([len(gama), len(gama) - 1])
     B_theta[1::, :] = np.identity(len(gama) - 1)
-    X = 2 * L * (np.multiply(np.abs(gama), LA.pinv(np.abs(gama))) - np.identity(len(gama)))
-    cov_out = LA.pinv(np.matmul(np.matmul(B_theta.T, (X + np.identity(len(X)))), B_theta))
 
-    return cov_out
+    invabscoh, uu = LA.lapack.spotrf(np.abs(gama), False, False)
+    invabscoh = LA.lapack.spotri(invabscoh)[0]
+    invabscoh = np.triu(invabscoh) + np.triu(invabscoh, k=1).T
+
+    X = 2 * L * (np.multiply(np.abs(gama), invabscoh) - np.identity(len(gama)))
+    cov_out = np.matmul(np.matmul(B_theta.T, (X + np.identity(len(X)))), B_theta)
+    invcov_out, uu = LA.lapack.cpotrf(cov_out, False, False)
+    invcov_out = LA.lapack.cpotri(invcov_out)[0]
+    invcov_out = np.triu(invcov_out) + np.triu(invcov_out, k=1).T
+    return invcov_out
 ####################################
 
 

@@ -255,11 +255,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_commands = []
 
         scp_args = '--work_dir {a0} --range_window {a1} --azimuth_window {a2} --method {a3} --test {a4} ' \
-                   '--patch_size {a5} --num_worker {a6} --mini_stack_size {a7}'.format(
+                   '--patch_size {a5} --num_worker {a6} --mini_stack_size {a7} --time_lag {a8}'.format(
             a0=self.workDir, a1=self.template['minopy.inversion.rangeWindow'],
             a2=self.template['minopy.inversion.azimuthWindow'], a3=self.template['minopy.inversion.phaseLinkingMethod'],
             a4=self.template['minopy.inversion.shpTest'], a5=self.template['minopy.inversion.patchSize'],
-            a6=self.num_workers, a7=self.template['minopy.inversion.ministackSize'])
+            a6=self.num_workers, a7=self.template['minopy.inversion.ministackSize'],
+            a8=self.template['minopy.inversion.stbas_time_lag'])
 
         if number_of_nodes > 1:
             for i in range(number_of_nodes):
@@ -288,7 +289,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         ifg_dir_names = {'mini_stacks': 'mini_stacks',
                          'single_reference': 'single_reference',
-                         'delaunay': 'delaunay'}
+                         'delaunay': 'delaunay',
+                         'sequential': 'sequential'}
 
         ifgram_dir = os.path.join(self.workDir, 'inverted/interferograms')
         baseline_dir = self.template['minopy.load.baselineDir']
@@ -328,6 +330,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             for line in lines:
                 pairs.append((line.split('_')[0], line.split('\n')[0].split('_')[1]))
         else:
+            if self.template['minopy.interferograms.type'] == 'sequential':
+                for i in range(1, len(self.date_list)):
+                        pairs.append((self.date_list[i-1], self.date_list[i]))
+
             if self.template['minopy.interferograms.type'] == 'single_reference':
                 indx = self.date_list.index(reference_date)
                 for i in range(0, len(self.date_list)):
@@ -335,18 +341,18 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                         pairs.append((self.date_list[indx], self.date_list[i]))
            
             if self.template['minopy.interferograms.type'] == 'mini_stacks':
-                total_num_mini_stacks = self.num_images // int(self.template['minopy.inversion.ministackSize'])
+                total_num_mini_stacks = self.num_images // int(self.template['minopy.interferograms.ministackSize'])
 
                 for i in range(total_num_mini_stacks):
-                    indx_ref = i * int(self.template['minopy.inversion.ministackSize'])
-                    last_ind = indx_ref + int(self.template['minopy.inversion.ministackSize']) + 1
+                    indx_ref = i * int(self.template['minopy.interferograms.ministackSize'])
+                    last_ind = indx_ref + int(self.template['minopy.interferograms.ministackSize']) + 1
                     if i == total_num_mini_stacks - 1:
                         last_ind = self.num_images
-                    indx_ref_0 = indx_ref
-                    #indx_ref_0 = (last_ind - indx_ref) // 2 + indx_ref
+                    #indx_ref_0 = indx_ref
+                    indx_ref_0 = (last_ind - indx_ref) // 2 + indx_ref
                     for t in range(indx_ref, last_ind):
                         if t != indx_ref_0:
-                            pairs.append((self.date_list[indx_ref], self.date_list[t]))
+                            pairs.append((self.date_list[indx_ref_0], self.date_list[t]))
 
         for pair in pairs:
             ind1.append(self.date_list.index(pair[0]))
@@ -444,7 +450,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         num_lin = 0
 
-        corr_file = os.path.join(self.workDir, 'inverted/quality') + '_msk'
+        corr_file = os.path.join(self.workDir, 'inverted/quality')
         unwrap_mask = os.path.join(self.workDir, 'inverted/mask_unwrap')
 
         for pair in self.pairs:
@@ -542,7 +548,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_file_phase_to_range = os.path.join(self.run_dir, RUN_FILES[sname])
         print('Generate {}'.format(run_file_phase_to_range))
 
-        run_commands = ['{} phase_to_range.py --work_dir {}\n'.format(self.text_cmd.strip("'"), self.workDir)]
+        run_commands = ['{} phase_to_range.py --work_dir {} --num_worker {}\n'.format(self.text_cmd.strip("'"),
+                                                                                      self.workDir,
+                                                                                      self.template['minopy.compute.numWorker'])]
         run_commands = run_commands[0].lstrip()
         os.makedirs(self.run_dir, exist_ok=True)
 

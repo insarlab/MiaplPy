@@ -11,13 +11,7 @@ import os
 import re
 import glob
 import numpy as np
-import h5py
 
-# Auto setting for file structure of Univ. of Miami, as shown below.
-# It required 3 conditions: 1) autoPath = True
-#                           2) $SCRATCHDIR is defined in environmental variable
-#                           3) input custom template with basename same as project_name
-# Change it to False if you are not using it.
 autoPath = True
 
 
@@ -32,7 +26,7 @@ minopy.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*
 minopy.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.cor
 minopy.load.connCompFile   = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*.unw.conncomp
 minopy.load.ionoFile       = None
-minopy.load.intFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/filt_fine*.int
+minopy.load.intFile        = None 
 
 minopy.load.demFile        = ${PROJECT_DIR}/merged/geom_reference/hgt.rdr.full
 minopy.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_reference/lat.rdr.full
@@ -115,7 +109,7 @@ class PathFind:
         self.scratchdir = os.getenv('SCRATCHDIR')
         self.defaultdir = os.path.expandvars('${MINOPY_HOME}/minopy/defaults')
         self.georeferencedir = 'subset/geom_reference'
-        #self.patchdir = 'patches'
+        self.patchdir = 'inverted/PATCHES'
         self.minopydir = 'minopy'
         self.rundir = 'run_files'
         self.configdir = 'configs'
@@ -138,7 +132,7 @@ def read_str2dict(inString, delimiter='=', print_msg=False):
     for line in lines:
         c = [i.strip() for i in line.strip().split(delimiter, 1)]
         if len(c) < 2 or line.startswith(('%', '#')):
-            next
+            continue
         else:
             key = c[0]
             value = str.replace(c[1], '\n', '').split("#")[0].strip()
@@ -189,6 +183,7 @@ def get_auto_path(processor, work_dir, template=dict()):
                 template : dict,
     Returns:    template : dict,
     """
+    import h5py
     project_dir = os.path.dirname(work_dir)
 
     input_h5 = [os.path.join(work_dir, 'inputs/slcStack.h5'), os.path.join(work_dir, 'inputs/geometryRadar.h5')]

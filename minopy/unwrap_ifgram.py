@@ -19,6 +19,7 @@ def enablePrint():
 
 blockPrint()
 import isce
+import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
 from minopy.objects.arg_parser import MinoPyParser
 import numpy as np
@@ -46,13 +47,10 @@ def main(iargs=None):
         string = dateStr + " * " + msg
         print(string)
 
-
     unwObj = Snaphu(inps)
     do_tiles, metadata = unwObj.need_to_split_tiles()
 
-
     time0 = time.time()
-
 
     try:
         if do_tiles:
@@ -66,11 +64,13 @@ def main(iargs=None):
         print('3')
         runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
 
-    # unfiltered_ifg = os.path.join(os.path.dirname(inps.input_ifg), 'fine.int')
-    # remove_filter(unfiltered_ifg, inps.input_ifg, inps.unwrapped_ifg)
-    # update_connect_component_mask(inps.unwrapped_ifg, inps.input_cor)
+    if inps.remove_filter_flag:
+        input_ifg_nofilter = os.path.join(os.path.dirname(inps.input_ifg), 'fine.int')
+        remove_filter(input_ifg_nofilter, inps.input_ifg, inps.unwrapped_ifg)
 
     print('Time spent: {} m'.format((time.time() - time0)/60))
+    
+
     return
 
 
@@ -208,7 +208,6 @@ class Snaphu:
 
 
 def runUnwrap(infile, outfile, corfile, config):
-    import isceobj
     from contrib.Snaphu.Snaphu import Snaphu
 
     costMode = 'DEFO'
@@ -277,6 +276,12 @@ def runUnwrap(infile, outfile, corfile, config):
     return
 
 
+#   Obsolete   ################################
+# unfiltered_ifg = os.path.join(os.path.dirname(inps.input_ifg), 'fine.int')
+# remove_filter(unfiltered_ifg, inps.input_ifg, inps.unwrapped_ifg)
+# update_connect_component_mask(inps.unwrapped_ifg, inps.input_cor)
+
+
 def update_connect_component_mask(unwrapped_file, temporal_coherence):
 
     ds_unw = gdal.Open(unwrapped_file + '.vrt', gdal.GA_ReadOnly)
@@ -325,15 +330,23 @@ def remove_filter(intfile, filtfile, unwfile):
     ifgphas = np.angle(ds_ifg.GetRasterBand(1).ReadAsArray())
     del ds_ifg
 
-    unwphas = integer_jumps + ifgphas
+
+    os.system('cp {} {}'.format(unwfile, unwfile+'.old'))
+
+    unwImage = isceobj.Image.createUnwImage()
+    unwImage.setFilename(unwfile)
+    unwImage.setAccessMode('write')
+    unwImage.setWidth(width)
+    unwImage.setLength(length)
+    unwImage.createImage()
+
+    out_unw = unwImage.asMemMap(unwfile)
+    print(out_unw.shape)
+    out_unw[:, 0, :] = unwamp
+    out_unw[:, 1, :] = ifgphas + integer_jumps
     del ifgphas, fifgphas
-
-    ifg = np.memmap(unwfile, dtype=np.float32, mode='write', shape=(2, length, width))
-    ifg[0, :, :] = unwamp
-    ifg[1, :, :] = unwphas
-    del ifg
-
-    IML.renderISCEXML(unwfile, bands=2, nyy=length, nxx=width, datatype='float32', scheme='BSQ')
+    unwImage.renderHdr()
+    unwImage.finalizeImage()
 
     return
 

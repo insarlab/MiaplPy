@@ -23,5 +23,6 @@ cdef class CPhaseLink:
     cdef float complex[:, :, ::1] patch_slc_images
     cdef readonly list box_list
     cdef readonly bytes out_dir
+    cdef readonly int time_lag
 
 

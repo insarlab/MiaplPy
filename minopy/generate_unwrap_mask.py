@@ -11,8 +11,6 @@ import h5py
 import mintpy
 from mintpy.utils import readfile, writefile
 import mintpy.workflow
-from osgeo import gdal
-import numpy as np
 
 def main(iargs=None):
     """
@@ -44,10 +42,14 @@ def main(iargs=None):
     if inps.custom_mask in ['None', None]:
         h5_mask = shadow_mask
     else:
-        h5_mask = inps.custom_mask
-        args_shm = '{} -m {} -o {} --fill 0'.format(inps.custom_mask,
-                                                    shadow_mask, h5_mask)
-        mintpy.mask.main(args_shm.split())
+        if os.path.exists(inps.custom_mask):
+            h5_mask = inps.custom_mask
+            args_shm = '{} -m {} -o {} --fill 0'.format(inps.custom_mask,
+                                                        shadow_mask, h5_mask)
+            mintpy.mask.main(args_shm.split())
+        else:
+            print('Mask {} does not exist!!!!!!  skip'.format(inps.custom_mask))
+            h5_mask = shadow_mask
 
     corr_file = os.path.join(minopy_dir, 'inverted/quality')
     mask_arg = ' {} -m {} --fill 0 -o {}'.format(corr_file,
@@ -56,13 +58,7 @@ def main(iargs=None):
     mintpy.mask.main(mask_arg.split())
 
     with h5py.File(h5_mask, 'r') as f:
-        mask_sh1 = f['mask'][:, :]
-
-    fq = gdal.Open(corr_file + '.vrt', gdal.GA_ReadOnly)
-    quality = fq.GetRasterBand(1).ReadAsArray()
-    del fq
-
-    mask = (quality > 0.5) * mask_sh1
+        mask = f['mask'][:, :]
 
     if not inps.output_mask is None:
         unwrap_mask = inps.output_mask
@@ -95,6 +91,19 @@ def main(iargs=None):
 
     writefile.write(mask, out_file=unwrap_mask, metadata=atr)
 
+    plot_masks(minopy_dir)
+
+    return
+
+
+def plot_masks(minopy_dir):
+    files = [os.path.join(minopy_dir, 'waterMask.h5'),
+             os.path.join(minopy_dir, 'shp'),
+             os.path.join(minopy_dir, 'maskPS.h5')]
+    for item in files:
+        if os.path.exists(item):
+            plt_args = '{} --nodisplay --noverbose --save -o {}'.format(item, item.split('.')[0] + '.png')
+            mintpy.view.main(plt_args.split())
     return
 
 

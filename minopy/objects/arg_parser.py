@@ -5,13 +5,11 @@
 ###############################################################################
 import sys
 import argparse
-from minopy.defaults import auto_path
-from minopy.defaults.auto_path import autoPath, PathFind
 import minopy
-import mintpy
+from minopy.defaults import auto_path
 import os
 import datetime
-pathObj = PathFind()
+pathObj = auto_path.PathFind()
 
 CLUSTER_LIST = ['lsf', 'pbs', 'slurm', 'local']
 
@@ -321,6 +319,8 @@ class MinoPyParser:
                            help='Azimuth window size for shp finding')
         patch.add_argument('-m', '--method', type=str, dest='inversion_method', default='EMI',
                            help='Inversion method (EMI, EVD, PTA, sequential_EMI, ...)')
+        patch.add_argument('-l', '--time_lag', type=int, dest='time_lag', default=10,
+                           help='Time lag in case StBAS is used')
         patch.add_argument('-t', '--test', type=str, dest='shp_test', default='ks',
                            help='Shp statistical test (ks, ad, ttest)')
         patch.add_argument('-p', '--patch_size', type=str, dest='patch_size', default=200,
@@ -400,6 +400,8 @@ class MinoPyParser:
                             help='Maximum abrupt phase discontinuity (cycles)')
         parser.add_argument('-nt', '--num_tiles', dest='num_tiles', type=int, default=1,
                             help='Number of tiles for Unwrapping in parallel')
+        parser.add_argument('--rmfilter', dest='remove_filter_flag', action='store_true',
+                            help='Remove filtering after unwrap')
 
         return parser
 
@@ -408,6 +410,8 @@ class MinoPyParser:
         parser = argparse.ArgumentParser(description='Convert phase to range time series')
         parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', required=True,
                             help='Working directory (minopy)')
+        parser.add_argument('-n', '--num_worker', dest='num_worker', type=int, default=1,
+                           help='Number of parallel tasks (default: 1)')
         return parser
 
     @staticmethod

@@ -10,10 +10,8 @@ from libc.stdio cimport printf
 from minopy.objects.slcStack import slcStack
 import h5py
 import time
-#from mintpy.objects import cluster
 from isceobj.Util.ImageUtil import ImageLib as IML
-#import multiprocessing as mp
-#from functools import partial
+
 
 
 cdef void write_wrapped(list date_list, bytes out_dir, int width, int length, bytes RSLCfile, bytes date):
@@ -77,6 +75,7 @@ cdef class CPhaseLink:
         self.metadata = self.slcStackObj.get_metadata()
         self.all_date_list = self.slcStackObj.get_date_list()
         self.n_image, self.length, self.width = self.slcStackObj.get_size()
+        self.time_lag = inps.time_lag
 
 
         # total number of neighbouring pixels
@@ -162,7 +161,7 @@ cdef class CPhaseLink:
 
 
     def initiate_output(self):
-        cdef object RSLC
+        cdef object RSLC, psf
 
         with h5py.File(self.RSLCfile.decode('UTF-8'), 'a') as RSLC:
 
@@ -207,11 +206,30 @@ cdef class CPhaseLink:
 
                 RSLC['quality'][:, :] = -1
 
-
                 # 1D dataset containing dates of all images
                 data = np.array(self.all_date_list, dtype=np.string_)
                 RSLC.create_dataset('date', data=data)
 
+        mask_ps_file = self.work_dir + b'/maskPS.h5'
+
+        with h5py.File(mask_ps_file.decode('UTF-8'), 'a') as psf:
+            if not 'mask' in psf.keys():
+                self.metadata['FILE_TYPE'] = 'mask' #'phase'
+                self.metadata['DATA_TYPE'] = 'int32'
+                self.metadata['data_type'] = 'BYTE'
+                self.metadata['description'] = 'PS mask'
+                self.metadata['file_name'] = mask_ps_file.decode('UTF-8')
+                self.metadata['family'] = 'PS mask'
+
+                for key, value in self.metadata.items():
+                    psf.attrs[key] = value
+
+                psf.create_dataset('mask',
+                                    shape=(self.length, self.width),
+                                    maxshape=(self.length, self.width),
+                                    chunks=True,
+                                    dtype=np.int32)
+                psf['mask'][:, :] = 0
 
         return
 
@@ -234,6 +252,7 @@ cdef class CPhaseLink:
             "default_mini_stack_size" : self.mini_stack_default_size,
             "shp_test": self.shp_test,
             "out_dir": self.out_dir,
+            "time_lag": self.time_lag,
         }
         return data_kwargs
 
@@ -256,7 +275,7 @@ cdef class CPhaseLink:
 
     def unpatch(self):
         cdef list block
-        cdef object fhandle
+        cdef object fhandle, psf
         cdef int index
         cdef cnp.ndarray[int, ndim=1] box
         cdef bytes patch_dir
@@ -266,6 +285,10 @@ cdef class CPhaseLink:
         if os.path.exists(self.RSLCfile.decode('UTF-8')):
             print('Deleting old phase_series.h5 ...')
             os.remove(self.RSLCfile.decode('UTF-8'))
+
+        mask_ps_file = self.work_dir + b'/maskPS.h5'
+        if os.path.exists(mask_ps_file.decode('UTF-8')):
+            os.remove(mask_ps_file.decode('UTF-8'))
 
         self.initiate_output()
         print('Unpatch and write wrapped phase time series to HDF5 file phase_series.h5 ')
@@ -277,6 +300,7 @@ cdef class CPhaseLink:
                 rslc_ref = np.load(patch_dir.decode('UTF-8') + '/phase_ref.npy')
                 quality = np.load(patch_dir.decode('UTF-8') + '/quality.npy')
                 shp = np.load(patch_dir.decode('UTF-8') + '/shp.npy')
+                mask_ps = np.load(patch_dir.decode('UTF-8') + '/mask_ps.npy')
 
                 print('-' * 50)
                 print("unpatch block {}/{} : {}".format(index, self.num_box, box[0:4]))
@@ -328,6 +352,16 @@ cdef class CPhaseLink:
             quality_memmap = None
 
             print('close HDF5 file phase_series.h5.')
+
+        print('write PS mask file')
+
+        with h5py.File(mask_ps_file.decode('UTF-8'), 'a') as psf:
+           for index, box in enumerate(self.box_list):
+               patch_dir = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
+               mask_ps = np.load(patch_dir.decode('UTF-8') + '/mask_ps.npy')
+               block = [box[1], box[3], box[0], box[2]]
+               write_hdf5_block_2D_int(psf, mask_ps, b'mask', block)
+
         return
 
 

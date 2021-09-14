@@ -8,7 +8,6 @@ import logging
 import warnings
 import time
 import datetime
-import numpy as np
 
 warnings.filterwarnings("ignore")
 
@@ -18,7 +17,6 @@ fiona_logger.propagate = False
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.lib import utils as iut
 from minopy.lib import invert as iv
-from math import ceil
 import multiprocessing as mp
 from functools import partial
 import signal
@@ -67,6 +65,7 @@ def main(iargs=None):
         out_dir = inversionObj.out_dir.decode('UTF-8')
         out_folder = out_dir + '/PATCHES/PATCH_{}'.format(index)
         os.makedirs(out_folder, exist_ok=True)
+        
         if not os.path.exists(out_folder + '/quality.npy'):
             box_list.append(box)
 
@@ -104,7 +103,8 @@ def main(iargs=None):
                    shp_test=data_kwargs['shp_test'],
                    def_sample_rows=data_kwargs['def_sample_rows'],
                    def_sample_cols=data_kwargs['def_sample_cols'],
-                   out_dir=data_kwargs['out_dir'])
+                   out_dir=data_kwargs['out_dir'],
+                   lag=data_kwargs['time_lag'])
 
     print('Reading SLC data from {} and inverting patches in parallel ...'.format(inps.slc_stack))
     try:
