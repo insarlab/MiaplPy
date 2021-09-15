@@ -1,6 +1,6 @@
 [![Language](https://img.shields.io/badge/python-3.6%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-GPLv3-yellow.svg)](https://github.com/geodesymiami/MiNoPy/blob/main/LICENSE)
-[![Version](https://img.shields.io/badge/version-v1.3.1-yellowgreen.svg)](https://github.com/geodesymiami/MiNoPy/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.0-yellowgreen.svg)](https://github.com/geodesymiami/MiNoPy/releases)
 
 
 ## MiNoPy ##
