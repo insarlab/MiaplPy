@@ -29,14 +29,15 @@ def cmd_line_parse(iargs=None):
 def find_baselines(iargs=None):
     inps = cmd_line_parse(iargs)
 
-    baselines, dates = get_baselines_dict(inps.baseline_dir)
+    baselines, dates0 = get_baselines_dict(inps.baseline_dir)
     with open(inps.date_list, 'r') as f:
         date_list = f.readlines()
         date_list = [dd.split('\n')[0] for dd in date_list]
 
-    for i, date in enumerate(dates):
-        if not date in date_list:
-            del dates[i]
+    dates = []
+    for date in dates0:
+        if date in date_list:
+            dates.append(date)
 
     dates = np.sort(dates)
 

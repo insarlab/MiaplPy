@@ -8,6 +8,7 @@
 
 import os
 import sys
+import shutil
 
 # Disable
 def blockPrint():
@@ -47,24 +48,27 @@ def main(iargs=None):
         string = dateStr + " * " + msg
         print(string)
 
-    unwObj = Snaphu(inps)
-    do_tiles, metadata = unwObj.need_to_split_tiles()
+    inps.work_dir = os.path.dirname(inps.input_ifg)
+    if not os.path.exists(inps.work_dir + '/filt_fine.unw.conncomp.vrt'):
 
-    time0 = time.time()
+        unwObj = Snaphu(inps)
+        do_tiles, metadata = unwObj.need_to_split_tiles()
 
-    try:
-        if do_tiles:
-            print('1')
-            unwObj.unwrap_tile()
-        else:
-            print('2')
-            unwObj.unwrap()
-    
-    except:
-        print('3')
-        runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
+        time0 = time.time()
 
-    if inps.remove_filter_flag:
+        try:
+            if do_tiles:
+                print('1')
+                unwObj.unwrap_tile()
+            else:
+                print('2')
+                unwObj.unwrap()
+
+        except:
+            print('3')
+            runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
+
+    if inps.remove_filter_flag and not os.path.exists(inps.unwrapped_ifg + '.old'):
         input_ifg_nofilter = os.path.join(os.path.dirname(inps.input_ifg), 'fine.int')
         remove_filter(input_ifg_nofilter, inps.input_ifg, inps.unwrapped_ifg)
 
@@ -78,10 +82,7 @@ class Snaphu:
 
     def __init__(self, inps):
 
-        work_dir = os.path.dirname(inps.input_ifg)
-        #if os.path.exists(work_dir + '/filt_fine.unw.conncomp.vrt'):
-        #    sys.exit(1)
-        self.config_file = os.path.join(work_dir, 'config_all')
+        self.config_file = os.path.join(inps.work_dir, 'config_all')
         LENGTH = inps.ref_length
         WIDTH = inps.ref_width
         self.num_tiles = inps.num_tiles
@@ -117,6 +118,8 @@ class Snaphu:
         self.config_default.append('LAMBDA   {}\n'.format(inps.wavelength))
         self.config_default.append('EARTHRADIUS   {}\n'.format(inps.earth_radius))
         self.config_default.append('INITMETHOD   {}\n'.format(inps.init_method))
+        os.system('rm -rf /tmp/{}'.format(os.path.basename(inps.work_dir)))
+        self.config_default.append('TILEDIR   /tmp/{}\n'.format(os.path.basename(inps.work_dir)))
         if not inps.unwrap_mask is None:
             self.config_default.append('BYTEMASKFILE   {}\n'.format(inps.unwrap_mask))
 
@@ -148,8 +151,11 @@ class Snaphu:
 
         if self.num_tiles > 1:
             do_tiles = True
-            x_tile = int(np.sqrt(self.num_tiles)) + 1
-            y_tile = x_tile
+            if np.mod(self.num_tiles, 2) == 0:
+                y_tile = int(np.sqrt(self.num_tiles))
+            else:
+                y_tile = int(np.sqrt(self.num_tiles + 1))
+            x_tile = self.num_tiles // y_tile
         else:
             do_tiles = False
             x_tile = 1
@@ -183,7 +189,7 @@ class Snaphu:
     def unwrap_tile(self):
 
         cmd = 'snaphu -f {config_file} -d {wrapped_file} {line_length} -o ' \
-              '{unwrapped_file} --tile {ytile} {xtile} 200 200 ' \
+              '{unwrapped_file} --tile {ytile} {xtile} 500 500 ' \
               '--nproc {num_proc}'.format(config_file=self.config_file, wrapped_file=self.inp_wrapped,
                                           line_length=self.width, unwrapped_file=self.out_unwrapped, ytile=self.y_tile,
                                           xtile=self.x_tile, num_proc=self.num_tiles)
@@ -239,7 +245,6 @@ def runUnwrap(infile, outfile, corfile, config):
     snp.setAltitude(altitude)
     snp.setCorrfile(corfile)
     snp.setInitMethod(initMethod)
-    #snp.setCorrLooks(corrLooks)
     snp.setMaxComponents(100)
     snp.setDefoMaxCycles(defomax)
     snp.setRangeLooks(rangeLooks)
@@ -330,8 +335,8 @@ def remove_filter(intfile, filtfile, unwfile):
     ifgphas = np.angle(ds_ifg.GetRasterBand(1).ReadAsArray())
     del ds_ifg
 
-
-    os.system('cp {} {}'.format(unwfile, unwfile+'.old'))
+    shutil.copy2(unwfile, unwfile + '.old')
+    #os.system('cp {} {}'.format(unwfile, unwfile+'.old'))
 
     unwImage = isceobj.Image.createUnwImage()
     unwImage.setFilename(unwfile)

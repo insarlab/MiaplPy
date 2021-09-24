@@ -60,8 +60,8 @@ def main(iargs=None):
         one_degree_longitude = 111412.84 * np.cos(rad_latitude) - \
                                93.5 * np.cos(3 * rad_latitude) + 0.118 * np.cos(5 * rad_latitude)
 
-        dx = dem_error * (np.cos(inc_angle)/np.sin(inc_angle)) * np.cos(az_angle) / one_degree_longitude  # converted to degree
-        dy = dem_error * (np.cos(inc_angle)/np.sin(inc_angle)) * np.sin(az_angle) / one_degree_latitude  # converted to degree
+        dx = np.divide(dem_error * (1 / np.tan(inc_angle)) * np.cos(az_angle), one_degree_longitude)  # converted to degree
+        dy = np.divide(dem_error * (1 / np.tan(inc_angle)) * np.sin(az_angle), one_degree_latitude)  # converted to degree
 
         if inps.reverse:
 

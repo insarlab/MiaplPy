@@ -455,6 +455,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         for pair in self.pairs:
             out_dir = os.path.join(self.ifgram_dir, pair[0] + '_' + pair[1])
+            if float(self.template['minopy.interferograms.filterStrength']) > 0:
+                corr_file = os.path.join(out_dir, 'filt_fine.cor')
             os.makedirs(out_dir, exist_ok='True')
 
             scp_args = '--ifg {a1} --coherence {a2} --unwrapped_ifg {a3} '\
@@ -467,6 +469,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                              a5=self.template['minopy.unwrap.initMethod'],
                                                              a6=length, a7=width, a8=height, a9=ntiles,
                                                              a10=earth_radius, a11=wavelength, a12=unwrap_mask)
+            if float(self.template['minopy.interferograms.filterStrength']) > 0:
+                scp_args += ' --rmfilter'
             cmd = '{} unwrap_ifgram.py {}'.format(self.text_cmd.strip("'"), scp_args)
             cmd = cmd.lstrip()
 
