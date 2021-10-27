@@ -88,7 +88,14 @@ def main(iargs=None):
                                                         inps.custom_mask, h5_mask)
             mintpy.mask.main(args_shm.split())
 
-    corr_file = os.path.join(minopy_dir, 'inverted/quality_{}'.format(inps.quality_type))
+    corr_file = os.path.join(minopy_dir, 'inverted/quality_average')
+    mask_arg = ' {} -m {} --fill 0 -o {}'.format(corr_file,
+                                                 h5_mask,
+                                                 corr_file + '_msk')
+
+    mintpy.mask.main(mask_arg.split())
+
+    corr_file = os.path.join(minopy_dir, 'inverted/quality_full')
     mask_arg = ' {} -m {} --fill 0 -o {}'.format(corr_file,
                                                  h5_mask,
                                                  corr_file + '_msk')

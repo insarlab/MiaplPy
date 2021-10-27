@@ -383,9 +383,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             sensor_type = 'tops'
 
         #  command for generating unwrap mask
-        cmd_generate_unwrap_mask = '{} generate_unwrap_mask.py --geometry {} --quality_type {} '.format(
-            self.text_cmd.strip("'"), os.path.join(self.workDir, 'inputs/geometryRadar.h5'),
-            self.template['minopy.timeseries.tempCohType'])
+        cmd_generate_unwrap_mask = '{} generate_unwrap_mask.py --geometry {} '.format(
+            self.text_cmd.strip("'"), os.path.join(self.workDir, 'inputs/geometryRadar.h5'))
 
         if not self.template['minopy.unwrap.mask'] in ['None', None]:
             cmd_generate_unwrap_mask += '--mask {}'.format(self.template['minopy.unwrap.mask'])
@@ -465,7 +464,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         num_lin = 0
 
-        corr_file = os.path.join(self.workDir, 'inverted/quality_{}'.format(self.template['minopy.timeseries.tempCohType']))
+        #corr_file = os.path.join(self.workDir, 'inverted/quality_{}'.format(self.template['minopy.timeseries.tempCohType']))
+        corr_file = os.path.join(self.workDir, 'inverted/quality_average')
         unwrap_mask = os.path.join(self.workDir, 'inverted/mask_unwrap')
         #unwrap_mask = os.path.abspath(self.template['minopy.unwrap.mask'])
 

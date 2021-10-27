@@ -345,8 +345,8 @@ class MinoPyParser:
                             help='Custom mask in HDF5 format')
         parser.add_argument('-o', '--output', type=str, dest='output_mask', default=None,
                             help='Output binary mask for unwrapping with snaphu')
-        parser.add_argument('-q', '--quality_type', type=str, dest='quality_type', default='full',
-                            help='Temporal coherence type (full or average from mini-stacks)')
+        #parser.add_argument('-q', '--quality_type', type=str, dest='quality_type', default='full',
+        #                    help='Temporal coherence type (full or average from mini-stacks)')
         parser.add_argument('-t', '--text_cmd', type=str, dest='text_cmd', default='',
                             help='Command before calling any script. exp: singularity run dockerimage.sif')
 
