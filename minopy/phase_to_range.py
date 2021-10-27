@@ -30,19 +30,6 @@ def get_phase_linking_coherence_mask(template, work_dir):
 
     mask_file = os.path.join(work_dir, 'maskTempCoh.h5')
 
-    if 'minopy.timeseries.waterMask' in template:
-        water_mask_file = template['minopy.timeseries.waterMask']
-        if os.path.exists(water_mask_file):
-            f1 = h5py.File(tcoh_file, 'a')
-            f2 = h5py.File(water_mask_file, 'r')
-            if 'waterMask' in f2:
-                water_mask = f2['waterMask']
-            else:
-                water_mask = f2['mask']
-            f1['temporalCoherence'][:, :] = np.multiply(f1['temporalCoherence'], water_mask)
-            f1.close()
-            f2.close()
-
     tcoh_min = float(template['minopy.timeseries.minTempCoh'])
 
     scp_args = '{} -m {} --nonzero -o {} --update'.format(tcoh_file, tcoh_min, mask_file)
@@ -153,7 +140,8 @@ def main(iargs=None):
     length, width = stack_obj.length, stack_obj.width
 
     # 1.0 read minopy quality
-    quality_name = os.path.join(inps.work_dir, 'inverted/quality_msk')
+    quality_name = os.path.join(inps.work_dir,
+                                'inverted/quality_{}_msk'.format(metadata['minopy.timeseries.tempCohType']))
     quality = np.memmap(quality_name, mode='r', dtype='float32', shape=(length, width))
 
     with h5py.File(os.path.join(inps.work_dir, 'avgSpatialCoh.h5'), 'r') as dsa:

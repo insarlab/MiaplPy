@@ -92,6 +92,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.inps = inps
         self.write_job = inps.write_job
         self.run_flag = inps.run_flag
+        self.copy_to_tmp = False
+        if 'copy_to_tmp' in inps:
+            self.copy_to_tmp = inps.copy_to_tmp
 
     def open(self):
         super().open()
@@ -248,8 +251,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         num_bursts = int(self.template['minopy.inversion.patchSize'])**2 // 40000
 
         slc_stack = os.path.join(self.workDir, 'inputs/slcStack.h5')
-        tmp_slc_stack = '/tmp/slcStack.h5'
-        if not self.write_job:
+        if self.copy_to_tmp:
+            tmp_slc_stack = '/tmp/slcStack.h5'
+        else:
             tmp_slc_stack = slc_stack
 
         run_commands = []
@@ -280,8 +284,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.write_job or not job_obj is None:
             job_obj.num_bursts = num_bursts
-            job_obj.write_batch_jobs(batch_file=run_inversion, num_cores_per_task=self.num_workers,
-                                     distribute=slc_stack)
+            if self.copy_to_tmp:
+                job_obj.write_batch_jobs(batch_file=run_inversion, num_cores_per_task=self.num_workers,
+                                         distribute=slc_stack)
+            else:
+                job_obj.write_batch_jobs(batch_file=run_inversion, num_cores_per_task=self.num_workers)
 
         return
 
@@ -342,18 +349,20 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
            
             if self.template['minopy.interferograms.type'] == 'mini_stacks':
                 total_num_mini_stacks = self.num_images // int(self.template['minopy.interferograms.ministackSize'])
-
+                #indx_ref_0 = None
                 for i in range(total_num_mini_stacks):
                     indx_ref = i * int(self.template['minopy.interferograms.ministackSize'])
                     last_ind = indx_ref + int(self.template['minopy.interferograms.ministackSize']) + 1
                     if i == total_num_mini_stacks - 1:
                         last_ind = self.num_images
                     #indx_ref_0 = indx_ref
-                    indx_ref_0 = (last_ind - indx_ref) // 2 + indx_ref
+                    indx_ref_1 = (last_ind - indx_ref) // 2 + indx_ref
                     for t in range(indx_ref, last_ind):
-                        if t != indx_ref_0:
-                            pairs.append((self.date_list[indx_ref_0], self.date_list[t]))
-
+                        if t != indx_ref_1:
+                            pairs.append((self.date_list[indx_ref_1], self.date_list[t]))
+                    #if not indx_ref_0 is None:
+                    #    pairs.append((self.date_list[indx_ref_0], self.date_list[indx_ref_1]))
+                    #indx_ref_0 = indx_ref_1
         for pair in pairs:
             ind1.append(self.date_list.index(pair[0]))
             ind2.append(self.date_list.index(pair[1]))
@@ -374,8 +383,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             sensor_type = 'tops'
 
         #  command for generating unwrap mask
-        cmd_generate_unwrap_mask = '{} generate_unwrap_mask.py --geometry {} '.format(
-            self.text_cmd.strip("'"), os.path.join(self.workDir, 'inputs/geometryRadar.h5'))
+        cmd_generate_unwrap_mask = '{} generate_unwrap_mask.py --geometry {} --quality_type {} '.format(
+            self.text_cmd.strip("'"), os.path.join(self.workDir, 'inputs/geometryRadar.h5'),
+            self.template['minopy.timeseries.tempCohType'])
+
         if not self.template['minopy.unwrap.mask'] in ['None', None]:
             cmd_generate_unwrap_mask += '--mask {}'.format(self.template['minopy.unwrap.mask'])
         cmd_generate_unwrap_mask = cmd_generate_unwrap_mask.lstrip() + '\n'
@@ -385,8 +396,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_commands.append(cmd_generate_unwrap_mask)
 
         phase_series = os.path.join(self.workDir, 'inverted/phase_series.h5')
-        tmp_phase_series = '/tmp/phase_series.h5'
-        if not self.write_job:
+        if self.copy_to_tmp:
+            tmp_phase_series = '/tmp/phase_series.h5'
+        else:
             tmp_phase_series = phase_series
         num_cpu = os.cpu_count()
         num_lin = 0
@@ -425,7 +437,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.write_job or not job_obj is None:
             job_obj.num_bursts = self.num_pixels // 30000000
-            job_obj.write_batch_jobs(batch_file=run_ifgs, distribute=phase_series)
+            if self.copy_to_tmp:
+                job_obj.write_batch_jobs(batch_file=run_ifgs, distribute=phase_series)
+            else:
+                job_obj.write_batch_jobs(batch_file=run_ifgs)
 
         return
 
@@ -450,8 +465,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         num_lin = 0
 
-        corr_file = os.path.join(self.workDir, 'inverted/quality')
+        corr_file = os.path.join(self.workDir, 'inverted/quality_{}'.format(self.template['minopy.timeseries.tempCohType']))
         unwrap_mask = os.path.join(self.workDir, 'inverted/mask_unwrap')
+        #unwrap_mask = os.path.abspath(self.template['minopy.unwrap.mask'])
 
         for pair in self.pairs:
             out_dir = os.path.join(self.ifgram_dir, pair[0] + '_' + pair[1])
@@ -462,15 +478,19 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             scp_args = '--ifg {a1} --coherence {a2} --unwrapped_ifg {a3} '\
                        '--max_discontinuity {a4} --init_method {a5} --length {a6} ' \
                        '--width {a7} --height {a8} --num_tiles {a9} --earth_radius {a10} ' \
-                       ' --wavelength {a11} -m {a12}'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
+                       ' --wavelength {a11}'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
                                                              a2=corr_file,
                                                              a3=os.path.join(out_dir, 'filt_fine.unw'),
                                                              a4=self.template['minopy.unwrap.maxDiscontinuity'],
                                                              a5=self.template['minopy.unwrap.initMethod'],
                                                              a6=length, a7=width, a8=height, a9=ntiles,
-                                                             a10=earth_radius, a11=wavelength, a12=unwrap_mask)
-            if float(self.template['minopy.interferograms.filterStrength']) > 0:
+                                                             a10=earth_radius, a11=wavelength)
+            if self.template['minopy.unwrap.mask']:
+                scp_args += ' -m {a12}'.format(a12=unwrap_mask)
+            if float(self.template['minopy.interferograms.filterStrength']) > 0 and self.template['minopy.unwrap.removeFilter']:
                 scp_args += ' --rmfilter'
+            if self.copy_to_tmp:
+                scp_args += ' --tmp'
             cmd = '{} unwrap_ifgram.py {}'.format(self.text_cmd.strip("'"), scp_args)
             cmd = cmd.lstrip()
 
