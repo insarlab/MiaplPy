@@ -365,23 +365,29 @@ def simulate_and_calculate_different_method_rms(iargs=None):
         temp_baseline, displacement = simulate_volcano_def_phase(inps.n_img, inps.tmp_bl)
 
     # Add fading/decaying signal
-    vv = temp_baseline.reshape(-1, 1)
-    tb = np.log(np.matmul(np.exp(-vv), np.exp(vv).T)).astype(np.int)
-    b = 0.02
-    a = 2.24
-    fading_signal = ((7 / 6) * a * tb / (np.abs(tb) + 1)) * np.exp(-b * (np.abs(tb) - 6))
-
+    #vv = temp_baseline.reshape(-1, 1)
+    #tb = np.log(np.matmul(np.exp(-vv), np.exp(vv).T)).astype(np.int)
+    #dt = np.eye(vv.shape[0])
+    #b = 0.02
+    #a = 2.24
+    ##fading_signal = ((7 / 6) * a * tb / (np.abs(tb) + 1)) * np.exp(-b * (np.abs(tb) - 6))
+    
+    
+    # DeZan paper equation
+    #fading_signal = 0.18 * np.exp(-np.abs(tb) / 11) * np.exp(1j * 0.03 * tb) + \
+    #                0.25 * np.exp(-np.abs(tb) / 50) * np.exp(1j * 0.002 * tb) + 0.13 + 0.44 * dt
+    
     inps.ph0 = np.matrix(-displacement * 4 * np.pi * inps.deformation_rate / inps.lamda).reshape(len(displacement), 1)
 
     inps.coh_sim_S = simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0, inps.decorr_days, inps.ph0,
                                                            seasonal=inps.seasonality)
 
-    inps.coh_sim_S *= np.exp(1j * fading_signal)
+    #inps.coh_sim_S = fading_signal
 
     inps.coh_sim_L = simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0.2, inps.decorr_days, inps.ph0,
                                                            seasonal=inps.seasonality)
 
-    inps.coh_sim_L *= np.exp(1j * fading_signal)
+    #inps.coh_sim_L = fading_signal
 
     repeat_simulation(numr=inps.n_sim, n_img=inps.n_img, n_shp=inps.n_shp,
                       phas=inps.ph0, coh_sim_S=inps.coh_sim_S, coh_sim_L=inps.coh_sim_L, outname=inps.outname,
