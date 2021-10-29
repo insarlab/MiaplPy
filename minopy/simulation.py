@@ -33,8 +33,8 @@ def create_parser():
     parser.add_argument('--o', '--out_dir', dest='out_dir', type=str, default='./simulation', help='output directory')
     parser.add_argument('--se', action='store_true', dest='seasonality', default=False,
                         help='add seasonality')
-    parser.add_argument('--m', action='store_true', dest='multistack', default=False,
-                        help='do multistack for sequential')
+    #parser.add_argument('--m', action='store_true', dest='multistack', default=False,
+    #                    help='do multistack for sequential')
 
     return parser
 
@@ -181,7 +181,7 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
     return C
 
 
-def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname, stacknumber=1):
+def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname) #, stacknumber=1):
     Timesmat = np.zeros([14, numr])
 
     EVD_est_resS = np.zeros([n_img, numr])
@@ -350,12 +350,14 @@ def simulate_and_calculate_different_method_rms(iargs=None):
     if inps.seasonality:
         outname = outname + '_seasonal'
 
-    if inps.multistack:
-        outname = outname + '_multistack.npy'
-        stacknum = 10
-    else:
-        outname = outname + '.npy'
-        stacknum = 1
+    #if inps.multistack:
+    #    outname = outname + '_multistack.npy'
+    #    stacknum = 10
+    #else:
+    #    outname = outname + '.npy'
+    #    stacknum = 1
+    
+    outname = outname + '.npy'
 
     inps.outname = os.path.join(simul_dir, outname)
 
@@ -390,8 +392,8 @@ def simulate_and_calculate_different_method_rms(iargs=None):
     #inps.coh_sim_L = fading_signal
 
     repeat_simulation(numr=inps.n_sim, n_img=inps.n_img, n_shp=inps.n_shp,
-                      phas=inps.ph0, coh_sim_S=inps.coh_sim_S, coh_sim_L=inps.coh_sim_L, outname=inps.outname,
-                      stacknumber=stacknum)
+                      phas=inps.ph0, coh_sim_S=inps.coh_sim_S, coh_sim_L=inps.coh_sim_L, outname=inps.outname) #,
+                      #stacknumber=stacknum)
 
     return
 
