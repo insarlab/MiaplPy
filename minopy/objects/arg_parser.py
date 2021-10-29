@@ -345,6 +345,8 @@ class MinoPyParser:
                             help='Custom mask in HDF5 format')
         parser.add_argument('-o', '--output', type=str, dest='output_mask', default=None,
                             help='Output binary mask for unwrapping with snaphu')
+        #parser.add_argument('-q', '--quality_type', type=str, dest='quality_type', default='full',
+        #                    help='Temporal coherence type (full or average from mini-stacks)')
         parser.add_argument('-t', '--text_cmd', type=str, dest='text_cmd', default='',
                             help='Command before calling any script. exp: singularity run dockerimage.sif')
 
@@ -402,6 +404,7 @@ class MinoPyParser:
                             help='Number of tiles for Unwrapping in parallel')
         parser.add_argument('--rmfilter', dest='remove_filter_flag', action='store_true',
                             help='Remove filtering after unwrap')
+        parser.add_argument('--tmp', dest='copy_to_tmp', action='store_true', help='Copy and process on tmp')
 
         return parser
 
@@ -465,6 +468,10 @@ class MinoPyParser:
         parser.add_argument('--walltime', dest='wall_time', default=None,
                              help='walltime for submitting the script as a job')
         parser.add_argument('--queue', dest='queue', default=None, help='Queue name')
+        parser.add_argument('--jobfiles', dest='write_job', action='store_true',
+                          help='Do not run the tasks, only write job files')
+        parser.add_argument('--runfiles', dest='run_flag', action='store_true', help='Create run files for all steps')
+        parser.add_argument('--tmp', dest='copy_to_tmp', action='store_true', help='Copy and process on tmp')
 
         step = parser.add_argument_group('steps processing (start/end/dostep)', STEP_HELP)
         step.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
@@ -473,9 +480,7 @@ class MinoPyParser:
                           help='End processing at the named step, default: {}'.format(STEP_LIST[-1]))
         step.add_argument('--dostep', dest='doStep', metavar='STEP',
                           help='Run processing at the named step only')
-        step.add_argument('--jobfiles', dest='write_job', action='store_true',
-                          help='Do not run the tasks, only write job files')
-        step.add_argument('--runfiles', dest='run_flag', action='store_true', help='Create run files for all steps')
+
 
         return parser, STEP_LIST, EXAMPLE
 

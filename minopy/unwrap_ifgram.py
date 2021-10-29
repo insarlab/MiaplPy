@@ -48,13 +48,15 @@ def main(iargs=None):
         string = dateStr + " * " + msg
         print(string)
 
+    time0 = time.time()
+
     inps.work_dir = os.path.dirname(inps.input_ifg)
     if not os.path.exists(inps.work_dir + '/filt_fine.unw.conncomp.vrt'):
 
         unwObj = Snaphu(inps)
         do_tiles, metadata = unwObj.need_to_split_tiles()
 
-        time0 = time.time()
+        #runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
 
         try:
             if do_tiles:
@@ -73,7 +75,6 @@ def main(iargs=None):
         remove_filter(input_ifg_nofilter, inps.input_ifg, inps.unwrapped_ifg)
 
     print('Time spent: {} m'.format((time.time() - time0)/60))
-    
 
     return
 
@@ -118,8 +119,9 @@ class Snaphu:
         self.config_default.append('LAMBDA   {}\n'.format(inps.wavelength))
         self.config_default.append('EARTHRADIUS   {}\n'.format(inps.earth_radius))
         self.config_default.append('INITMETHOD   {}\n'.format(inps.init_method))
-        os.system('rm -rf /tmp/{}'.format(os.path.basename(inps.work_dir)))
-        self.config_default.append('TILEDIR   /tmp/{}\n'.format(os.path.basename(inps.work_dir)))
+        if inps.copy_to_tmp:
+            os.system('rm -rf /tmp/{}'.format(os.path.basename(inps.work_dir)))
+            self.config_default.append('TILEDIR   /tmp/{}\n'.format(os.path.basename(inps.work_dir)))
         if not inps.unwrap_mask is None:
             self.config_default.append('BYTEMASKFILE   {}\n'.format(inps.unwrap_mask))
 
@@ -325,17 +327,34 @@ def remove_filter(intfile, filtfile, unwfile):
     length = ds_unw.RasterYSize
     del ds_unw
 
+    ds_ifg = gdal.Open(intfile + ".vrt", gdal.GA_ReadOnly)
+    ifgphas = np.angle(ds_ifg.GetRasterBand(1).ReadAsArray())
+    del ds_ifg
+
+    oldunwf = unwfile.split('filt_fine.unw')[0] + 'old_filt_fine.unw'
+    unwImage_o = isceobj.Image.createUnwImage()
+    unwImage_o.setFilename(oldunwf)
+    unwImage_o.setAccessMode('write')
+    unwImage_o.setWidth(width)
+    unwImage_o.setLength(length)
+    unwImage_o.createImage()
+
+    out_unw = unwImage_o.asMemMap(oldunwf)
+    # print(out_unw.shape)
+    out_unw[:, 0, :] = unwamp
+    out_unw[:, 1, :] = unwphas
+    # del ifgphas, fifgphas
+    unwImage_o.renderHdr()
+    unwImage_o.finalizeImage()
+
     ds_fifg = gdal.Open(filtfile + ".vrt", gdal.GA_ReadOnly)
     fifgphas = np.angle(ds_fifg.GetRasterBand(1).ReadAsArray())
     del ds_fifg
 
     integer_jumps = unwphas - fifgphas
+    del fifgphas
 
-    ds_ifg = gdal.Open(intfile + ".vrt", gdal.GA_ReadOnly)
-    ifgphas = np.angle(ds_ifg.GetRasterBand(1).ReadAsArray())
-    del ds_ifg
-
-    shutil.copy2(unwfile, unwfile + '.old')
+    #shutil.copy2(unwfile, unwfile + '.old')
     #os.system('cp {} {}'.format(unwfile, unwfile+'.old'))
 
     unwImage = isceobj.Image.createUnwImage()
@@ -346,10 +365,10 @@ def remove_filter(intfile, filtfile, unwfile):
     unwImage.createImage()
 
     out_unw = unwImage.asMemMap(unwfile)
-    print(out_unw.shape)
+    #print(out_unw.shape)
     out_unw[:, 0, :] = unwamp
     out_unw[:, 1, :] = ifgphas + integer_jumps
-    del ifgphas, fifgphas
+    #del ifgphas, fifgphas
     unwImage.renderHdr()
     unwImage.finalizeImage()
 

@@ -18,6 +18,7 @@ cdef class CPhaseLink:
     cdef bint sequential
     cdef dict metadata
     cdef list all_date_list
+    cdef float[::1] prep_baselines
     cdef int[::1] sample_rows, sample_cols
     cdef int reference_row, reference_col
     cdef float complex[:, :, ::1] patch_slc_images
