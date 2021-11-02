@@ -10,6 +10,7 @@ import numpy as np
 from minopy.lib.utils import sequential_phase_linking_py, phase_linking_process_py, datum_connect_py
 import argparse
 from scipy import linalg as LA
+from scipy.linalg import lapack as lap
 import matplotlib.pyplot as plt
 
 # displacement = 1mm/y = (1 mm *4pi / lambda(mm)) rad/y  --> 6 day = 4pi*6/lambda*365
@@ -24,17 +25,27 @@ def create_parser():
     parser.add_argument('-ns', '--nshp', dest='n_shp', type=int, default=300, help='Number of neighbouring samples')
     parser.add_argument('-ni', '--nimg', dest='n_img', type=int, default=100, help='Number of images')
     parser.add_argument('-dd', '--decorr_days', dest='decorr_days', type=int, default=50, help='Decorrelatopn days')
+    parser.add_argument('-df', '--decorr_days_fading', dest='decorr_days_fading', type=int, default=11,
+                        help='Decorrelatopn days_fading')
     parser.add_argument('-tb', '--tmp_bl', dest='tmp_bl', type=int, default=6, help='Temporal baseline')
-    parser.add_argument('-dr', '--def_rate', dest='deformation_rate', type=float, default=1,
-                        help='Linear deformation rate. -- Default : 1 mm/y')
-    parser.add_argument('-st', '--signal_type', dest='signal_type', type=str, default='linear',
-                        help='(linear or nonlinear) deformation signal')
+    parser.add_argument('-dr', '--def_rate', dest='deformation_rate', type=float, default=4,
+                        help='Linear deformation rate. -- Default : 4 mm/y')
+    parser.add_argument('-fr', '--fading_rate', dest='fading_rate', type=float, default=50,
+                        help='Fading signal rate. -- Default : 50 mm/y')
+    parser.add_argument('-g0', '--gamma0', dest='gamma0', type=float, default=0.6,
+                        help='Short temporal coherence. -- Default : 0.6')
+    parser.add_argument('-gl', '--gammal', dest='gammal', type=float, default=0.2,
+                        help='Long temporal coherence. -- Default : 0.2')
+    parser.add_argument('-gf', '--gamma_fading', dest='gamma_fading', type=float, default=0.18,
+                        help='Fading signal coherence. -- Default : 0.18')
+    #parser.add_argument('-st', '--signal_type', dest='signal_type', type=str, default='linear',
+    #                    help='(linear or nonlinear) deformation signal')
     parser.add_argument('-nr', '--n_sim', dest='n_sim', type=int, default=1000, help='Number of simulation')
     parser.add_argument('--o', '--out_dir', dest='out_dir', type=str, default='./simulation', help='output directory')
     parser.add_argument('--se', action='store_true', dest='seasonality', default=False,
                         help='add seasonality')
-    parser.add_argument('--m', action='store_true', dest='multistack', default=False,
-                        help='do multistack for sequential')
+    #parser.add_argument('--m', action='store_true', dest='multistack', default=False,
+    #                    help='do multistack for sequential')
 
     return parser
 
@@ -97,21 +108,21 @@ def simulate_neighborhood_stack(corr_matrix, neighborSamples=300):
     for ii in range(neighborSamples):
         cpxSLC = simulate_noise(corr_matrix)
         neighbor_stack[:, ii] = cpxSLC
+
     return neighbor_stack
 
 
 def simulate_noise(corr_matrix):
     nsar = corr_matrix.shape[0]
-    eigen_value, eigen_vector = LA.eigh(corr_matrix)
+    eigen_value, eigen_vector = lap.cheevx(corr_matrix)[0:2]
     msk = (eigen_value < 1e-3)
     eigen_value[msk] = 0.
     # corr_matrix =  np.dot(eigen_vector, np.dot(np.diag(eigen_value), np.matrix.getH(eigen_vector)))
 
     # C = np.linalg.cholesky(corr_matrix)
-    CM = np.dot(eigen_vector, np.dot(np.diag(np.sqrt(eigen_value)), np.matrix.getH(eigen_vector)))
-    Zr = (np.random.randn(nsar) + 1j * np.random.randn(nsar)) / np.sqrt(2)
-    noise = np.dot(CM, Zr)
-
+    CM = np.matmul(eigen_vector, np.matmul(np.diag(np.sqrt(eigen_value)), np.conj(eigen_vector.T)))
+    Zr = (np.random.randn(nsar) + 1j * np.random.randn(nsar))
+    noise = np.matmul(CM, Zr)
     return noise
 
 
@@ -127,7 +138,6 @@ def simulate_constant_vel_phase(n_img=100, tmp_bl=6):
     """ Simulate Interferogram with constant velocity deformation rate """
     t = np.ogrid[0:(tmp_bl * n_img):tmp_bl]
     x = t / 365
-
     return t, x
 
 
@@ -152,15 +162,17 @@ def double_solve(f1, f2, x0, y0):
     return fsolve(func, [x0, y0])
 
 
-def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=False):
+def simulate_coherence_matrix_exponential(t, gamma0, gammaf, gamma_fading, vel_phase, decorr_days,
+                                                        vel_fading, decorr_days_fading, seasonal=False):
     """Simulate a Coherence matrix based on de-correlation rate, phase and dates"""
     # t: a vector of acquistion times
     # ph: a vector of simulated phase time-series for one pixel
     # returns the complex covariance matrix
     # corr_mat = (gamma0-gammaf)*np.exp(-np.abs(days_mat/decorr_days))+gammaf
+
     length = t.shape[0]
     C = np.ones((length, length), dtype=np.complex64)
-    factor = gamma0 - gammaf
+
     if seasonal:
         f1 = lambda x, y: (x - y) ** 2 - gammaf
         f2 = lambda x, y: (x + y) ** 2 - gamma0
@@ -168,20 +180,26 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
         A = res[0]
         B = res[1]
 
+    import pdb; pdb.set_trace()
+
     for ii in range(length):
         for jj in range(ii + 1, length):
+
+            factor1 = (gamma0 - gammaf) * np.exp(-np.abs(t[ii] - t[jj]) / decorr_days) + gammaf
+            factor2 = gamma_fading * np.exp(-np.abs(t[ii] - t[jj]) / decorr_days_fading)
+
             if seasonal:
-                factor = (A + B * np.cos(2 * np.pi * t[ii] / 180)) * (A + B * np.cos(2 * np.pi * t[jj] / 180))
-            # gamma = factor*((gamma0-gammaf)*np.exp(-np.abs((t[ii] - t[jj])/Tau0))+gammaf)
-            gamma = factor * (np.exp((t[ii] - t[jj]) / Tau0)) + gammaf
-            ph0 = ph[ii] - ph[jj]
-            C[ii, jj] = gamma * np.exp(1j * ph0)
+                factor1 = (A + B * np.cos(2 * np.pi * t[ii] / 180)) * (A + B * np.cos(2 * np.pi * t[jj] / 180))
+
+            ph0 = vel_phase * (t[jj] - t[ii])
+            fading = vel_fading * (t[jj] - t[ii])
+            C[ii, jj] = factor1 * np.exp(1j * ph0) + factor2 * np.exp(1j * fading)
             C[jj, ii] = np.conj(C[ii, jj])
 
     return C
 
 
-def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname, stacknumber=1):
+def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname): #, stacknumber=1):
     Timesmat = np.zeros([14, numr])
 
     EVD_est_resS = np.zeros([n_img, numr])
@@ -200,6 +218,7 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname, s
     PTA_seq_est_resS = np.zeros([n_img, numr])
     PTA_seq_est_resL = np.zeros([n_img, numr])
 
+
     for t in range(numr):
         if np.mod(t, 10) == 0:
             print('Iteration: ', str(t))
@@ -210,45 +229,36 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname, s
         time0 = time.time()
 
         ####
-        ph_stbas, noval, temp_quality = phase_linking_process_py(CCGsam_Sterm, 0, b'StBAS', False, 10)
-        # ph_stbas, noval = phase_linking_process_py(CCGsam_Sterm, 0, b'StBAS', False, 10)
+        ph_stbas, noval, temp_quality = phase_linking_process_py(CCGsam_Sterm, 0, b'StBAS', False, 4)
         stbas_est_resS[:, t:t + 1] = np.angle(np.array(ph_stbas)).reshape(-1, 1) - phas
         time01 = time.time()
-        ph_stbas, noval, temp_quality = phase_linking_process_py(CCGsam_Lterm, 0, b'StBAS', False, 10)
-        # ph_stbas, noval = phase_linking_process_py(CCGsam_Lterm, 0, b'StBAS', False, 10)
+        ph_stbas, noval, temp_quality = phase_linking_process_py(CCGsam_Lterm, 0, b'StBAS', False, 4)
         stbas_est_resL[:, t:t + 1] = np.angle(np.array(ph_stbas)).reshape(-1, 1) - phas
         time02 = time.time()
 
         ####
         ph_EVD, noval, temp_quality = phase_linking_process_py(CCGsam_Sterm, 0, b'EVD', False, 0)
-        # ph_EVD, noval  = phase_linking_process_py(CCGsam_Sterm, 0, b'EVD', False, 0)
         EVD_est_resS[:, t:t + 1] = np.angle(np.array(ph_EVD)).reshape(-1, 1) - phas
         time1 = time.time()
         ph_EVD, noval, temp_quality = phase_linking_process_py(CCGsam_Lterm, 0, b'EVD', False, 0)
-        # ph_EVD, noval = phase_linking_process_py(CCGsam_Lterm, 0, b'EVD', False, 0)
         EVD_est_resL[:, t:t + 1] = np.angle(np.array(ph_EVD)).reshape(-1, 1) - phas
         time2 = time.time()
 
         ####
         ph_EMI, noval, temp_quality = phase_linking_process_py(CCGsam_Sterm, 0, b'EMI', False, 0)
-        # ph_EMI, noval = phase_linking_process_py(CCGsam_Sterm, 0, b'EMI', False, 0)
         EMI_est_resS[:, t:t + 1] = np.angle(np.array(ph_EMI)).reshape(-1, 1) - phas
         time3 = time.time()
-        #print(temp_quality)
+
         ph_EMI, noval, temp_quality = phase_linking_process_py(CCGsam_Lterm, 0, b'EMI', False, 0)
-        # ph_EMI, noval = phase_linking_process_py(CCGsam_Lterm, 0, b'EMI', False, 0)
         EMI_est_resL[:, t:t + 1] = np.angle(np.array(ph_EMI)).reshape(-1, 1) - phas
         time4 = time.time()
-        #print(temp_quality)
 
         ####
         ph_PTA, noval, temp_quality = phase_linking_process_py(CCGsam_Sterm, 0, b'PTA', False, 0)
-        # ph_PTA, noval = phase_linking_process_py(CCGsam_Sterm, 0, b'PTA', False, 0)
         PTA_est_resS[:, t:t + 1] = np.angle(np.array(ph_PTA)).reshape(-1, 1) - phas
         time5 = time.time()
 
         ph_PTA, noval, temp_quality = phase_linking_process_py(CCGsam_Lterm, 0, b'PTA', False, 0)
-        # ph_PTA, noval = phase_linking_process_py(CCGsam_Lterm, 0, b'PTA', False, 0)
         PTA_est_resL[:, t:t + 1] = np.angle(np.array(ph_PTA)).reshape(-1, 1) - phas
         time6 = time.time()
 
@@ -256,41 +266,34 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname, s
 
         num_seq = np.int(n_img // 10)
         ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Sterm, b'EVD', 10, num_seq)
-        # ph_vec, sqeezed = sequential_phase_linking_py(CCGsam_Sterm, b'EVD', 10, num_seq)
         ph_vec = datum_connect_py(sqeezed, ph_vec, 10)
         EVD_seq_est_resS[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time7 = time.time()
 
         ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Lterm, b'EVD', 10, num_seq)
-        # ph_vec, sqeezed = sequential_phase_linking_py(CCGsam_Lterm, b'EVD', 10, num_seq)
         ph_vec = datum_connect_py(sqeezed, ph_vec, 10)
         EVD_seq_est_resL[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time8 = time.time()
 
         ####
         ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Sterm, b'EMI', 10, num_seq)
-        # ph_vec, sqeezed = sequential_phase_linking_py(CCGsam_Sterm, b'EMI', 10, num_seq)
         ph_vec = datum_connect_py(sqeezed, ph_vec, 10)
         EMI_seq_est_resS[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time9 = time.time()
-        #print(temp_quality)
 
         ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Lterm, b'EMI', 10, num_seq)
-        # ph_vec, sqeezed = sequential_phase_linking_py(CCGsam_Lterm, b'EMI', 10, num_seq)
         ph_vec = datum_connect_py(sqeezed, ph_vec, 10)
         EMI_seq_est_resL[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time10 = time.time()
-        #print(temp_quality)
+
 
         ####
         ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Sterm, b'PTA', 10, num_seq)
-        # ph_vec, sqeezed = sequential_phase_linking_py(CCGsam_Sterm, b'PTA', 10, num_seq)
         ph_vec = datum_connect_py(sqeezed, ph_vec, 10)
         PTA_seq_est_resS[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time11 = time.time()
 
         ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Lterm, b'PTA', 10, num_seq)
-        # ph_vec, sqeezed = sequential_phase_linking_py(CCGsam_Lterm, b'PTA', 10, num_seq)
         ph_vec = datum_connect_py(sqeezed, ph_vec, 10)
         PTA_seq_est_resL[:, t:t + 1] = np.angle(np.array(ph_vec)).reshape(-1, 1) - phas
         time12 = time.time()
@@ -332,8 +335,8 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname, s
     out_time = np.mean(Timesmat, axis=1)
     out_time_name = outname.split('.npy')[0] + '_time.npy'
 
-    np.save(outname, rmsemat_est)
-    np.save(out_time_name, out_time)
+    #np.save(outname, rmsemat_est)
+    #np.save(out_time_name, out_time)
 
     return None
 
@@ -346,46 +349,38 @@ def simulate_and_calculate_different_method_rms(iargs=None):
     if not os.path.isdir(simul_dir):
         os.mkdir(simul_dir)
 
-    outname = 'rmsemat_modifiedSignalEq_' + inps.signal_type
+    outname = 'rmsemat_modifiedSignalEq_linear'
     if inps.seasonality:
         outname = outname + '_seasonal'
 
-    if inps.multistack:
-        outname = outname + '_multistack.npy'
-        stacknum = 10
-    else:
-        outname = outname + '.npy'
-        stacknum = 1
+    outname = outname + '.npy'
 
     inps.outname = os.path.join(simul_dir, outname)
 
-    if inps.signal_type == 'linear':
-        temp_baseline, displacement = simulate_constant_vel_phase(inps.n_img, inps.tmp_bl)
-    else:
-        temp_baseline, displacement = simulate_volcano_def_phase(inps.n_img, inps.tmp_bl)
+    vel_phase = inps.deformation_rate / 365 * 4 * np.pi / inps.lamda
+    vel_fading = inps.fading_rate / 365 * 4 * np.pi / inps.lamda  # 0.031 # rad/day
 
-    # Add fading/decaying signal
-    vv = temp_baseline.reshape(-1, 1)
-    tb = np.log(np.matmul(np.exp(-vv), np.exp(vv).T)).astype(np.int)
-    b = 0.02
-    a = 2.24
-    fading_signal = ((7 / 6) * a * tb / (np.abs(tb) + 1)) * np.exp(-b * (np.abs(tb) - 6))
+    temp_baseline = np.ogrid[0:(inps.tmp_bl * inps.n_img):inps.tmp_bl]
 
-    inps.ph0 = np.matrix(-displacement * 4 * np.pi * inps.deformation_rate / inps.lamda).reshape(len(displacement), 1)
+    #if inps.signal_type == 'linear':
+    #    temp_baseline, displacement = simulate_constant_vel_phase(inps.n_img, inps.tmp_bl)
+    #else:
+    #    temp_baseline, displacement = simulate_volcano_def_phase(inps.n_img, inps.tmp_bl)
 
-    inps.coh_sim_S = simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0, inps.decorr_days, inps.ph0,
-                                                           seasonal=inps.seasonality)
+    ph0 = -vel_phase * (temp_baseline)
+    gamma_l = 0
+    inps.coh_sim_S = simulate_coherence_matrix_exponential(temp_baseline, inps.gamma0, gamma_l, inps.gamma_fading,
+                                                           vel_phase, inps.decorr_days,
+                                                           vel_fading, inps.decorr_days_fading, seasonal=inps.seasonality)
 
-    inps.coh_sim_S *= np.exp(1j * fading_signal)
-
-    inps.coh_sim_L = simulate_coherence_matrix_exponential(temp_baseline, 0.8, 0.2, inps.decorr_days, inps.ph0,
-                                                           seasonal=inps.seasonality)
-
-    inps.coh_sim_L *= np.exp(1j * fading_signal)
+    gamma_l = inps.gammal
+    inps.coh_sim_L = simulate_coherence_matrix_exponential(temp_baseline, inps.gamma0, gamma_l, inps.gamma_fading,
+                                                           vel_phase, inps.decorr_days,
+                                                           vel_fading, inps.decorr_days_fading, seasonal=inps.seasonality)
 
     repeat_simulation(numr=inps.n_sim, n_img=inps.n_img, n_shp=inps.n_shp,
-                      phas=inps.ph0, coh_sim_S=inps.coh_sim_S, coh_sim_L=inps.coh_sim_L, outname=inps.outname,
-                      stacknumber=stacknum)
+                      phas=ph0.reshape(-1, 1), coh_sim_S=inps.coh_sim_S, coh_sim_L=inps.coh_sim_L, outname=inps.outname)
+                      #stacknumber=stacknum)
 
     return
 
@@ -396,4 +391,3 @@ if __name__ == '__main__':
 
     '''
     simulate_and_calculate_different_method_rms()
-
