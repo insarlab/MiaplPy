@@ -13,8 +13,6 @@ from scipy import linalg as LA
 from scipy.linalg import lapack as lap
 import matplotlib.pyplot as plt
 
-# displacement = 1mm/y = (1 mm *4pi / lambda(mm)) rad/y  --> 6 day = 4pi*6/lambda*365
-# displacement = lambda*phi/ 4*pi.
 
 def create_parser():
     """ Creates command line argument parser object. """
