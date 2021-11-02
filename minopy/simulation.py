@@ -180,8 +180,6 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, gamma_fading, vel_p
         A = res[0]
         B = res[1]
 
-    import pdb; pdb.set_trace()
-
     for ii in range(length):
         for jj in range(ii + 1, length):
 
@@ -200,6 +198,7 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, gamma_fading, vel_p
 
 
 def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname): #, stacknumber=1):
+
     Timesmat = np.zeros([14, numr])
 
     EVD_est_resS = np.zeros([n_img, numr])
@@ -335,8 +334,8 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname): 
     out_time = np.mean(Timesmat, axis=1)
     out_time_name = outname.split('.npy')[0] + '_time.npy'
 
-    #np.save(outname, rmsemat_est)
-    #np.save(out_time_name, out_time)
+    np.save(outname, rmsemat_est)
+    np.save(out_time_name, out_time)
 
     return None
 
@@ -367,11 +366,13 @@ def simulate_and_calculate_different_method_rms(iargs=None):
     #else:
     #    temp_baseline, displacement = simulate_volcano_def_phase(inps.n_img, inps.tmp_bl)
 
+
     ph0 = -vel_phase * (temp_baseline)
     gamma_l = 0
     inps.coh_sim_S = simulate_coherence_matrix_exponential(temp_baseline, inps.gamma0, gamma_l, inps.gamma_fading,
                                                            vel_phase, inps.decorr_days,
                                                            vel_fading, inps.decorr_days_fading, seasonal=inps.seasonality)
+
 
     gamma_l = inps.gammal
     inps.coh_sim_L = simulate_coherence_matrix_exponential(temp_baseline, inps.gamma0, gamma_l, inps.gamma_fading,
