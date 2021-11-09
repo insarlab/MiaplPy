@@ -441,19 +441,10 @@ cdef float test_PS_cy(float complex[:, ::1] coh_mat, float[::1] amplitude):
     # amp_diff_dispersion = np.std(amplitude_diff)/np.mean(amplitude)
     amp_dispersion = np.std(amplitude)/np.mean(amplitude)
 
-    #if Eigen_value[n-1]*(100 / s) > 25 and amp_diff_dispersion <= 0.6:
-    if Eigen_value[n-1]*(100 / s) > 25 and amp_dispersion < 0.4:
+    if Eigen_value[n-1]*(100 / s) > 80 and amp_dispersion < 0.3:
         temp_quality = 1
     else:
         temp_quality = 0
-
-    #elif Eigen_value[n-1]*(100 / s) > 25:
-
-    #    x0 = cexpf(1j * cargf_r(Eigen_vector[0, n-1]))
-    #    for i in range(n):
-    #        vec[i] = Eigen_vector[i, n-1] * conjf(x0)
-
-    #    temp_quality = gam_pta_c(angmat2(coh_mat), vec)
 
     return temp_quality #, vec
 
@@ -1160,7 +1151,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
 
         quality[0, data[0] - row1, data[1] - col1] = temp_quality         # Average temporal coherence from mini stacks
         quality[1, data[0] - row1, data[1] - col1] = temp_quality_full    # Full stack temporal coherence
-
+        
         prog_bar.update(p + 1, every=500, suffix='{}/{} pixels, patch {}'.format(p + 1, num_points, index))
         p += 1
 

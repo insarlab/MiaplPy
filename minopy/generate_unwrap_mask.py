@@ -35,9 +35,16 @@ def main(iargs=None):
     minopy_dir = os.path.dirname(os.path.dirname(inps.geometry_stack))
 
     shadow_mask = os.path.join(minopy_dir, 'shadow_mask.h5')
-    args_shm = '{} shadowMask -m 0.5 --revert -o {}'.format(inps.geometry_stack, shadow_mask)
+    corr_file = os.path.join(minopy_dir, 'inverted/quality_average')
 
-    mintpy.generate_mask.main(args_shm.split())
+    with h5py.File(inps.geometry_stack, 'r') as ds:
+        if 'shadowMask' in ds.keys():
+            args_shm = '{} shadowMask -m 0.5 --revert -o {}'.format(inps.geometry_stack, shadow_mask)
+            mintpy.generate_mask.main(args_shm.split())
+        else:
+            print('There is no shadow mask in geometryRadar.h5, all values set to 1')
+            args_shm = '{} -m -1 -o {}'.format(corr_file, shadow_mask)
+            mintpy.generate_mask.main(args_shm.split())
 
     if not inps.custom_mask in ['None', None]:
         h5_mask = inps.custom_mask
