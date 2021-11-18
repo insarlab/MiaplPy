@@ -24,6 +24,8 @@ def test_PS_py(coh_mat, amplitude):
 
     s = np.sqrt(s)
     amp_dispersion = np.std(amplitude) / np.mean(amplitude)
+    print(amplitude)
+    print(amp_dispersion)
 
     if Eigen_value[nd - 1] * (100 / s) > 70 and amp_dispersion < 0.4:
         temp_quality = 1
@@ -233,10 +235,11 @@ def process_pixel(coord, stackfile, range_window=19, azimuth_window=9, phase_lin
     #sam = np.arange(col1, col2, dtype=np.int32)
     #overlap_width = col2 - col1
     data = (coord[0] - row1, coord[1] - col1)
+    print(data)
     if slc_stack:
          patch_slc_images = StackObj.read(datasetName='slc', box=box, print_msg=False)
     else:
-        print(box)
+
         with h5py.File(stackfile, 'r') as f:
             patch_phase = f['phase'][:, box[1]:box[3], box[0]:box[2]]
             patch_amplitude = f['amplitude'][:, box[1]:box[3], box[0]:box[2]]
@@ -256,8 +259,8 @@ def process_pixel(coord, stackfile, range_window=19, azimuth_window=9, phase_lin
             CCG[m, t] = patch_slc_images[m, shp[t, 0], shp[t, 1]]
 
     coh_mat = iut.est_corr_py(CCG)
-
     temp_quality = 0
+
     if num_shp < 20:
         x0 = np.conj(patch_slc_images[0, data[0], data[1]])
         for m in range(n_image):
@@ -280,6 +283,7 @@ def process_pixel(coord, stackfile, range_window=19, azimuth_window=9, phase_lin
 
         amp_refined = np.mean(np.abs(CCG), axis=1)
         temp_quality_full = gam_pta(np.angle(coh_mat), vec_refined)
+        print(temp_quality_full)
 
     for m in range(n_image):
 

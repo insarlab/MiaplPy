@@ -66,7 +66,7 @@ def main(iargs=None):
         out_folder = out_dir + '/PATCHES/PATCH_{}'.format(index)
         os.makedirs(out_folder, exist_ok=True)
         
-        if not os.path.exists(out_folder + '/quality.npy'):
+        if not os.path.exists(out_folder + '/flag.npy'):
             box_list.append(box)
 
     #print('Total number of PATCHES: {}'.format(len(inversionObj.box_list)))
@@ -121,7 +121,7 @@ def main(iargs=None):
             index = box[4]
             out_dir = inversionObj.out_dir.decode('UTF-8')
             out_folder = out_dir + '/PATCHES/PATCH_{}'.format(index)
-            while not os.path.exists(out_folder + '/quality.npy'):
+            while not os.path.exists(out_folder + '/flag.npy'):
                 time.sleep(10)
 
         inversionObj.unpatch()
