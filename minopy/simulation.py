@@ -22,7 +22,8 @@ def create_parser():
     parser.add_argument('-l', '--lambda', dest='lamda', type=float, default=56.0, help='Sensor wavelength (mm)')
     parser.add_argument('-ns', '--nshp', dest='n_shp', type=int, default=300, help='Number of neighbouring samples')
     parser.add_argument('-ni', '--nimg', dest='n_img', type=int, default=100, help='Number of images')
-    parser.add_argument('-dd', '--decorr_days', dest='decorr_days', type=int, default=50, help='Decorrelatopn days')
+    parser.add_argument('-dd', '--decorr_days', dest='decorr_days', type=int, default=50,
+                        help='Decorrelatopn days default=50 exponentialy, 400 with seasonality')
     parser.add_argument('-df', '--decorr_days_fading', dest='decorr_days_fading', type=int, default=11,
                         help='Decorrelatopn days_fading')
     parser.add_argument('-tb', '--tmp_bl', dest='tmp_bl', type=int, default=6, help='Temporal baseline')
@@ -32,8 +33,8 @@ def create_parser():
                         help='Fading signal rate. -- Default : 50 mm/y')
     parser.add_argument('-g0', '--gamma0', dest='gamma0', type=float, default=0.6,
                         help='Short temporal coherence. -- Default : 0.6')
-    parser.add_argument('-gl', '--gammal', dest='gammal', type=float, default=0.2,
-                        help='Long temporal coherence. -- Default : 0.2')
+    parser.add_argument('-gl', '--gammal', dest='gammal', type=float, default=0.1,
+                        help='Long temporal coherence. -- Default : 0.1')
     parser.add_argument('-gf', '--gamma_fading', dest='gamma_fading', type=float, default=0.18,
                         help='Fading signal coherence. -- Default : 0.18')
     #parser.add_argument('-st', '--signal_type', dest='signal_type', type=str, default='linear',
@@ -177,11 +178,12 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, gamma_fading, vel_p
         res = double_solve(f1, f2, 0.5, 0.5)
         A = res[0]
         B = res[1]
+        print(A, B)
 
     for ii in range(length):
         for jj in range(ii + 1, length):
 
-            factor1 = (gamma0 - gammaf) * np.exp(-np.abs(t[ii] - t[jj]) / decorr_days) + gammaf
+            factor1 = (gamma0 - gammaf)
             factor2 = gamma_fading * np.exp(-np.abs(t[ii] - t[jj]) / decorr_days_fading)
 
             if seasonal:
@@ -189,7 +191,8 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, gamma_fading, vel_p
 
             ph0 = vel_phase * (t[jj] - t[ii])
             fading = vel_fading * (t[jj] - t[ii])
-            C[ii, jj] = factor1 * np.exp(1j * ph0) + factor2 * np.exp(1j * fading)
+            C[ii, jj] = (factor1 * np.exp(-np.abs(t[ii] - t[jj]) / decorr_days) + gammaf) * np.exp(1j * ph0) + \
+                        factor2 * np.exp(1j * fading)
             C[jj, ii] = np.conj(C[ii, jj])
 
     return C
@@ -348,6 +351,7 @@ def simulate_and_calculate_different_method_rms(iargs=None):
     outname = 'rmsemat_modifiedSignalEq_linear'
     if inps.seasonality:
         outname = outname + '_seasonal'
+        inps.decorr_days = 400
 
     outname = outname + '.npy'
 
