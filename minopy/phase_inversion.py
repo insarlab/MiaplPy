@@ -100,6 +100,7 @@ def main(iargs=None):
                    phase_linking_method=data_kwargs['phase_linking_method'],
                    total_num_mini_stacks=data_kwargs['total_num_mini_stacks'],
                    default_mini_stack_size=data_kwargs['default_mini_stack_size'],
+                   ps_shp=data_kwargs['ps_shp'],
                    shp_test=data_kwargs['shp_test'],
                    def_sample_rows=data_kwargs['def_sample_rows'],
                    def_sample_cols=data_kwargs['def_sample_cols'],

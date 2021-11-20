@@ -22,6 +22,7 @@ cdef class CPhaseLink:
     cdef int[::1] sample_rows, sample_cols
     cdef int reference_row, reference_col
     cdef float complex[:, :, ::1] patch_slc_images
+    cdef int ps_shp
     cdef readonly list box_list
     cdef readonly bytes out_dir
     cdef readonly int time_lag

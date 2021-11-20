@@ -212,7 +212,7 @@ cdef inline float complex[::1] EVD_phase_estimation_cy(float complex[:, ::1] coh
     cdef cnp.intp_t i, n = coh.shape[0]
     cdef float complex[::1] vec = np.zeros(n, dtype=np.complex64)
 
-    eigen_value, eigen_vector = lap.cheevx(coh)[0:2]
+    eigen_value, eigen_vector = lap.cheevd(coh)[0:2]
 
     x0 = cexpf(1j * cargf_r(eigen_vector[0, n-1]))
 
@@ -235,7 +235,7 @@ cdef inline float complex[::1] EMI_phase_estimation_cy(float complex[:, ::1] coh
 
     invabscoh = inverse_float_matrix(abscoh)
     M = multiply_elementwise_dc(invabscoh, coh)
-    eigen_value, eigen_vector = lap.cheevx(M)[0:2]
+    eigen_value, eigen_vector = lap.cheevd(M)[0:2]
 
     x0 = cexpf(1j * cargf_r(eigen_vector[0, 0]))
 
@@ -429,7 +429,7 @@ cdef float test_PS_cy(float complex[:, ::1] coh_mat, float[::1] amplitude):
     #cdef float complex x0
     
     #amplitude_diff = np.zeros(n, dtype=np.float32)
-    Eigen_value, Eigen_vector = lap.cheevx(coh_mat)[0:2]
+    Eigen_value, Eigen_vector = lap.cheevd(coh_mat)[0:2]
 
     s = 0
     for i in range(ns):
@@ -1042,7 +1042,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
                     object slcStackObj, float distance_threshold, cnp.ndarray[int, ndim=1] def_sample_rows,
                     cnp.ndarray[int, ndim=1] def_sample_cols, int reference_row, int reference_col,
                     bytes phase_linking_method, int total_num_mini_stacks, int default_mini_stack_size,
-                    bytes shp_test, bytes out_dir, int lag):
+                    int ps_shp, bytes shp_test, bytes out_dir, int lag):
 
     cdef cnp.ndarray[int, ndim=1] big_box = get_big_box_cy(box, range_window, azimuth_window, width, length)
     cdef int box_width = box[2] - box[0]
@@ -1106,7 +1106,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
 
         coh_mat = est_corr_cy(CCG)
         #temp_quality = 0
-        if num_shp < 20:
+        if num_shp <= ps_shp:
             x0 = conjf(patch_slc_images[0, data[0], data[1]])
             for m in range(n_image):
                 vec_refined[m] = patch_slc_images[m, data[0], data[1]]  * x0

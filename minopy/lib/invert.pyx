@@ -67,7 +67,7 @@ cdef class CPhaseLink:
         self.range_window = np.int32(inps.range_window)
         self.azimuth_window = np.int32(inps.azimuth_window)
         self.patch_size = np.int32(inps.patch_size)
-
+        self.ps_shp = np.int32(inps.ps_shp)
         self.out_dir = self.work_dir + b'/inverted'
         os.makedirs(self.out_dir.decode('UTF-8'), exist_ok='True')
 
@@ -257,6 +257,7 @@ cdef class CPhaseLink:
             "phase_linking_method" : self.phase_linking_method,
             "total_num_mini_stacks" : self.total_num_mini_stacks,
             "default_mini_stack_size" : self.mini_stack_default_size,
+            'ps_shp': self.ps_shp,
             "shp_test": self.shp_test,
             "out_dir": self.out_dir,
             "time_lag": self.time_lag,

@@ -313,9 +313,9 @@ class MinoPyParser:
         parser = self.parser
         patch = parser.add_argument_group('Phase inversion option')
         patch.add_argument('-w', '--work_dir', type=str, dest='work_dir', help='Working directory (minopy)')
-        patch.add_argument('-r', '--range_window', type=str, dest='range_window', default=15,
+        patch.add_argument('-r', '--range_window', type=int, dest='range_window', default=15,
                            help='Range window size for shp finding')
-        patch.add_argument('-a', '--azimuth_window', type=str, dest='azimuth_window', default=15,
+        patch.add_argument('-a', '--azimuth_window', type=int, dest='azimuth_window', default=15,
                            help='Azimuth window size for shp finding')
         patch.add_argument('-m', '--method', type=str, dest='inversion_method', default='EMI',
                            help='Inversion method (EMI, EVD, PTA, sequential_EMI, ...)')
@@ -323,7 +323,9 @@ class MinoPyParser:
                            help='Time lag in case StBAS is used')
         patch.add_argument('-t', '--test', type=str, dest='shp_test', default='ks',
                            help='Shp statistical test (ks, ad, ttest)')
-        patch.add_argument('-p', '--patch_size', type=str, dest='patch_size', default=200,
+        patch.add_argument('-psn', '--ps_num_shp', type=int, dest='ps_shp', default=10,
+                           help='Number of SHPs for PS candidates')
+        patch.add_argument('-p', '--patch_size', type=int, dest='patch_size', default=200,
                            help='Azimuth window size for shp finding')
         patch.add_argument('-ms', '--mini_stack_size', type=int, dest='ministack_size', default=10,
                            help='Number of images in each mini stack')

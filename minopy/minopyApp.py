@@ -259,12 +259,13 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_commands = []
 
         scp_args = '--work_dir {a0} --range_window {a1} --azimuth_window {a2} --method {a3} --test {a4} ' \
-                   '--patch_size {a5} --num_worker {a6} --mini_stack_size {a7} --time_lag {a8}'.format(
+                   '--patch_size {a5} --num_worker {a6} --mini_stack_size {a7} --time_lag {a8} --ps_num_shp {a9}'.format(
             a0=self.workDir, a1=self.template['minopy.inversion.rangeWindow'],
             a2=self.template['minopy.inversion.azimuthWindow'], a3=self.template['minopy.inversion.phaseLinkingMethod'],
             a4=self.template['minopy.inversion.shpTest'], a5=self.template['minopy.inversion.patchSize'],
             a6=self.num_workers, a7=self.template['minopy.inversion.ministackSize'],
-            a8=self.template['minopy.inversion.stbas_time_lag'])
+            a8=self.template['minopy.inversion.stbas_time_lag'],
+            a9=self.template['minopy.inversion.PsNumShp'])
 
         if number_of_nodes > 1:
             for i in range(number_of_nodes):
