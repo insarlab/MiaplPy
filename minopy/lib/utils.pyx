@@ -1112,9 +1112,11 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
                 vec_refined[m] = patch_slc_images[m, data[0], data[1]]  * x0
                 amp_refined[m] = cabsf(patch_slc_images[m, data[0], data[1]])
             temp_quality = test_PS_cy(coh_mat, amp_refined)
-            temp_quality_full = temp_quality
             if temp_quality == 1:
                 mask_ps[data[0] - row1, data[1] - col1] = 1
+            else:
+                temp_quality = gam_pta_c(angmat2(coh_mat), vec_refined)
+            temp_quality_full = temp_quality
 
         else:
             
