@@ -288,7 +288,7 @@ cdef class CPhaseLink:
         cdef cnp.ndarray[int, ndim=1] box
         cdef bytes patch_dir
         cdef float complex[:, :, ::1] rslc_ref
-        cdef float[:, :, ::1] quality
+        cdef cnp.ndarray[float, ndim=3] quality
 
         if os.path.exists(self.RSLCfile.decode('UTF-8')):
             print('Deleting old phase_series.h5 ...')
@@ -310,6 +310,8 @@ cdef class CPhaseLink:
                 quality = np.load(patch_dir.decode('UTF-8') + '/quality.npy', allow_pickle=True)
                 shp = np.load(patch_dir.decode('UTF-8') + '/shp.npy', allow_pickle=True)
                 mask_ps = np.load(patch_dir.decode('UTF-8') + '/mask_ps.npy', allow_pickle=True)
+
+                quality[quality<0] = 0
 
                 print('-' * 50)
                 print("unpatch block {}/{} : {}".format(index, self.num_box, box[0:4]))

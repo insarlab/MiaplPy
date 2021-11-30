@@ -49,7 +49,7 @@ minopy.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*
 minopy.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.cor
 minopy.load.connCompFile   = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*.conncomp
 minopy.load.ionoFile       = None
-minopy.load.intFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/filt_fine*.int
+minopy.load.intFile        = None 
 
 minopy.load.demFile        = ${PROJECT_DIR}/merged/geom_reference/hgt.rdr
 minopy.load.lookupYFile    = ${PROJECT_DIR}/merged/geom_reference/lat.rdr
@@ -262,7 +262,7 @@ def get_auto_path(processor, work_dir, template=dict()):
         if processor == 'isceTops':
             template['minopy.load.metaFile'] = os.path.join(work_dir, 'inputs/reference/IW*.xml')
         else:
-            template['minopy.load.metaFile'] = os.path.join(work_dir, 'inputs/reference/referenceShelve/data.dat')
+            template['minopy.load.metaFile'] = os.path.join(work_dir, 'inputs/reference/data.dat')
 
     return template
 

@@ -293,7 +293,7 @@ def main(iargs=None):
             ts_std = np.zeros((num_date, box_len, box_wid), np.float32)
 
             # initiate dask cluster and client
-            cluster_obj = cluster.DaskCluster('local', inps.num_worker)
+            cluster_obj = cluster.DaskCluster('local', str(inps.num_worker))
             cluster_obj.open()
 
             # run dask

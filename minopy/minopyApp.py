@@ -291,7 +291,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             else:
                 job_obj.write_batch_jobs(batch_file=run_inversion, num_cores_per_task=self.num_workers)
 
-        return
+        return slc_stack
 
     def get_interferogram_pairs(self):
 
@@ -458,7 +458,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         run_commands = []
         num_cpu = os.cpu_count()
-        ntiles = self.num_pixels // 4000000
+        ntiles = self.num_pixels // 40000000
         if ntiles == 0:
             ntiles = 1
         num_cpu = num_cpu // ntiles
@@ -472,8 +472,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         for pair in self.pairs:
             out_dir = os.path.join(self.ifgram_dir, pair[0] + '_' + pair[1])
-            if float(self.template['minopy.interferograms.filterStrength']) > 0:
-                corr_file = os.path.join(out_dir, 'filt_fine.cor')
+            #if float(self.template['minopy.interferograms.filterStrength']) > 0:
+            #    corr_file = os.path.join(out_dir, 'filt_fine.cor')
             os.makedirs(out_dir, exist_ok='True')
 
             scp_args = '--ifg {a1} --coherence {a2} --unwrapped_ifg {a3} '\
@@ -617,7 +617,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             if sname == 'load_slc':
                 self.run_load_slc('load_slc', job_obj)
             elif sname == 'phase_inversion':
-                self.run_phase_inversion('phase_inversion', job_obj)
+                slc_stack = self.run_phase_inversion('phase_inversion', job_obj)
+                if self.copy_to_tmp:
+                    os.system('cp {} /tmp'.format(slc_stack))
             elif sname == 'generate_ifgram':
                 self.run_interferogram('generate_ifgram', job_obj)
             elif sname == 'unwrap_ifgram':
