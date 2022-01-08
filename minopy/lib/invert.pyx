@@ -61,6 +61,7 @@ cdef class CPhaseLink:
         cdef float alpha
         self.inps = inps
         self.work_dir = inps.work_dir.encode('UTF-8')
+        self.mask_file = inps.mask_file.encode('UTF-8')
         self.phase_linking_method = inps.inversion_method.encode('UTF-8')
         self.shp_test = inps.shp_test.encode('UTF-8')
         self.slc_stack = inps.slc_stack.encode('UTF-8')
@@ -200,13 +201,13 @@ cdef class CPhaseLink:
 
                 RSLC['shp'][:, :] = 1
 
-                RSLC.create_dataset('quality',
+                RSLC.create_dataset('temporalCoherence',
                                     shape=(2, self.length, self.width),
                                     maxshape=(2, self.length, self.width),
                                     chunks=True,
                                     dtype=np.float32)
 
-                RSLC['quality'][:, :, :] = -1
+                RSLC['temporalCoherence'][:, :, :] = -1
 
 
                 # 1D dataset containing dates of all images
@@ -261,6 +262,7 @@ cdef class CPhaseLink:
             "shp_test": self.shp_test,
             "out_dir": self.out_dir,
             "time_lag": self.time_lag,
+            "mask_file": self.mask_file,
         }
         return data_kwargs
 
@@ -288,7 +290,7 @@ cdef class CPhaseLink:
         cdef cnp.ndarray[int, ndim=1] box
         cdef bytes patch_dir
         cdef float complex[:, :, ::1] rslc_ref
-        cdef cnp.ndarray[float, ndim=3] quality
+        cdef cnp.ndarray[float, ndim=3] temp_coh
 
         if os.path.exists(self.RSLCfile.decode('UTF-8')):
             print('Deleting old phase_series.h5 ...')
@@ -299,22 +301,22 @@ cdef class CPhaseLink:
             os.remove(mask_ps_file.decode('UTF-8'))
 
         self.initiate_output()
-        print('Unpatch and write wrapped phase time series to HDF5 file phase_series.h5 ')
+        print('Concatenate and write wrapped phase time series to HDF5 file phase_series.h5 ')
         print('open  HDF5 file phase_series.h5 in a mode')
 
         with h5py.File(self.RSLCfile.decode('UTF-8'), 'a') as fhandle:
             
             for index, box in enumerate(self.box_list):
-                patch_dir = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
+                patch_dir = self.out_dir + ('/PATCHES/PATCH_{:04.0f}'.format(index)).encode('UTF-8')
                 rslc_ref = np.load(patch_dir.decode('UTF-8') + '/phase_ref.npy', allow_pickle=True)
-                quality = np.load(patch_dir.decode('UTF-8') + '/quality.npy', allow_pickle=True)
+                temp_coh = np.load(patch_dir.decode('UTF-8') + '/tempCoh.npy', allow_pickle=True)
                 shp = np.load(patch_dir.decode('UTF-8') + '/shp.npy', allow_pickle=True)
                 mask_ps = np.load(patch_dir.decode('UTF-8') + '/mask_ps.npy', allow_pickle=True)
 
-                quality[quality<0] = 0
+                temp_coh[temp_coh<0] = 0
 
                 print('-' * 50)
-                print("unpatch block {}/{} : {}".format(index, self.num_box, box[0:4]))
+                print("Concatenate block {}/{} : {}".format(index, self.num_box, box[0:4]))
 
                 # wrapped interferograms 3D
                 block = [0, self.n_image, box[1], box[3], box[0], box[2]]
@@ -328,7 +330,7 @@ cdef class CPhaseLink:
 
                 # temporal coherence - 2D
                 block = [0, 2, box[1], box[3], box[0], box[2]]
-                write_hdf5_block_3D(fhandle, quality, b'quality', block)
+                write_hdf5_block_3D(fhandle, temp_coh, b'temporalCoherence', block)
 
             
             print('write shp file')
@@ -347,35 +349,35 @@ cdef class CPhaseLink:
             shp_memmap = None
 
 
-            print('write averaged quality file from mini stacks')
-            quality_file = self.out_dir + b'/quality_average'
+            print('write averaged temporal coherence file from mini stacks')
+            temp_coh_file = self.out_dir + b'/tempCoh_average'
 
-            if not os.path.exists(quality_file.decode('UTF-8')):
-                quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='write', dtype='float32',
+            if not os.path.exists(temp_coh_file.decode('UTF-8')):
+                temp_coh_memmap = np.memmap(temp_coh_file.decode('UTF-8'), mode='write', dtype='float32',
                                            shape=(self.length, self.width))
-                IML.renderISCEXML(quality_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
+                IML.renderISCEXML(temp_coh_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
                                   datatype='float32', scheme='BIL')
             else:
-                quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='r+', dtype='float32',
+                temp_coh_memmap = np.memmap(temp_coh_file.decode('UTF-8'), mode='r+', dtype='float32',
                                            shape=(self.length, self.width))
 
-            quality_memmap[:, :] = fhandle['quality'][0, :, :]
-            quality_memmap = None
+            temp_coh_memmap[:, :] = fhandle['temporalCoherence'][0, :, :]
+            temp_coh_memmap = None
 
-            print('write quality file from full stack')
-            quality_file = self.out_dir + b'/quality_full'
+            print('write temporal coherence file from full stack')
+            temp_coh_file = self.out_dir + b'/tempCoh_full'
 
-            if not os.path.exists(quality_file.decode('UTF-8')):
-                quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='write', dtype='float32',
+            if not os.path.exists(temp_coh_file.decode('UTF-8')):
+                temp_coh_memmap = np.memmap(temp_coh_file.decode('UTF-8'), mode='write', dtype='float32',
                                            shape=(self.length, self.width))
-                IML.renderISCEXML(quality_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
+                IML.renderISCEXML(temp_coh_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
                                   datatype='float32', scheme='BIL')
             else:
-                quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='r+', dtype='float32',
+                temp_coh_memmap = np.memmap(temp_coh_file.decode('UTF-8'), mode='r+', dtype='float32',
                                            shape=(self.length, self.width))
 
-            quality_memmap[:, :] = fhandle['quality'][1, :, :]
-            quality_memmap = None
+            temp_coh_memmap[:, :] = fhandle['temporalCoherence'][1, :, :]
+            temp_coh_memmap = None
 
             print('close HDF5 file phase_series.h5.')
 
@@ -383,7 +385,7 @@ cdef class CPhaseLink:
 
         with h5py.File(mask_ps_file.decode('UTF-8'), 'a') as psf:
            for index, box in enumerate(self.box_list):
-               patch_dir = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
+               patch_dir = self.out_dir + ('/PATCHES/PATCH_{:04.0f}'.format(index)).encode('UTF-8')
                mask_ps = np.load(patch_dir.decode('UTF-8') + '/mask_ps.npy', allow_pickle=True)
                block = [box[1], box[3], box[0], box[2]]
                write_hdf5_block_2D_int(psf, mask_ps, b'mask', block)

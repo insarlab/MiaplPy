@@ -17,11 +17,11 @@ def enablePrint():
 blockPrint()
 import datetime
 import isceobj
-from isceobj.Image.IntImage import IntImage
 import numpy as np
 from minopy.objects.arg_parser import MinoPyParser
 import h5py
 from math import sqrt, exp
+
 enablePrint()
 
 
@@ -103,7 +103,7 @@ def run_interferogram(inps, resampName):
         intImage.renderHdr()
         intImage.finalizeImage()
 
-    return resampName
+    return
 
 def runFilter(infile, outfile, filterStrength):
     from mroipac.filter.Filter import Filter
@@ -123,7 +123,7 @@ def runFilter(infile, outfile, filterStrength):
 
     objFilter = Filter()
     objFilter.wireInputPort(name='interferogram',object=intImage)
-    objFilter.wireOutputPort(name='filtered interferogram',object=filtImage)
+    objFilter.wireOutputPort(name='filtered interferogram', object=filtImage)
     objFilter.goldsteinWerner(alpha=filterStrength)
 
     intImage.finalizeImage()

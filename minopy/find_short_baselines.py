@@ -164,7 +164,7 @@ def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baselin
     ax.xaxis.set_minor_locator(months)
     ax.autoscale_view()
 
-    fig.savefig(out_dir + '/unwrap_network.png', bbox_inches='tight', dpi=150)
+    fig.savefig(out_dir + '/network.pdf', bbox_inches='tight', dpi=150)
     plt.close(fig)
 
     return

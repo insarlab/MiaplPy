@@ -11,6 +11,7 @@ from scipy.optimize import minimize
 from skimage.measure._ccomp import label_cython as clabel
 from scipy.stats import anderson_ksamp, ttest_ind
 from mintpy.utils import ptime
+from mintpy.utils import readfile
 import time
 
 
@@ -1047,13 +1048,13 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
                     object slcStackObj, float distance_threshold, cnp.ndarray[int, ndim=1] def_sample_rows,
                     cnp.ndarray[int, ndim=1] def_sample_cols, int reference_row, int reference_col,
                     bytes phase_linking_method, int total_num_mini_stacks, int default_mini_stack_size,
-                    int ps_shp, bytes shp_test, bytes out_dir, int lag):
+                    int ps_shp, bytes shp_test, bytes out_dir, int lag, bytes mask_file):
 
     cdef cnp.ndarray[int, ndim=1] big_box = get_big_box_cy(box, range_window, azimuth_window, width, length)
     cdef int box_width = box[2] - box[0]
     cdef int box_length = box[3] - box[1]
     cdef cnp.ndarray[float complex, ndim=3] rslc_ref = np.zeros((n_image, box_length, box_width), dtype=np.complex64)
-    cdef cnp.ndarray[float, ndim=3] quality = np.zeros((2, box_length, box_width), dtype=np.float32)
+    cdef cnp.ndarray[float, ndim=3] tempCoh = np.zeros((2, box_length, box_width), dtype=np.float32)
     cdef cnp.ndarray[int, ndim=2] mask_ps = np.zeros((box_length, box_width), dtype=np.int32)
     cdef cnp.ndarray[int, ndim=2] SHP = np.zeros((box_length, box_width), dtype=np.int32)
     cdef int row1 = box[1] - big_box[1]
@@ -1079,8 +1080,14 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef int ps, index = box[4]
     cdef float time0 = time.time()
     cdef float complex x0
+    cdef float mi, se
+    cdef int[:, ::1] mask = np.ones((box_length, box_width), dtype=np.int32)
 
-    out_folder = out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
+    if os.path.exists(mask_file.decode('UTF-8')):
+        mask = (readfile.read(mask_file.decode('UTF-8'),
+                              box=(box[0], box[1], box[2], box[3]))[0]*1).astype(np.int32)
+
+    out_folder = out_dir + ('/PATCHES/PATCH_{:04.0f}'.format(index)).encode('UTF-8')
 
     os.makedirs(out_folder.decode('UTF-8'), exist_ok=True)
     if os.path.exists(out_folder.decode('UTF-8') + '/flag.npy'):
@@ -1098,73 +1105,84 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     for i in range(num_points):
         ps = 0
         data = (coords[i,0], coords[i,1])
-        #num_shp = SHP[data[0] - row1, data[1] - col1]
-        #if num_shp == 0:
-        shp = get_shp_row_col_c(data, patch_slc_images, def_sample_rows, def_sample_cols, azimuth_window,
-                                range_window, reference_row, reference_col, distance_threshold, shp_test)
-        num_shp = shp.shape[0]
-        SHP[data[0] - row1, data[1] - col1] = num_shp
-        CCG = np.zeros((n_image, num_shp), dtype=np.complex64)
-        for t in range(num_shp):
-            for m in range(n_image):
-                CCG[m, t] = patch_slc_images[m, shp[t,0], shp[t,1]]
+        if mask[data[0] - row1, data[1] - col1]:
 
-        coh_mat = est_corr_cy(CCG)
-        #temp_quality = 0
-        if num_shp <= ps_shp:
-            x0 = conjf(patch_slc_images[0, data[0], data[1]])
-            for m in range(n_image):
-                vec_refined[m] = patch_slc_images[m, data[0], data[1]]  * x0
-                amp_refined[m] = cabsf(patch_slc_images[m, data[0], data[1]])
-            temp_quality, vec = test_PS_cy(coh_mat, amp_refined)
-            if temp_quality == 1:
-                mask_ps[data[0] - row1, data[1] - col1] = 1
+            #num_shp = SHP[data[0] - row1, data[1] - col1]
+            #if num_shp == 0:
+            shp = get_shp_row_col_c(data, patch_slc_images, def_sample_rows, def_sample_cols, azimuth_window,
+                                    range_window, reference_row, reference_col, distance_threshold, shp_test)
+            num_shp = shp.shape[0]
+            SHP[data[0] - row1, data[1] - col1] = num_shp
+            CCG = np.zeros((n_image, num_shp), dtype=np.complex64)
+            for t in range(num_shp):
+                for m in range(n_image):
+                    CCG[m, t] = patch_slc_images[m, shp[t,0], shp[t,1]]
+
+            coh_mat = est_corr_cy(CCG)
+            #temp_quality = 0
+            if num_shp <= ps_shp:
+                x0 = conjf(patch_slc_images[0, data[0], data[1]])
+                for m in range(n_image):
+                    vec_refined[m] = patch_slc_images[m, data[0], data[1]]  * x0
+                    amp_refined[m] = cabsf(patch_slc_images[m, data[0], data[1]])
+                temp_quality, vec = test_PS_cy(coh_mat, amp_refined)
+                if temp_quality == 1:
+                    mask_ps[data[0] - row1, data[1] - col1] = 1
+                else:
+                    vec_refined = vec
+                temp_quality_full = temp_quality
+
             else:
-                vec_refined = vec
-            temp_quality_full = temp_quality
 
+                if len(phase_linking_method) > 10 and phase_linking_method[0:10] == b'sequential':
+                    vec_refined, squeezed_images, temp_quality = sequential_phase_linking_cy(CCG, phase_linking_method,
+                                                                               default_mini_stack_size,
+                                                                               total_num_mini_stacks)
+
+                    vec_refined = datum_connect_cy(squeezed_images, vec_refined, default_mini_stack_size)
+
+                else:
+                    vec_refined, noval, temp_quality = phase_linking_process_cy(CCG, 0, phase_linking_method, False, lag)
+
+                amp_refined = mean_along_axis_x(absmat2(CCG))
+                temp_quality_full = gam_pta_c(angmat2(coh_mat), vec_refined)
+
+
+            for m in range(n_image):
+
+                if m == 0:
+                    vec_refined[m] = amp_refined[m] + 0j
+                else:
+                    vec_refined[m] = amp_refined[m] * cexpf(1j * cargf(vec_refined[m]))
+
+                rslc_ref[m, data[0] - row1, data[1] - col1] = vec_refined[m]
+
+            if temp_quality < 0:
+                temp_quality = 0
+            if temp_quality_full < 0:
+                temp_quality_full = 0
+            tempCoh[0, data[0] - row1, data[1] - col1] = temp_quality         # Average temporal coherence from mini stacks
+            tempCoh[1, data[0] - row1, data[1] - col1] = temp_quality_full    # Full stack temporal coherence
         else:
-            
-            if len(phase_linking_method) > 10 and phase_linking_method[0:10] == b'sequential':
-                vec_refined, squeezed_images, temp_quality = sequential_phase_linking_cy(CCG, phase_linking_method,
-                                                                           default_mini_stack_size,
-                                                                           total_num_mini_stacks)
+            x0 = conjf(patch_slc_images[0, data[0], data[1]])
+            tempCoh[0, data[0] - row1, data[1] - col1] = 0.1    # Average temporal coherence from mini stacks
+            tempCoh[1, data[0] - row1, data[1] - col1] = 0.1    # Full stack temporal coherence
+            SHP[data[0] - row1, data[1] - col1] = 1
+            for m in range(n_image):
+                    rslc_ref[m, data[0] - row1, data[1] - col1] = patch_slc_images[m, data[0], data[1]]  * x0
 
-                vec_refined = datum_connect_cy(squeezed_images, vec_refined, default_mini_stack_size)
 
-            else:
-                vec_refined, noval, temp_quality = phase_linking_process_cy(CCG, 0, phase_linking_method, False, lag)
-
-            amp_refined = mean_along_axis_x(absmat2(CCG))
-            temp_quality_full = gam_pta_c(angmat2(coh_mat), vec_refined)
-
-        
-        for m in range(n_image):
-
-            if m == 0:
-                vec_refined[m] = amp_refined[m] + 0j
-            else:
-                vec_refined[m] = amp_refined[m] * cexpf(1j * cargf(vec_refined[m]))
-
-            rslc_ref[m, data[0] - row1, data[1] - col1] = vec_refined[m]
-
-        if temp_quality < 0:
-            temp_quality = 0
-        if temp_quality_full < 0:
-            temp_quality_full = 0
-        quality[0, data[0] - row1, data[1] - col1] = temp_quality         # Average temporal coherence from mini stacks
-        quality[1, data[0] - row1, data[1] - col1] = temp_quality_full    # Full stack temporal coherence
-        
         prog_bar.update(p + 1, every=500, suffix='{}/{} pixels, patch {}'.format(p + 1, num_points, index))
         p += 1
 
     np.save(out_folder.decode('UTF-8') + '/phase_ref.npy', rslc_ref)
     np.save(out_folder.decode('UTF-8') + '/shp.npy', SHP)
-    np.save(out_folder.decode('UTF-8') + '/quality.npy', quality)
+    np.save(out_folder.decode('UTF-8') + '/tempCoh.npy', tempCoh)
     np.save(out_folder.decode('UTF-8') + '/mask_ps.npy', mask_ps)
     np.save(out_folder.decode('UTF-8') + '/flag.npy', [1])
 
-    print('    Phase inversion of PATCH_{} is Completed in {} s\n'.format(index, time.time()-time0))
+    mi, se = divmod(time.time()-time0, 60)
+    print('    Phase inversion of PATCH_{:04.0f} is Completed in {:02.0f} mins {:02.0f} secs\n'.format(index, mi, se))
 
     return
 

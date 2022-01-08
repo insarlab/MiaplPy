@@ -35,7 +35,7 @@ def main(iargs=None):
     minopy_dir = os.path.dirname(os.path.dirname(inps.geometry_stack))
 
     shadow_mask = os.path.join(minopy_dir, 'shadow_mask.h5')
-    corr_file = os.path.join(minopy_dir, 'inverted/quality_average')
+    corr_file = os.path.join(minopy_dir, 'inverted/tempCoh_average')
 
     with h5py.File(inps.geometry_stack, 'r') as ds:
         if 'shadowMask' in ds.keys():
@@ -95,14 +95,14 @@ def main(iargs=None):
                                                         inps.custom_mask, h5_mask)
             mintpy.mask.main(args_shm.split())
 
-    corr_file = os.path.join(minopy_dir, 'inverted/quality_average')
+    corr_file = os.path.join(minopy_dir, 'inverted/tempCoh_average')
     mask_arg = ' {} -m {} --fill 0 -o {}'.format(corr_file,
                                                  h5_mask,
                                                  corr_file + '_msk')
 
     mintpy.mask.main(mask_arg.split())
 
-    corr_file = os.path.join(minopy_dir, 'inverted/quality_full')
+    corr_file = os.path.join(minopy_dir, 'inverted/tempCoh_full')
     mask_arg = ' {} -m {} --fill 0 -o {}'.format(corr_file,
                                                  h5_mask,
                                                  corr_file + '_msk')

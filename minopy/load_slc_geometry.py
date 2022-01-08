@@ -305,7 +305,7 @@ def read_subset_box(inpsDict):
         # Use the min bbox if files size are different
         if inpsDict['processor'] == 'snap':
             fnames = ut.get_file_list(inpsDict['minopy.load.slcFile'])
-            pix_box = update_box4files_with_inconsistent_size(fnames)
+            pix_box = mld.update_box4files_with_inconsistent_size(fnames)
 
         #if not pix_box:
         #    return inpsDict
@@ -387,32 +387,50 @@ def read_inps_dict2slc_stack_dict_object(inpsDict):
         print(msg)
         # raise Exception(msg)
 
+
+    if not inpsDict['minopy.load.startDate'] in [None, 'None']:
+        start_date = datetime.datetime.strptime(inpsDict['minopy.load.startDate'], '%Y%m%d')
+    else:
+        start_date = None
+    if not inpsDict['minopy.load.endDate'] in [None, 'None']:
+        end_date = datetime.datetime.strptime(inpsDict['minopy.load.endDate'], '%Y%m%d')
+    else:
+        end_date = None
+
     # dsPathDict --> pairsDict --> stackObj
     dsNameList = list(dsPathDict.keys())
     pairsDict = {}
+
     for dsPath in dsPathDict[dsName0]:
         dates = ptime.yyyymmdd(read_attribute(dsPath.split('.xml')[0], metafile_ext='.rsc')['DATE'])
+        date_val = datetime.datetime.strptime(dates, '%Y%m%d')
+        include_date = True
+        if not start_date is None and start_date > date_val:
+            include_date = False
+        if not end_date is None and end_date < date_val:
+            include_date = False
 
-        #####################################
-        # A dictionary of data files for a given pair.
-        # One pair may have several types of dataset.
-        # example slcPathDict = {'slc': /pathToFile/*.slc.full}
-        # All path of data file must contain the reference and secondary date, either in file name or folder name.
-        slcPathDict = {}
-        for i in range(len(dsNameList)):
-            dsName = dsNameList[i]
-            dsPath1 = dsPathDict[dsName][0]
-            if dates in dsPath1:
-                slcPathDict[dsName] = dsPath1
-            else:
-                dsPath2 = [i for i in dsPathDict[dsName] if dates in i]
-                if len(dsPath2) > 0:
-                    slcPathDict[dsName] = dsPath2[0]
+        if include_date:
+            #####################################
+            # A dictionary of data files for a given pair.
+            # One pair may have several types of dataset.
+            # example slcPathDict = {'slc': /pathToFile/*.slc.full}
+            # All path of data file must contain the reference and secondary date, either in file name or folder name.
+            slcPathDict = {}
+            for i in range(len(dsNameList)):
+                dsName = dsNameList[i]
+                dsPath1 = dsPathDict[dsName][0]
+                if dates in dsPath1:
+                    slcPathDict[dsName] = dsPath1
                 else:
-                    print('WARNING: {} file missing for pair {}'.format(dsName, dates))
+                    dsPath2 = [i for i in dsPathDict[dsName] if dates in i]
+                    if len(dsPath2) > 0:
+                        slcPathDict[dsName] = dsPath2[0]
+                    else:
+                        print('WARNING: {} file missing for image {}'.format(dsName, dates))
 
-        slcObj = slcDict(dates=dates, datasetDict=slcPathDict)
-        pairsDict[dates] = slcObj
+            slcObj = slcDict(dates=dates, datasetDict=slcPathDict)
+            pairsDict[dates] = slcObj
 
     if len(pairsDict) > 0:
         stackObj = slcStackDict(pairsDict=pairsDict)

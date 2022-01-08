@@ -26,13 +26,13 @@ as_logger.setLevel(logging.WARNING)
 
 # expose the following modules
 __all__ = [
-    'load_slc',
+    'load_slc_geometry',
     'generate_ifgram',
     'generate_unwrap_mask',
     'phase_inversion',
     'load_ifgram',
     'unwrap_ifgram',
-    'phase_to_range',
+    'network_inversion',
     'find_short_baselines',
     'version',
 ]

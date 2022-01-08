@@ -998,6 +998,7 @@ def get_latest_template_minopy(work_dir):
     """
     lfile = os.path.join(os.path.dirname(__file__), '../defaults/minopyApp.cfg')  # latest version
     cfile = os.path.join(work_dir, 'minopyApp.cfg')  # current version
+
     if not os.path.isfile(cfile):
         print('copy default template file {} to work directory'.format(lfile))
         shutil.copy2(lfile, work_dir)
@@ -1081,12 +1082,12 @@ def read_initial_info(work_dir, templateFile):
 
         Parser_LoadSlc = MinoPyParser(scp_args.split(), script='load_slc')
         inps_loadSlc = Parser_LoadSlc.parse()
-        iDict = minopy.load_slc.read_inps2dict(inps_loadSlc)
-        minopy.load_slc.prepare_metadata(iDict)
-        metadata = minopy.load_slc.read_subset_box(iDict)
+        iDict = minopy.load_slc_geometry.read_inps2dict(inps_loadSlc)
+        minopy.load_slc_geometry.prepare_metadata(iDict)
+        metadata = minopy.load_slc_geometry.read_subset_box(iDict)
         box = metadata['box']
         num_pixels = (box[2] - box[0]) * (box[3] - box[1])
-        stackObj = minopy.load_slc.read_inps_dict2slc_stack_dict_object(iDict)
+        stackObj = minopy.load_slc_geometry.read_inps_dict2slc_stack_dict_object(iDict)
         date_list = stackObj.get_date_list()
 
     return date_list, num_pixels, metadata

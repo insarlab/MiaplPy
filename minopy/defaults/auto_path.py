@@ -22,8 +22,8 @@ minopy.load.metaFile       = ${PROJECT_DIR}/reference/IW*.xml
 minopy.load.baselineDir    = ${PROJECT_DIR}/baselines
 
 minopy.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc.full
-minopy.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.unw
-minopy.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.cor
+minopy.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/fi*.unw
+minopy.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/fi*.cor
 minopy.load.connCompFile   = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*.unw.conncomp
 minopy.load.ionoFile       = None
 minopy.load.intFile        = None 
@@ -45,9 +45,9 @@ minopy.load.metaFile       = ${referenceShelve}/referenceShelve/data.dat
 minopy.load.baselineDir    = ${PROJECT_DIR}/baselines
 
 minopy.load.slcFile        = ${PROJECT_DIR}/merged/SLC/*/*.slc
-minopy.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.unw
-minopy.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*fine*.cor
-minopy.load.connCompFile   = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*.conncomp
+minopy.load.unwFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/fi*.unw
+minopy.load.corFile        = ${WORK_DIR}/inverted/interferograms_${int_type}/*/fi*.cor
+minopy.load.connCompFile   = ${WORK_DIR}/inverted/interferograms_${int_type}/*/*.unw.conncomp
 minopy.load.ionoFile       = None
 minopy.load.intFile        = None 
 
