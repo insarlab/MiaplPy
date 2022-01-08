@@ -17,6 +17,7 @@ gdal
 isce2
 cython
 setuptools
+pulp
 # pyaps dependencies
 cdsapi
 ecCodes
