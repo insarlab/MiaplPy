@@ -82,9 +82,12 @@ class MinoPyParser:
 
         inps.project_dir = os.path.abspath(inps.project_dir)
         inps.PROJECT_NAME = os.path.basename(inps.project_dir)
-        #inps.work_dir = os.path.join(inps.project_dir, 'minopy')
-        if inps.work_dir == 'minopy':
-            inps.work_dir = os.path.abspath(os.path.join(inps.project_dir, inps.work_dir))
+
+        if inps.work_dir is None:
+            inps.work_dir = os.path.abspath(os.path.join(inps.project_dir, 'minopy'))
+        else:
+            inps.work_dir = os.path.abspath(inps.work_dir)
+
         os.makedirs(inps.work_dir, exist_ok=True)
         inps.out_dir = os.path.join(inps.work_dir, 'inputs')
         os.makedirs(inps.out_dir, exist_ok=True)
@@ -176,19 +179,12 @@ class MinoPyParser:
             print('Run routine processing with {} on steps: {}'.format(os.path.basename(__file__), inps.run_steps))
             print('Remaining steps: {}'.format(self.STEP_LIST[idx0 + 1:]))
 
-        if not inps.generate_template:
+        if inps.workDir is None:
             if inps.customTemplateFile:
                 path1 = os.path.dirname(inps.customTemplateFile)
-                path2 = path1 + '/minopy'
+                inps.workDir = path1 + '/minopy'
             else:
-                path1 = os.path.dirname(inps.templateFile)
-                path2 = path1
-
-            if not inps.workDir:
-                if path1.endswith('minopy'):
-                    inps.workDir = path1
-                else:
-                    inps.workDir = path2
+                inps.workDir = os.path.dirname(inps.templateFile)
 
         inps.workDir = os.path.abspath(inps.workDir)
 
@@ -261,7 +257,7 @@ class MinoPyParser:
 
         parser.add_argument('-pj', '--project_dir', type=str, dest='project_dir',
                             help='Project directory of SLC dataset to read from')
-        parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', default='minopy',
+        parser.add_argument('-d', '--work_dir', dest='work_dir', default=None,
                             help='Working directory of minopy (default ./minopy)')
         parser.add_argument('-pr', '--processor', type=str, dest='processor',
                             choices={'isce', 'gamma', 'roipac'},
@@ -445,8 +441,8 @@ class MinoPyParser:
         parser.add_argument('customTemplateFile', nargs='?',
                             help='Custom template with option settings.\n' +
                                  "ignored if the default minopyApp.cfg is input.")
-        parser.add_argument('--dir', '--work-dir', dest='workDir', default='./',
-                        help='Work directory, (default: %(default)s).')
+        parser.add_argument('--dir', '--work-dir', dest='workDir', default=None,
+                            help='Work directory, (default: %(default)s).')
 
         parser.add_argument('-g', dest='generate_template', action='store_true',
                             help='Generate default template (if it does not exist) and exit.')

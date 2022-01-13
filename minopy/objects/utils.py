@@ -13,7 +13,7 @@ import datetime
 import re
 import numpy as np
 from minopy.objects.arg_parser import MinoPyParser
-from mintpy.utils import readfile
+from mintpy.utils import readfile, ptime, utils as ut
 from mintpy.objects import (
     datasetUnitDict,
     geometry,
@@ -26,6 +26,26 @@ from mintpy.objects import (
     timeseries,
     HDFEOS
 )
+
+
+datasetName2templateKey = {'slc': 'minopy.load.slcFile',
+                               'unwrapPhase': 'minopy.load.unwFile',
+                               'coherence': 'minopy.load.corFile',
+                               'connectComponent': 'minopy.load.connCompFile',
+                               'wrapPhase': 'minopy.load.intFile',
+                               'iono': 'minopy.load.ionoFile',
+                               'height': 'minopy.load.demFile',
+                               'latitude': 'minopy.load.lookupYFile',
+                               'longitude': 'minopy.load.lookupXFile',
+                               'azimuthCoord': 'minopy.load.lookupYFile',
+                               'rangeCoord': 'minopy.load.lookupXFile',
+                               'incidenceAngle': 'minopy.load.incAngleFile',
+                               'azimuthAngle': 'minopy.load.azAngleFile',
+                               'shadowMask': 'minopy.load.shadowMaskFile',
+                               'waterMask': 'minopy.load.waterMaskFile',
+                               'bperp': 'minopy.load.bperpFile'
+                               }
+
 
 
 class OutControl:
@@ -1040,6 +1060,112 @@ def get_latest_template_minopy(work_dir):
             #os.system(mvCmd)
     return cfile
 
+def read_subset_template2box(template_file):
+    """Read minopy.subset.lalo/yx option from template file into box type
+    Return None if not specified.
+    (Modified from mintpy.subsets)
+    """
+    tmpl = readfile.read_template(template_file)
+    # subset.lalo -> geo_box
+    try:
+        opts = [i.strip().replace('[','').replace(']','') for i in tmpl['minopy.subset.lalo'].split(',')]
+        lat0, lat1 = sorted([float(i.strip()) for i in opts[0].split(':')])
+        lon0, lon1 = sorted([float(i.strip()) for i in opts[1].split(':')])
+        geo_box = (lon0, lat1, lon1, lat0)
+    except:
+        geo_box = None
+
+    # subset.yx -> pix_box
+    try:
+        opts = [i.strip().replace('[','').replace(']','') for i in tmpl['minopy.subset.yx'].split(',')]
+        y0, y1 = sorted([int(i.strip()) for i in opts[0].split(':')])
+        x0, x1 = sorted([int(i.strip()) for i in opts[1].split(':')])
+        pix_box = (x0, y0, x1, y1)
+    except:
+        pix_box = None
+
+    return pix_box, geo_box
+
+
+def read_subset_box(inpsDict):
+    import mintpy.load_data as mld
+
+    # Read subset info from template
+    inpsDict['box'] = None
+    inpsDict['box4geo_lut'] = None
+
+    pix_box, geo_box = read_subset_template2box(inpsDict['template_file'][0])
+
+    # Grab required info to read input geo_box into pix_box
+
+    try:
+        lookupFile = [glob.glob(str(inpsDict['minopy.load.lookupYFile'] + '.xml'))[0],
+                      glob.glob(str(inpsDict['minopy.load.lookupXFile'] + '.xml'))[0]]
+        lookupFile = [x.split('.xml')[0] for x in lookupFile]
+    except:
+        lookupFile = None
+
+    try:
+
+        pathKey = [i for i in datasetName2templateKey.values()
+                   if i in inpsDict.keys()][0]
+
+        file = glob.glob(str(inpsDict[pathKey] + '.xml'))[0]
+        atr = read_attribute(file.split('.xml')[0], metafile_ext='.rsc')
+    except:
+        atr = dict()
+    geocoded = None
+    if 'Y_FIRST' in atr.keys():
+        geocoded = True
+    else:
+        geocoded = False
+
+    # Check conflict
+    if geo_box and not geocoded and lookupFile is None:
+        geo_box = None
+        print(('WARNING: mintpy.subset.lalo is not supported'
+               ' if 1) no lookup file AND'
+               '    2) radar/unkonwn coded dataset'))
+        print('\tignore it and continue.')
+
+    if not geo_box and not pix_box:
+        # adjust for the size inconsistency problem in SNAP geocoded products
+        # ONLY IF there is no input subset
+        # Use the min bbox if files size are different
+        if inpsDict['processor'] == 'snap':
+            fnames = ut.get_file_list(inpsDict['minopy.load.slcFile'])
+            pix_box = mld.update_box4files_with_inconsistent_size(fnames)
+
+        #if not pix_box:
+        #    return inpsDict
+
+    # geo_box --> pix_box
+    coord = coord_rev(atr, lookup_file=lookupFile)
+    if geo_box is not None:
+        pix_box = coord.bbox_geo2radar(geo_box)
+        pix_box = coord.check_box_within_data_coverage(pix_box)
+        print('input bounding box of interest in lalo: {}'.format(geo_box))
+    print('box to read for datasets in y/x: {}'.format(pix_box))
+
+    # Get box for geocoded lookup table (for gamma/roipac)
+    box4geo_lut = None
+    if lookupFile is not None:
+        atrLut = read_attribute(lookupFile[0], metafile_ext='.xml')
+        if not geocoded and 'Y_FIRST' in atrLut.keys():
+            geo_box = coord.bbox_radar2geo(pix_box)
+            box4geo_lut = ut.coordinate(atrLut).bbox_geo2radar(geo_box)
+            print('box to read for geocoded lookup file in y/x: {}'.format(box4geo_lut))
+
+    if pix_box in [None, 'None'] and 'WIDTH' in atr:
+        pix_box = (0, 0, int(atr['WIDTH']), int(atr['LENGTH']))
+
+    for key in atr:
+        if not key in inpsDict or inpsDict[key] in [None, 'NONE']:
+            inpsDict[key] = atr[key]
+
+    inpsDict['box'] = pix_box
+    inpsDict['box4geo_lut'] = box4geo_lut
+    return inpsDict
 
 
 def update_or_skip_inversion(inverted_date_list, slc_dates):
@@ -1078,19 +1204,127 @@ def read_initial_info(work_dir, templateFile):
         num_pixels = int(metadata['LENGTH']) * int(metadata['WIDTH'])
     else:
         scp_args = '--template {}'.format(templateFile)
-        scp_args += ' --project_dir {}'.format(os.path.dirname(work_dir))
+        scp_args += ' --project_dir {} --work_dir {}'.format(os.path.dirname(work_dir), work_dir)
 
         Parser_LoadSlc = MinoPyParser(scp_args.split(), script='load_slc')
         inps_loadSlc = Parser_LoadSlc.parse()
-        iDict = minopy.load_slc_geometry.read_inps2dict(inps_loadSlc)
-        minopy.load_slc_geometry.prepare_metadata(iDict)
-        metadata = minopy.load_slc_geometry.read_subset_box(iDict)
+        iDict = read_inps2dict(inps_loadSlc)
+        prepare_metadata(iDict)
+        metadata = read_subset_box(iDict)
         box = metadata['box']
         num_pixels = (box[2] - box[0]) * (box[3] - box[1])
-        stackObj = minopy.load_slc_geometry.read_inps_dict2slc_stack_dict_object(iDict)
+        stackObj = read_inps_dict2slc_stack_dict_object(iDict)
         date_list = stackObj.get_date_list()
 
     return date_list, num_pixels, metadata
+
+
+def read_inps2dict(inps):
+    """Read input Namespace object info into inpsDict"""
+
+    from minopy.defaults import auto_path
+    from mintpy.objects import sensor
+
+    # Read input info into inpsDict
+    inpsDict = vars(inps)
+    inpsDict['PLATFORM'] = None
+    auto_template = os.path.join(os.path.dirname(__file__), '../defaults/minopyApp_auto.cfg')
+
+    # Read template file
+    template = {}
+    for fname in inps.template_file:
+        temp = readfile.read_template(fname)
+        temp = check_template_auto_value(temp, auto_file=auto_template)
+        template.update(temp)
+    for key, value in template.items():
+        inpsDict[key] = value
+    if 'processor' in template.keys():
+        template['minopy.load.processor'] = template['processor']
+
+    prefix = 'minopy.load.'
+    key_list = [i.split(prefix)[1] for i in template.keys() if i.startswith(prefix)]
+    for key in key_list:
+        value = template[prefix + key]
+        if key in ['processor', 'updateMode', 'compression', 'autoPath']:
+            inpsDict[key] = template[prefix + key]
+        elif key in ['xstep', 'ystep']:
+            inpsDict[key] = int(template[prefix + key])
+        elif value:
+            inpsDict[prefix + key] = template[prefix + key]
+
+    if not 'compression' in inpsDict or inpsDict['compression'] == False:
+        inpsDict['compression'] = None
+
+    inpsDict['xstep'] = inpsDict.get('xstep', 1)
+    inpsDict['ystep'] = inpsDict.get('ystep', 1)
+
+    # PROJECT_NAME --> PLATFORM
+    if not 'PROJECT_NAME' in inpsDict:
+        cfile = [i for i in list(inps.template_file) if os.path.basename(i) != 'minopyApp.cfg']
+        inpsDict['PROJECT_NAME'] = sensor.project_name2sensor_name(cfile)[1]
+
+    inpsDict['PLATFORM'] = str(sensor.project_name2sensor_name(str(inpsDict['PROJECT_NAME']))[0])
+    if inpsDict['PLATFORM']:
+        print('SAR platform/sensor : {}'.format(inpsDict['PLATFORM']))
+    print('processor: {}'.format(inpsDict['processor']))
+
+    # Here to insert code to check default file path for miami user
+    #work_dir = os.path.dirname(os.path.dirname(inpsDict['outfile']))
+    if inpsDict.get('autoPath', False):
+        print(('check auto path setting for Univ of Miami users'
+               ' for processor: {}'.format(inpsDict['processor'])))
+        inpsDict = auto_path.get_auto_path(processor=inpsDict['processor'],
+                                           work_dir=inps.work_dir,
+                                           template=inpsDict)
+
+    reference_dir = os.path.dirname(inpsDict['minopy.load.metaFile'])
+    out_reference = inps.work_dir + '/inputs/reference'
+    if not os.path.exists(out_reference):
+        shutil.copytree(reference_dir, out_reference)
+
+    baseline_dir = os.path.abspath(inpsDict['minopy.load.baselineDir'])
+    out_baseline = inps.work_dir + '/inputs/baselines'
+    if not os.path.exists(out_baseline):
+        shutil.copytree(baseline_dir, out_baseline)
+
+    return inpsDict
+
+
+def prepare_metadata(inpsDict):
+    import warnings
+    processor = inpsDict['processor']
+    script_name = 'prep_slc_{}.py'.format(processor)
+    print('-' * 50)
+    print('prepare metadata files for {} products'.format(processor))
+    if processor in ['gamma', 'roipac', 'snap']:
+        for key in [i for i in inpsDict.keys() if (i.startswith('minopy.load.') and i.endswith('File'))]:
+            if len(glob.glob(str(inpsDict[key]))) > 0:
+                cmd = '{} {}'.format(script_name, inpsDict[key])
+                print(cmd)
+                os.system(cmd)
+
+    elif processor == 'isce':
+
+        slc_dir = os.path.dirname(os.path.dirname(inpsDict['minopy.load.slcFile']))
+        slc_file = os.path.basename(inpsDict['minopy.load.slcFile'])
+        meta_files = sorted(glob.glob(inpsDict['minopy.load.metaFile']))
+        if len(meta_files) < 1:
+            warnings.warn('No input metadata file found: {}'.format(inpsDict['minopy.load.metaFile']))
+        try:
+            meta_file = meta_files[0]
+            baseline_dir = inpsDict['minopy.load.baselineDir']
+            geom_dir = os.path.dirname(inpsDict['minopy.load.demFile'])
+            cmd = '{s} -s {i} -f {f} -m {m} -b {b} -g {g}'.format(s=script_name,
+                                                                  i=slc_dir,
+                                                                  f=slc_file,
+                                                                  m=meta_file,
+                                                                  b=baseline_dir,
+                                                                  g=geom_dir)
+            print(cmd)
+            os.system(cmd)
+        except:
+            pass
+    return
 
 
 def multilook(infile, outfile, rlks, alks, multilook_tool='gdal'):
@@ -1170,3 +1404,156 @@ def cov2corr(cov_matrix):
     corr_matrix = np.matmul(y, np.transpose(D))
 
     return corr_matrix
+
+
+def read_inps_dict2slc_stack_dict_object(inpsDict):
+    """Read input arguments into dict of slcStackDict object"""
+    # inpsDict --> dsPathDict
+    print('-' * 50)
+    print('searching slcs info')
+    print('input data files:')
+
+    from minopy.objects.slcStack import (slcDatasetNames,
+                                         slcStackDict,
+                                         slcDict)
+
+    maxDigit = max([len(i) for i in list(datasetName2templateKey.keys())])
+    dsPathDict = {}
+    for dsName in [i for i in slcDatasetNames
+                   if i in datasetName2templateKey.keys()]:
+        key = datasetName2templateKey[dsName]
+        if key in inpsDict.keys():
+            files = sorted(glob.glob(str(inpsDict[key] + '.xml')))
+            if len(files) > 0:
+                dsPathDict[dsName] = files
+                print('{:<{width}}: {path}'.format(dsName,
+                                                   width=maxDigit,
+                                                   path=inpsDict[key]))
+
+    # Check 1: required dataset
+    dsName0 = 'slc'
+    if dsName0 not in dsPathDict.keys():
+        print('WARNING: No reqired {} data files found!'.format(dsName0))
+        return None
+
+    # Check 2: data dimension for slc files
+    dsPathDict = skip_files_with_inconsistent_size(dsPathDict,
+                                                   pix_box=inpsDict['box'],
+                                                   dsName=dsName0)
+
+    # Check 3: number of files for all dataset types
+    # dsPathDict --> dsNumDict
+    dsNumDict = {}
+    for key in dsPathDict.keys():
+        num_file = len(dsPathDict[key])
+        dsNumDict[key] = num_file
+        print('number of {:<{width}}: {num}'.format(key, width=maxDigit, num=num_file))
+
+    dsNumList = list(dsNumDict.values())
+    if any(i != dsNumList[0] for i in dsNumList):
+        msg = 'WARNING: NOT all types of dataset have the same number of files.'
+        msg += ' -> skip interferograms with missing files and continue.'
+        print(msg)
+        # raise Exception(msg)
+
+    if not inpsDict['minopy.load.startDate'] in [None, 'None']:
+        start_date = datetime.datetime.strptime(inpsDict['minopy.load.startDate'], '%Y%m%d')
+    else:
+        start_date = None
+    if not inpsDict['minopy.load.endDate'] in [None, 'None']:
+        end_date = datetime.datetime.strptime(inpsDict['minopy.load.endDate'], '%Y%m%d')
+    else:
+        end_date = None
+
+    # dsPathDict --> pairsDict --> stackObj
+    dsNameList = list(dsPathDict.keys())
+    pairsDict = {}
+
+    for dsPath in dsPathDict[dsName0]:
+        dates = ptime.yyyymmdd(read_attribute(dsPath.split('.xml')[0], metafile_ext='.rsc')['DATE'])
+        date_val = datetime.datetime.strptime(dates, '%Y%m%d')
+        include_date = True
+        if not start_date is None and start_date > date_val:
+            include_date = False
+        if not end_date is None and end_date < date_val:
+            include_date = False
+
+        if include_date:
+            #####################################
+            # A dictionary of data files for a given pair.
+            # One pair may have several types of dataset.
+            # example slcPathDict = {'slc': /pathToFile/*.slc.full}
+            # All path of data file must contain the reference and secondary date, either in file name or folder name.
+            slcPathDict = {}
+            for i in range(len(dsNameList)):
+                dsName = dsNameList[i]
+                dsPath1 = dsPathDict[dsName][0]
+                if dates in dsPath1:
+                    slcPathDict[dsName] = dsPath1
+                else:
+                    dsPath2 = [i for i in dsPathDict[dsName] if dates in i]
+                    if len(dsPath2) > 0:
+                        slcPathDict[dsName] = dsPath2[0]
+                    else:
+                        print('WARNING: {} file missing for image {}'.format(dsName, dates))
+
+            slcObj = slcDict(dates=dates, datasetDict=slcPathDict)
+            pairsDict[dates] = slcObj
+
+    if len(pairsDict) > 0:
+        stackObj = slcStackDict(pairsDict=pairsDict)
+    else:
+        stackObj = None
+    return stackObj
+
+
+
+def skip_files_with_inconsistent_size(dsPathDict, pix_box=None, dsName='slc'):
+    """Skip files by removing the file path from the input dsPathDict."""
+    atr_list = [read_attribute(fname.split('.xml')[0], metafile_ext='.xml') for fname in dsPathDict[dsName]]
+    length_list = [int(atr['LENGTH']) for atr in atr_list]
+    width_list = [int(atr['WIDTH']) for atr in atr_list]
+
+    # Check size requirements
+    drop_inconsistent_files = False
+    if any(len(set(size_list)) > 1 for size_list in [length_list, width_list]):
+        if pix_box is None:
+            drop_inconsistent_files = True
+        else:
+            # if input subset is within the min file sizes: do NOT drop
+            max_box_width, max_box_length = pix_box[2:4]
+            if max_box_length > min(length_list) or max_box_width > min(width_list):
+                drop_inconsistent_files = True
+
+    # update dsPathDict
+    if drop_inconsistent_files:
+        common_length = ut.most_common(length_list)
+        common_width = ut.most_common(width_list)
+
+        # print out warning message
+        msg = '\n' + '*' * 80
+        msg += '\nWARNING: NOT all input unwrapped interferograms have the same row/column number!'
+        msg += '\nThe most common size is: ({}, {})'.format(common_length, common_width)
+        msg += '\n' + '-' * 30
+        msg += '\nThe following dates have different size:'
+
+        dsNames = list(dsPathDict.keys())
+        date_list = [atr['DATE'] for atr in atr_list]
+        for i in range(len(date_list)):
+            if length_list[i] != common_length or width_list[i] != common_width:
+                date = date_list[i]
+                dates = ptime.yyyymmdd(date)
+                # update file list for all datasets
+                for dsName in dsNames:
+                    fnames = [i for i in dsPathDict[dsName]
+                              if all(d[2:8] in i for d in dates)]
+                    if len(fnames) > 0:
+                        dsPathDict[dsName].remove(fnames[0])
+                msg += '\n\t{}\t({}, {})'.format(date, length_list[i], width_list[i])
+
+        msg += '\n' + '-' * 30
+        msg += '\nSkip loading the interferograms above.'
+        msg += '\nContinue to load the rest interferograms.'
+        msg += '\n' + '*' * 80 + '\n'
+        print(msg)
+    return dsPathDict

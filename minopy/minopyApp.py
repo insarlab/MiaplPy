@@ -104,18 +104,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.templateFile_mintpy = self.templateFile
         self.template_mintpy = self.template
 
-        network_inversion_options = {}
-        update_flag = False
-        if self.customTemplateFile:
-            if not 'mintpy.networkInversion.weightFunc' in self.customTemplate:
-                self.customTemplate['mintpy.networkInversion.weightFunc'] = 'no'
-                update_flag = True
-            if not 'mintpy.networkInversion.minNormVelocity' in self.customTemplate:
-                self.customTemplate['mintpy.networkInversion.minNormVelocity'] = 'no'
-                update_flag = True
-            if update_flag:
-                self.templateFile_mintpy = ut.update_template_file(self.templateFile_mintpy, self.customTemplate)
-
         # Read minopy templates and add to mintpy template
         # 1. Get default template file
         self.templateFile = get_latest_template_minopy(self.workDir)
