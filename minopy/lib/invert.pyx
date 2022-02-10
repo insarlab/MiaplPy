@@ -44,11 +44,6 @@ cdef void write_hdf5_block_3D(object fhandle, float[:, :, ::1] data, bytes datas
     fhandle[datasetName.decode('UTF-8')][block[0]:block[1], block[2]:block[3], block[4]:block[5]] = data
     return
 
-cdef void write_hdf5_block_2D_float(object fhandle, float[:, ::1] data, bytes datasetName, list block):
-
-    fhandle[datasetName.decode('UTF-8')][block[0]:block[1], block[2]:block[3]] = data
-    return
-
 cdef void write_hdf5_block_2D_int(object fhandle, int[:, ::1] data, bytes datasetName, list block):
 
     fhandle[datasetName.decode('UTF-8')][block[0]:block[1], block[2]:block[3]] = data
@@ -209,7 +204,6 @@ cdef class CPhaseLink:
 
                 RSLC['temporalCoherence'][:, :, :] = -1
 
-
                 # 1D dataset containing dates of all images
                 data = np.array(self.all_date_list, dtype=np.string_)
                 RSLC.create_dataset('date', data=data)
@@ -286,11 +280,12 @@ cdef class CPhaseLink:
     def unpatch(self):
         cdef list block
         cdef object fhandle, psf
-        cdef int index
+        cdef int index, box_length, box_width
         cdef cnp.ndarray[int, ndim=1] box
         cdef bytes patch_dir
         cdef float complex[:, :, ::1] rslc_ref
-        cdef cnp.ndarray[float, ndim=3] temp_coh
+        cdef cnp.ndarray[float, ndim=3] temp_coh, ps_prod, eig_values = np.zeros((3, self.length, self.width), dtype=np.float32)
+        cdef cnp.ndarray[float, ndim=2] amp_disp = np.zeros((self.length, self.width), dtype=np.float32)
 
         if os.path.exists(self.RSLCfile.decode('UTF-8')):
             print('Deleting old phase_series.h5 ...')
@@ -307,11 +302,15 @@ cdef class CPhaseLink:
         with h5py.File(self.RSLCfile.decode('UTF-8'), 'a') as fhandle:
             
             for index, box in enumerate(self.box_list):
+                box_width = box[2] - box[0]
+                box_length = box[3] - box[1]
+
                 patch_dir = self.out_dir + ('/PATCHES/PATCH_{:04.0f}'.format(index)).encode('UTF-8')
                 rslc_ref = np.load(patch_dir.decode('UTF-8') + '/phase_ref.npy', allow_pickle=True)
                 temp_coh = np.load(patch_dir.decode('UTF-8') + '/tempCoh.npy', allow_pickle=True)
                 shp = np.load(patch_dir.decode('UTF-8') + '/shp.npy', allow_pickle=True)
                 mask_ps = np.load(patch_dir.decode('UTF-8') + '/mask_ps.npy', allow_pickle=True)
+                ps_prod = np.load(patch_dir.decode('UTF-8') + '/ps_products.npy', allow_pickle=True)
 
                 temp_coh[temp_coh<0] = 0
 
@@ -327,27 +326,43 @@ cdef class CPhaseLink:
                 # SHP - 2D
                 block = [box[1], box[3], box[0], box[2]]
                 write_hdf5_block_2D_int(fhandle, shp, b'shp', block)
+                amp_disp[block[0]:block[1], block[2]:block[3]] = ps_prod[0, :, :]
 
-                # temporal coherence - 2D
+                # temporal coherence - 3D
                 block = [0, 2, box[1], box[3], box[0], box[2]]
                 write_hdf5_block_3D(fhandle, temp_coh, b'temporalCoherence', block)
+                eig_values[0:3, block[2]:block[3], block[4]:block[5]] = ps_prod[1:4, :, :]
 
-            
-            print('write shp file')
-            shp_file = self.work_dir + b'/shp'
-
-            if not os.path.exists(shp_file.decode('UTF-8')):
-                shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='write', dtype='int16',
+            print('write amplitude dispersion and top eigen values')
+            amp_disp_file = self.out_dir + b'/amp_dipersion_index'
+            if not os.path.exists(amp_disp_file.decode('UTF-8')):
+                amp_disp_memmap = np.memmap(amp_disp_file.decode('UTF-8'), mode='write', dtype='float32',
                                            shape=(self.length, self.width))
-                IML.renderISCEXML(shp_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
-                                  datatype='int16', scheme='BIL')
+                IML.renderISCEXML(amp_disp_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
+                                  datatype='float32', scheme='BIL')
             else:
-                shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='r+', dtype='int16',
+                amp_disp_memmap = np.memmap(amp_disp_file.decode('UTF-8'), mode='r+', dtype='float32',
                                            shape=(self.length, self.width))
 
-            shp_memmap[:, :] = fhandle['shp'][:, :]
-            shp_memmap = None
+            amp_disp_memmap[:, :] = amp_disp[:, :]
+            amp_disp_memmap = None
 
+            top_eig_files = self.out_dir + b'/top_eigenvalues'
+            if not os.path.exists(top_eig_files.decode('UTF-8')):
+                top_eig_memmap = np.memmap(top_eig_files.decode('UTF-8'), mode='write', dtype='float32',
+                                           shape=(3, self.length, self.width))
+                IML.renderISCEXML(top_eig_files.decode('UTF-8'), bands=3, nyy=self.length, nxx=self.width,
+                                  datatype='float32', scheme='BSQ')
+            else:
+                top_eig_memmap = np.memmap(top_eig_files.decode('UTF-8'), mode='r+', dtype='float32',
+                                           shape=(3, self.length, self.width))
+
+            print(top_eig_memmap.shape, np.array(eig_values).shape)
+            top_eig_memmap[0:3, :, :] = eig_values[:, :, :]
+            #top_eig_memmap[2, :, :] = eig_values[1, :, :]/eig_values[0, :, :]
+            rr, cc, kk = np.where(np.isnan(top_eig_memmap))
+            top_eig_memmap[:, rr, cc] = np.nan
+            top_eig_memmap = None
 
             print('write averaged temporal coherence file from mini stacks')
             temp_coh_file = self.out_dir + b'/tempCoh_average'

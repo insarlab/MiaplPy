@@ -204,7 +204,7 @@ class slcStackDict:
         self.get_metadata()
         if extra_metadata:
             self.metadata.update(extra_metadata)
-            print('add extra metadata: {}'.format(extra_metadata))
+            #print('add extra metadata: {}'.format(extra_metadata))
         self.metadata = attr.update_attribute4subset(self.metadata, box)
 
         # update metadata due to multilook

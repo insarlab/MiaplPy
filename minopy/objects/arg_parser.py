@@ -31,8 +31,8 @@ class MinoPyParser:
 
         if self.script == 'load_slc':
             self.parser = self.load_slc_parser()
-        elif self.script == 'phase_inversion':
-            self.parser = self.phase_inversion_parser()
+        elif self.script == 'phase_linking':
+            self.parser = self.phase_linking_parser()
         elif self.script == 'generate_interferograms':
             self.parser = self.generate_interferograms_parser()
         elif self.script == 'generate_mask':
@@ -41,7 +41,7 @@ class MinoPyParser:
             self.parser = self.unwrap_parser()
         elif self.script == 'generate_temporal_coherence':
             self.parser = self.generate_temporal_coherence_parser()
-        elif self.script == 'network_inversion':
+        elif self.script == 'invert_network':
             self.parser = self.network_inversion_parser()
         elif self.script == 'minopy_app':
             self.parser, self.STEP_LIST, EXAMPLE = self.minopy_app_parser()
@@ -277,7 +277,7 @@ class MinoPyParser:
                             help='Output HDF5 file')
         return parser
 
-    def phase_inversion_parser(self):
+    def phase_linking_parser(self):
         parser = self.parser
         patch = parser.add_argument_group('Phase inversion option')
         patch.add_argument('-w', '--work_dir', type=str, dest='work_dir', help='Working directory (minopy)')
@@ -389,6 +389,9 @@ class MinoPyParser:
         parser = argparse.ArgumentParser(description='Convert phase to range time series')
         parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', required=True,
                             help='Working directory (minopy)')
+        parser.add_argument('--shadow_mask', dest='shadow_mask', action='store_true',
+                            help='use shadow mask to mask final results')
+
         return parser
 
     @staticmethod
@@ -398,6 +401,8 @@ class MinoPyParser:
                             help='Working directory (minopy)')
         parser.add_argument('-t', '--template', dest='template_file', type=str, default=None,
                             help='template file (default: smallbaselineApp.cfg)')
+        parser.add_argument('--shadow_mask', dest='shadow_mask', action='store_true',
+                            help='use shadow mask to mask final results')
 
         return parser
 
@@ -405,14 +410,14 @@ class MinoPyParser:
     def minopy_app_parser():
 
         STEP_LIST = [
-            'load_slc_geometry',
-            'phase_inversion',
+            'load_data',
+            'phase_linking',
             'concatenate_patch',
             'generate_ifgram',
             'unwrap_ifgram',
             'load_ifgram',
             'ifgram_correction',
-            'network_inversion',
+            'invert_network',
             'timeseries_correction']
 
 
@@ -430,8 +435,8 @@ class MinoPyParser:
               minopyApp.py  -h / --help                       # help 
               minopyApp.py  -H                                # print    default template options
               # Run with --start/stop/step options
-              minopyApp.py PichinchaSenDT142.template --dostep  load_slc       # run the step 'download' only
-              minopyApp.py PichinchaSenDT142.template --start load_slc         # start from the step 'download' 
+              minopyApp.py PichinchaSenDT142.template --dostep  load_data       # run the step 'download' only
+              minopyApp.py PichinchaSenDT142.template --start load_data         # start from the step 'download' 
               minopyApp.py PichinchaSenDT142.template --stop  unwrap_ifgram    # end after step 'interferogram'
               """
         parser = argparse.ArgumentParser(description='Routine Time Series Analysis for MiNoPy',

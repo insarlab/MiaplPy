@@ -218,9 +218,9 @@ class geometryDict(GDict):
             # Calculate data
             data = None
             if dsName == 'incidenceAngle':
-                data = self.get_incidence_angle(box=box)
+                data = self.get_incidence_angle(box=box, xstep=xstep, ystep=ystep)
             elif dsName == 'slantRangeDistance':
-                data = self.get_slant_range_distance(box=box)
+                data = self.get_slant_range_distance(box=box, xstep=xstep, ystep=ystep)
 
             # Write dataset
             if data is not None:
@@ -244,7 +244,7 @@ class geometryDict(GDict):
         self.get_metadata()
         if extra_metadata:
             self.metadata.update(extra_metadata)
-            print('add extra metadata: {}'.format(extra_metadata))
+            #print('add extra metadata: {}'.format(extra_metadata))
         self.metadata = attr.update_attribute4subset(self.metadata, box)
         self.metadata['FILE_TYPE'] = self.name
         for key, value in self.metadata.items():

@@ -70,84 +70,59 @@ def main(iargs=None):
         return
 
     iDict = mut.read_subset_box(iDict)
+    #iDict = mld.read_subset_box(iDict)
 
     extraDict = mld.get_extra_metadata(iDict)
 
     # initiate objects
     stackObj = mut.read_inps_dict2slc_stack_dict_object(iDict)
-    
+
+    iDict['ds_name2key'] = datasetName2templateKey
     geomRadarObj, geomGeoObj = read_inps_dict2geometry_dict_object(iDict)
 
     # prepare write
-    updateMode, comp, box, boxGeo, xyStep, xyStepGeo = mut.print_write_setting(iDict)
+    #updateMode, comp, box, boxGeo, xyStep, xyStepGeo = mut.print_write_setting(iDict)
+    updateMode, comp, box, boxGeo = mld.print_write_setting(iDict)
 
     if any([stackObj, geomRadarObj, geomGeoObj]) and not os.path.isdir(inps.out_dir):
         os.makedirs(inps.out_dir)
         print('create directory: {}'.format(inps.out_dir))
 
     # write
-    if stackObj and update_object(inps.out_file[0], stackObj, box, updateMode=updateMode):
+    if stackObj and mld.update_object(inps.out_file[0], stackObj, box, updateMode=updateMode,
+                                      xstep=iDict['xstep'], ystep=iDict['ystep']):
         print('-' * 50)
         stackObj.write2hdf5(outputFile=inps.out_file[0],
                             access_mode='a',
                             box=box,
-                            xstep=xyStep[0],
-                            ystep=xyStep[1],
+                            xstep=iDict['xstep'],
+                            ystep=iDict['ystep'],
                             compression=comp,
                             extra_metadata=extraDict)
 
-    if geomRadarObj and update_object(inps.out_file[1], geomRadarObj, box, updateMode=updateMode):
+    if geomRadarObj and mld.update_object(inps.out_file[1], geomRadarObj, box, updateMode=updateMode,
+                                          xstep=iDict['xstep'], ystep=iDict['ystep']):
         print('-' * 50)
         geomRadarObj.write2hdf5(outputFile=inps.out_file[1],
                                 access_mode='a',
                                 box=box,
-                                xstep=xyStep[0],
-                                ystep=xyStep[1],
+                                xstep=iDict['xstep'],
+                                ystep=iDict['ystep'],
                                 compression='lzf',
                                 extra_metadata=extraDict)
 
-    if geomGeoObj and update_object(inps.out_file[2], geomGeoObj, boxGeo, updateMode=updateMode):
+    if geomGeoObj and mld.update_object(inps.out_file[2], geomGeoObj, boxGeo, updateMode=updateMode,
+                                        xstep=iDict['xstep'], ystep=iDict['ystep']):
         print('-' * 50)
         geomGeoObj.write2hdf5(outputFile=inps.out_file[2],
                               access_mode='a',
                               box=boxGeo,
-                              xstep=xyStepGeo[0],
-                              ystep=xyStepGeo[1],
+                              xstep=iDict['xstep'],
+                              ystep=iDict['ystep'],
                               compression='lzf')
     return inps.out_file
 
 #################################################################
-
-
-def update_object(outFile, inObj, box, updateMode=True):
-    """Do not write h5 file if: 1) h5 exists and readable,
-                                2) it contains all date12 from slcStackDict,
-                                            or all datasets from geometryDict"""
-    write_flag = True
-    if updateMode and ut.run_or_skip(outFile, check_readable=True) == 'skip':
-        if inObj.name == 'slc':
-            in_size = inObj.get_size(box=box)[1:]
-            in_date_list = inObj.get_date_list()
-
-            outObj = slcStack(outFile)
-            out_size = outObj.get_size()[1:]
-            # out_date12_list = outObj.get_date12_list(dropIfgram=False)
-            out_date_list = outObj.get_date_list()
-
-            if out_size == in_size and set(in_date_list).issubset(set(out_date_list)):
-                print(('All date12   exists in file {} with same size as required,'
-                       ' no need to re-load.'.format(os.path.basename(outFile))))
-                write_flag = False
-
-        elif inObj.name == 'geometry':
-            outObj = geometry(outFile)
-            outObj.open(print_msg=False)
-            if (outObj.get_size() == inObj.get_size(box=box)
-                    and all(i in outObj.datasetNames for i in inObj.get_dataset_list())):
-                print(('All datasets exists in file {} with same size as required,'
-                       ' no need to re-load.'.format(os.path.basename(outFile))))
-                write_flag = False
-    return write_flag
 
 
 def read_inps_dict2geometry_dict_object(inpsDict):

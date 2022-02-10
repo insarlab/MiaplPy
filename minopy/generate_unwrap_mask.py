@@ -88,27 +88,8 @@ def main(iargs=None):
 
     writefile.write(mask, out_file=unwrap_mask, metadata=atr)
 
-    h5_mask = shadow_mask
-    if not inps.custom_mask in ['None', None]:
-        if os.path.exists(inps.custom_mask):
-            args_shm = '{} -m {} -o {} --fill 0'.format(shadow_mask,
-                                                        inps.custom_mask, h5_mask)
-            mintpy.mask.main(args_shm.split())
-
-    corr_file = os.path.join(minopy_dir, 'inverted/tempCoh_average')
-    mask_arg = ' {} -m {} --fill 0 -o {}'.format(corr_file,
-                                                 h5_mask,
-                                                 corr_file + '_msk')
-
-    mintpy.mask.main(mask_arg.split())
-
-    corr_file = os.path.join(minopy_dir, 'inverted/tempCoh_full')
-    mask_arg = ' {} -m {} --fill 0 -o {}'.format(corr_file,
-                                                 h5_mask,
-                                                 corr_file + '_msk')
-
-    mintpy.mask.main(mask_arg.split())
     plot_masks(minopy_dir)
+
 
     return
 

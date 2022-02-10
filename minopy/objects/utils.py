@@ -1066,9 +1066,13 @@ def read_subset_template2box(template_file):
     (Modified from mintpy.subsets)
     """
     tmpl = readfile.read_template(template_file)
+    keys = ['minopy.subset.lalo', 'mintpy.subset.lalo']
+    key_lalo = [key for key in keys if key in tmpl][0]
+    keys = ['minopy.subset.yx', 'mintpy.subset.yx']
+    key_yx = [key for key in keys if key in tmpl][0]
     # subset.lalo -> geo_box
     try:
-        opts = [i.strip().replace('[','').replace(']','') for i in tmpl['minopy.subset.lalo'].split(',')]
+        opts = [i.strip().replace('[','').replace(']','') for i in tmpl[key_lalo].split(',')]
         lat0, lat1 = sorted([float(i.strip()) for i in opts[0].split(':')])
         lon0, lon1 = sorted([float(i.strip()) for i in opts[1].split(':')])
         geo_box = (lon0, lat1, lon1, lat0)
@@ -1077,7 +1081,7 @@ def read_subset_template2box(template_file):
 
     # subset.yx -> pix_box
     try:
-        opts = [i.strip().replace('[','').replace(']','') for i in tmpl['minopy.subset.yx'].split(',')]
+        opts = [i.strip().replace('[','').replace(']','') for i in tmpl[key_yx].split(',')]
         y0, y1 = sorted([int(i.strip()) for i in opts[0].split(':')])
         x0, x1 = sorted([int(i.strip()) for i in opts[1].split(':')])
         pix_box = (x0, y0, x1, y1)
@@ -1089,12 +1093,14 @@ def read_subset_template2box(template_file):
 
 def read_subset_box(inpsDict):
     import mintpy.load_data as mld
+    from mintpy import subset
 
     # Read subset info from template
     inpsDict['box'] = None
     inpsDict['box4geo_lut'] = None
 
     pix_box, geo_box = read_subset_template2box(inpsDict['template_file'][0])
+    #pix_box, geo_box = subset.read_subset_template2box(inpsDict['template_file'][0])
 
     # Grab required info to read input geo_box into pix_box
 
@@ -1192,7 +1198,7 @@ def update_or_skip_inversion(inverted_date_list, slc_dates):
 
 def read_initial_info(work_dir, templateFile):
     from minopy.objects.slcStack import slcStack
-    import minopy.workflow
+    #import minopy.workflow
 
     slc_file = os.path.join(work_dir, 'inputs/slcStack.h5')
 
@@ -1557,3 +1563,20 @@ def skip_files_with_inconsistent_size(dsPathDict, pix_box=None, dsName='slc'):
         msg += '\n' + '*' * 80 + '\n'
         print(msg)
     return dsPathDict
+
+def find_one_year_interferograms(date_list):
+    dates = np.array([datetime.datetime.strptime(date, '%Y%m%d') for date in date_list])
+
+    ifg_ind = []
+    for i, date in enumerate(dates):
+        range_1 = date + datetime.timedelta(days=365) - datetime.timedelta(days=5)
+        range_2 = date + datetime.timedelta(days=365) + datetime.timedelta(days=5)
+        index = np.where((dates >= range_1) * (dates <= range_2))[0]
+        if len(index) >= 1:
+            date_diff = list(dates[index] - (date + datetime.timedelta(days=365)))
+            ind = date_diff.index(np.nanmin(date_diff))
+            ind_date = index[ind]
+            date2 = date_list[ind_date]
+            ifg_ind.append((date_list[i], date2))
+
+    return ifg_ind

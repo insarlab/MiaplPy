@@ -18,7 +18,7 @@ def main(iargs=None):
         Overwrite filtered SLC images in Isce merged/SLC directory.
     """
 
-    Parser = MinoPyParser(iargs, script='network_inversion')
+    Parser = MinoPyParser(iargs, script='invert_network')
     inps = Parser.parse()
 
     dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
@@ -34,11 +34,12 @@ def main(iargs=None):
 
     start_time = time.time()
     os.chdir(inps.work_dir)
+    minopy_dir = os.path.dirname(inps.work_dir)
 
     if inps.template_file is None:
-        inps.template_file = os.path.join(inps.work_dir, 'smallbaselineApp.cfg')
+        inps.template_file = os.path.join(minopy_dir, 'smallbaselineApp.cfg')
 
-    minopy_template_file = os.path.join(inps.work_dir, 'minopyApp.cfg')
+    minopy_template_file = os.path.join(minopy_dir, 'minopyApp.cfg')
     inps.ifgramStackFile = os.path.join(inps.work_dir, 'inputs/ifgramStack.h5')
 
     template = readfile.read_template(minopy_template_file)
@@ -52,12 +53,14 @@ def main(iargs=None):
 
     # 1) invert ifgramStack for time-series
     stack_file = ut.check_loaded_dataset(inps.work_dir, print_msg=False)[1]
-    iargs = [stack_file, '-t', inps.template_file, '--update']
+    iargs = [stack_file, '-t', inps.template_file, '--update'] #, '--calc-cov']
     print('\nifgram_inversion.py', ' '.join(iargs))
     ifgram_inversion.main(iargs)
 
     # 1) Replace temporal coherence with the one obtained from full stack inversion
     iargs = ['-d', inps.work_dir]
+    if inps.shadow_mask:
+        iargs = ['-d', inps.work_dir, '--shadow_mask']
     print('\ngenerate_temporal_coherence.py', ' '.join(iargs))
     generate_temporal_coherence.main(iargs)
 

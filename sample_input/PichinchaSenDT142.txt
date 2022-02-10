@@ -26,7 +26,7 @@ minopy.load.connCompFile   = ./inverted/interferograms_single_reference/*/*.unw.
 minopy.subset.lalo         = -0.199:-0.142,-78.612:-78.578
 
 # MiNoPy options
-minopy.compute.numWorker   = 40
+minopy.multiprocessing.numProcessor   = 40
 minopy.interferograms.type = single_reference
 
 ## Mintpy options
@@ -34,5 +34,4 @@ mintpy.compute.cluster     = local  # if dask is not available, set this option 
 mintpy.compute.numWorker   = 8
 
 mintpy.reference.lalo     = -0.1786, -78.5933
-mintpy.unwrapError.method          = bridging
 mintpy.troposphericDelay.method = no

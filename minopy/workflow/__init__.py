@@ -29,7 +29,7 @@ __all__ = [
     'load_slc_geometry',
     'generate_ifgram',
     'generate_unwrap_mask',
-    'phase_inversion',
+    'phase_linking',
     'load_ifgram',
     'unwrap_ifgram',
     'network_inversion',

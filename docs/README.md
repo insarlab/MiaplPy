@@ -4,7 +4,7 @@
 
 
 ## MiNoPy ##
-*MIami NOn linear phase inversion in PYthon*
+*MIami NOn linear phase linking in PYthon*
 
 An open source python package of InSAR processing with Non Linear phase inversion in full resolution. It reads a stack of coregistered SLCs and
 produces time series of surface deformation. This package depends on MintPy for time series corrections.
@@ -20,19 +20,19 @@ THIS IS RESEARCH CODE PROVIDED TO YOU "AS IS" WITH NO WARRANTIES OF CORRECTNESS.
 
 The workflow starts with reading coregistered SLCs, then performs an inversion to get wrapped phase time series.
 Interferograms are then unwrapped and different corrections are applied on the final time series.
-Everything is followed by defined steps in the `minopyApp.py` and the input is a text file containing adjustable options (template_file)
-Starting the software will create two templates in minopy folder: `minopyApp.cfg` and `smallbaselineApp.cfg`
-Use `smallbaselineApp.cfg` only for mintpy corrections. 
+Everything is followed by defined steps in the `minopyApp.py` and the input is a text file containing adjustable options (configuration file)
+Starting the software will create two configuration files in minopy folder: `minopyApp.cfg` and `custom_smallbaselineApp.cfg`
+Use `custom_smallbaselineApp.cfg` only for mintpy corrections. 
 
 examples:
 
 ```
-- minopyApp.py template_file
-- minopyApp.py template_file --start load_slc --stop unwrap_ifgram
-- minopyApp.py template_file --dostep generate_ifgram
+- minopyApp.py config_file
+- minopyApp.py config_file --start load_data --stop unwrap_ifgram
+- minopyApp.py config_file --dostep generate_ifgram
 ```
 
-Use `minopyApp.py template_file --runfiles` to create run files, you may then run them one by one manually
+Use `minopyApp.py config_file --runfiles` to create run files, you may then run them one by one manually
 
 Use `minopyApp.py -H` for a complete list of required options.
 
@@ -48,10 +48,10 @@ Area: Pichincha volcano, Ecuador\
 Dataset: Sentinel-1 Descending Track 142, 46 acquisitions, 2016.04.19 - 2017.12.28\
 Size: ~318 Mb\
 ```
-wget https://zenodo.org/record/5214439/files/PichinchaSenDT142.zip
+wget https://zenodo.org/record/6039250/files/PichinchaSenDT142.zip
 unzip PichinchaSenDT142.zip
 cd PichinchaSenDT142
-minopyApp.py PichinchaSenDT142.template --dir ./minopy
+minopyApp.py PichinchaSenDT142.txt --dir ./minopy
 ```
 
 #### Example tutorial in jupyter notebook [nbviewer](https://nbviewer.org/github/geodesymiami/MiNoPy_notebooks/blob/main/minopyApp.ipynb)

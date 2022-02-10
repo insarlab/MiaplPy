@@ -87,7 +87,7 @@ class MinopyRun(object):
 
         self.work_dir = inps.workDir
 
-        self.quality_file = self.work_dir + '/inverted/quality'
+        #self.quality_file = self.work_dir + '/inverted/quality'
 
         self.run_dir = inps.run_dir
 

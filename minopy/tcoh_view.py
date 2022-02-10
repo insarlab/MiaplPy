@@ -14,24 +14,83 @@ from minopy.objects.slcStack import slcStack
 import minopy.lib.utils as iut
 from mintpy import timeseries2velocity as ts2vel
 import mintpy.tsview as tsview
+import argparse
 
 ###########################################################################################
 EXAMPLE = """example:
-  tsview.py timeseries.h5
-  tsview.py timeseries.h5  --wrap
-  tsview.py timeseries.h5  --yx 300 400 --zero-first  --nodisplay
-  tsview.py geo_timeseries.h5  --lalo 33.250 131.665  --nodisplay
-  tsview.py timeseries_ECMWF_ramp_demErr.h5  --sub-x 900 1400 --sub-y 0 500
+  tcoh_view.py timeseries.h5 --slc ../inputs/slcStack.h5
+  tcoh_view.py timeseries.h5 --slc ../inputs/slcStack.h5 -rw 19 -aw 9 
+  tcoh_view.py timeseries.h5 --slc ../inputs/slcStack.h5 --wrap
+  tcoh_view.py timeseries.h5 --slc ../inputs/slcStack.h5 --yx 300 400 --zero-first  --nodisplay
+  tcoh_view.py timeseries_ECMWF_ramp_demErr.h5 --slc ../inputs/slcStack.h5  --sub-x 900 1400 --sub-y 0 500
 
   # press left / right key to slide images
 
-  # multiple time-series files
-  tsview.py timeseries_ECMWF_ramp_demErr.h5 timeseries_ECMWF_ramp.h5 timeseries_ECMWF.h5 timeseries.h5 --off 5
-  tsview.py timeseries_ECMWF_ramp_demErr.h5 ../GIANT/Stack/LS-PARAMS.h5 --off 5 --label mintpy giant
 """
 
+def create_parser():
+    parser = argparse.ArgumentParser(description='Interactive time-series viewer',
+                                     formatter_class=argparse.RawTextHelpFormatter,
+                                     epilog=EXAMPLE)
+    parser.add_argument('file', nargs='+',
+                        help='time-series file to display\n'
+                             'i.e.: timeseries_ERA5_ramp_demErr.h5 (MintPy)\n'
+                             '      LS-PARAMS.h5 (GIAnT)\n'
+                             '      S1_IW12_128_0593_0597_20141213_20180619.he5 (HDF-EOS5)')
+    parser.add_argument('--label', dest='file_label', nargs='*', help='labels to display for multiple input files')
+    parser.add_argument('--ylim', dest='ylim', nargs=2, metavar=('YMIN', 'YMAX'), type=float, help='Y limits for point plotting.')
+    parser.add_argument('--tick-right', dest='tick_right', action='store_true', help='set tick and tick label to the right')
+    parser.add_argument('-l','--lookup', dest='lookup_file', type=str, help='lookup table file')
+
+    parser.add_argument('-n', dest='idx', metavar='NUM', type=int, help='Epoch/slice number for initial display.')
+    parser.add_argument('--error', dest='error_file', help='txt file with error for each date.')
+
+    # time info
+    parser.add_argument('--start-date', dest='start_date', type=str, help='start date of displacement to display')
+    parser.add_argument('--end-date', dest='end_date', type=str, help='end date of displacement to display')
+    parser.add_argument('--exclude', '--ex', dest='ex_date_list', nargs='*', default=['exclude_date.txt'], help='Exclude date shown as gray.')
+    parser.add_argument('--zf', '--zero-first', dest='zero_first', action='store_true', help='Set displacement at first acquisition to zero.')
+    parser.add_argument('--off','--offset', dest='offset', type=float, help='Offset for each timeseries file.')
+
+    parser.add_argument('--noverbose', dest='print_msg', action='store_false', help='Disable the verbose message printing.')
+
+    # temporal model fitting
+    parser.add_argument('--nomodel', '--nofit', dest='plot_model', action='store_false',
+                        help='Do not plot the prediction of the time function (deformation model) fitting.')
+    parser.add_argument('--plot-model-conf-int', '--plot-fit-conf-int', dest='plot_model_conf_int', action='store_true',
+                        help='Plot the time function prediction confidence intervals.\n'
+                             '[!-- Preliminary feature alert! --!]\n'
+                             '[!-- This feature is NOT throughly checked. Read the code before use. Interpret at your own risk! --!]')
+
+    parser = arg_group.add_timefunc_argument(parser)
+
+    # pixel of interest
+    pixel = parser.add_argument_group('Pixel Input')
+    pixel.add_argument('--yx', type=int, metavar=('Y', 'X'), nargs=2, help='initial pixel to plot in Y/X coord')
+    pixel.add_argument('--lalo', type=float, metavar=('LAT', 'LON'), nargs=2, help='initial pixel to plot in lat/lon coord')
+
+    pixel.add_argument('--marker', type=str, default='o', help='marker style (default: %(default)s).')
+    pixel.add_argument('--ms', '--markersize', dest='marker_size', type=float, default=6.0, help='marker size (default: %(default)s).')
+    pixel.add_argument('--lw', '--linewidth', dest='linewidth', type=float, default=0, help='line width (default: %(default)s).')
+    pixel.add_argument('--ew', '--edgewidth', dest='edge_width', type=float, default=1.0, help='Edge width for the error bar (default: %(default)s)')
+
+    # other groups
+    parser = arg_group.add_data_disp_argument(parser)
+    parser = arg_group.add_dem_argument(parser)
+    parser = arg_group.add_figure_argument(parser)
+    parser = arg_group.add_gps_argument(parser)
+    parser = arg_group.add_mask_argument(parser)
+    parser = arg_group.add_map_argument(parser)
+    parser = arg_group.add_memory_argument(parser)
+    parser = arg_group.add_reference_argument(parser)
+    parser = arg_group.add_save_argument(parser)
+    parser = arg_group.add_subset_argument(parser)
+
+    return parser
+
+
 def tcoh_create_parser():
-    parser = tsview.create_parser()
+    parser = create_parser()
     parser.add_argument('--slc', dest='slc_file', nargs='+',
                         help='slc stack file to get pixel shp\n'
                              'i.e.: slcStack.h5 (MintPy)\n')

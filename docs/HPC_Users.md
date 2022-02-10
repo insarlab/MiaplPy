@@ -14,12 +14,13 @@ submit_jobs.bash $PWD/PichinchaSenDT142.template --minopy
 `submit_jobs.bash` commmand can be used for running individual jobs in run_files:
 
 ```
-sbatch_jobs.bash minopy/run_files/run_01_minopy_load_slc 
-submit_jobs.bash minopy/run_files/run_02_minopy_phase_inversion
-submit_jobs.bash minopy/run_files/run_03_minopy_generate_ifgram
-submit_jobs.bash minopy/run_files/run_04_minopy_unwrap_ifgram
-submit_jobs.bash minopy/run_files/run_05_minopy_load_ifgram
-submit_jobs.bash minopy/run_files/run_06_mintpy_correct_unwrap_error 
-submit_jobs.bash minopy/run_files/run_07_minopy_phase_to_range
-submit_jobs.bash minopy/run_files/run_08_mintpy_corrections
+sbatch_jobs.bash minopy/run_files/run_01_minopy_load_data 
+submit_jobs.bash minopy/run_files/run_02_minopy_phase_linking
+submit_jobs.bash minopy/run_files/run_03_minopy_concatenate_patch
+submit_jobs.bash minopy/run_files/run_04_minopy_generate_ifgram
+submit_jobs.bash minopy/run_files/run_05_minopy_unwrap_ifgram
+submit_jobs.bash minopy/run_files/run_06_minopy_load_ifgram
+submit_jobs.bash minopy/run_files/run_07_mintpy_ifgram_Correction 
+submit_jobs.bash minopy/run_files/run_08_minopy_invert_network
+submit_jobs.bash minopy/run_files/run_09_mintpy_timeseries_correction
 ```
