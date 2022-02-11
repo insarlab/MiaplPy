@@ -64,8 +64,9 @@ def main(iargs=None):
         dy = np.divide(dem_error * (1 / np.tan(inc_angle)) * np.sin(az_angle), one_degree_latitude)  # converted to degree
 
         if inps.reverse:
+            sign = np.sign(latitude)
+            latitude -= sign * dy
 
-            latitude += dy
             longitude += dx
             atr[key] = 'no'
             block = [0, latitude.shape[0], 0, latitude.shape[1]]
@@ -83,7 +84,9 @@ def main(iargs=None):
 
 
         else:
-            latitude -= dy
+            sign = np.sign(latitude)
+            latitude += sign * dy
+             
             longitude -= dx
             atr[key] = 'yes'
             block = [0, latitude.shape[0], 0, latitude.shape[1]]
