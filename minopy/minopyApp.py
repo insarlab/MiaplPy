@@ -20,7 +20,7 @@ from mintpy.utils import writefile, readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.defaults.auto_path import autoPath, PathFind
-from minopy.find_short_baselines import find_baselines, plot_baselines
+import minopy.find_short_baselines as fb   # import find_baselines, plot_baselines
 from minopy.objects.utils import (check_template_auto_value,
                                   log_message, get_latest_template_minopy,
                                   read_initial_info, find_one_year_interferograms)
@@ -115,15 +115,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         shutil.move(self.templateFile, self.templateFile_mintpy)
         self.template_mintpy = self.template
 
-        update_flag = False
-        if self.customTemplateFile:
-            if not 'mintpy.networkInversion.weightFunc' in self.customTemplate or \
-                    self.customTemplate['mintpy.networkInversion.weightFunc'] == 'auto':
-                self.customTemplate['mintpy.networkInversion.weightFunc'] = 'no'
-                update_flag = True
-            if update_flag:
-                self.templateFile_mintpy = ut.update_template_file(self.templateFile_mintpy, self.customTemplate)
-
         # Read minopy templates and add to mintpy template
         # 1. Get default template file
         self.templateFile = get_latest_template_minopy(self.workDir)
@@ -135,8 +126,14 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.run_dir = os.path.join(self.workDir, pathObj.rundir)
         os.makedirs(self.run_dir, exist_ok=True)
 
+        name_ifg_network = self.template['minopy.interferograms.type']
+        if self.template['minopy.interferograms.type'] == 'delaunay':
+            name_ifg_network += '_{}'.format(self.template['minopy.interferograms.delaunayBaselineRatio'])
+        elif self.template['minopy.interferograms.type'] == 'sequential':
+            name_ifg_network += '_{}'.format(self.template['minopy.interferograms.numSequential'])
+
         self.out_dir_network = '{}/{}'.format(self.workDir,
-                                              self.template['minopy.interferograms.type'] + '_network')
+                                              name_ifg_network + '_network')
         os.makedirs(self.out_dir_network, exist_ok=True)
 
         self.azimuth_look = 1
@@ -360,10 +357,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if not self.template['minopy.interferograms.list'] in [None, 'None', 'auto']:
             ifgram_dir = ifgram_dir + '_list'
+            os.makedirs(ifgram_dir, exist_ok='True')
         else:
             ifgram_dir = ifgram_dir + '_{}'.format(ifg_dir_names[self.template['minopy.interferograms.type']])
 
-        os.makedirs(ifgram_dir, exist_ok='True')
+
 
         if self.template['minopy.interferograms.referenceDate']:
             reference_date = self.template['minopy.interferograms.referenceDate']
@@ -373,10 +371,16 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.template['minopy.interferograms.type'] == 'delaunay' and \
             self.template['minopy.interferograms.list'] in [None, 'None']:
-            scp_args = ' -b {} -o {} --temporalBaseline {} --perpBaseline {} --date_list {}'.format(
+
+            ifgram_dir += '_{}'.format(self.template['minopy.interferograms.delaunayBaselineRatio'])
+            os.makedirs(ifgram_dir, exist_ok='True')
+
+            scp_args = ' -b {} -o {} --temporalBaseline {} --perpBaseline {} --date_list {} --baseline_ratio {}'.format(
                 baseline_dir, short_baseline_ifgs, self.template['minopy.interferograms.delaunayTempThresh'],
-                self.template['minopy.interferograms.delaunayPerpThresh'], self.date_list_text)
-            find_baselines(scp_args.split())
+                self.template['minopy.interferograms.delaunayPerpThresh'], self.date_list_text,
+                self.template['minopy.interferograms.delaunayBaselineRatio'])
+
+            fb.find_baselines(scp_args.split())
             print('Successfully created short_baseline_ifgs.txt ')
             self.template['minopy.interferograms.list'] = short_baseline_ifgs
 
@@ -391,6 +395,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 pairs.append((line.split('_')[0], line.split('\n')[0].split('_')[1]))
         else:
             if self.template['minopy.interferograms.type'] == 'sequential':
+                ifgram_dir += '_{}'.format(self.template['minopy.interferograms.numSequential'])
+                os.makedirs(ifgram_dir, exist_ok='True')
                 num_seq = int(self.template['minopy.interferograms.numSequential'])
                 for t in range(0, num_seq-1):
                     for l in range(t + 1, num_seq):
@@ -400,27 +406,33 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                         pairs.append((self.date_list[i - t], self.date_list[i]))
 
             if self.template['minopy.interferograms.type'] == 'single_reference':
+                os.makedirs(ifgram_dir, exist_ok='True')
                 indx = self.date_list.index(reference_date)
                 for i in range(0, len(self.date_list)):
                     if not indx == i:
                         pairs.append((self.date_list[indx], self.date_list[i]))
            
             if self.template['minopy.interferograms.type'] == 'mini_stacks':
-                total_num_mini_stacks = self.num_images // int(self.template['minopy.interferograms.ministackSize'])
-                #indx_ref_0 = None
+                os.makedirs(ifgram_dir, exist_ok='True')
+                mini_stack_size = int(self.template['minopy.interferograms.ministackSize'])
+                total_num_mini_stacks = self.num_images // mini_stack_size
+                bperp = fb.get_baselines_dict(baseline_dir)[0]
+
                 for i in range(total_num_mini_stacks):
-                    indx_ref = i * int(self.template['minopy.interferograms.ministackSize'])
-                    last_ind = indx_ref + int(self.template['minopy.interferograms.ministackSize']) + 1
+                    indx_ref = i * mini_stack_size
+                    last_ind = indx_ref + mini_stack_size + 1
                     if i == total_num_mini_stacks - 1:
                         last_ind = self.num_images
-                    #indx_ref_0 = indx_ref
+
                     indx_ref_1 = (last_ind - indx_ref) // 2 + indx_ref
                     for t in range(indx_ref, last_ind):
                         if t != indx_ref_1:
                             pairs.append((self.date_list[indx_ref_1], self.date_list[t]))
-                    #if not indx_ref_0 is None:
-                    #    pairs.append((self.date_list[indx_ref_0], self.date_list[indx_ref_1]))
-                    #indx_ref_0 = indx_ref_1
+
+                    if i < total_num_mini_stacks-1:
+                        pairs.append(fb.find_short_pbaseline_pair(bperp, self.date_list, mini_stack_size, last_ind))
+
+
         if self.template['minopy.interferograms.oneYear'] in ['yes', True]:
             one_years = find_one_year_interferograms(self.date_list)
             pairs += one_years
@@ -428,7 +440,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         for pair in pairs:
             ind1.append(self.date_list.index(pair[0]))
             ind2.append(self.date_list.index(pair[1]))
-        plot_baselines(ind1=ind1, ind2=ind2, dates=self.date_list,
+        fb.plot_baselines(ind1=ind1, ind2=ind2, dates=self.date_list,
                        baseline_dir=baseline_dir, out_dir=self.out_dir_network)
 
         if self.template['minopy.interferograms.list'] in [None, 'None', 'auto']:
@@ -436,6 +448,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             with open(os.path.join(self.out_dir_network, 'interferograms_list.txt'), 'w') as f:
                 f.writelines(ifgdates)
 
+        print('----- Number of interferograms in the selected network: {} -----'.format(len(pairs)))
         return ifgram_dir, pairs
 
 

@@ -82,14 +82,6 @@ def run_interferogram(inps, resampName):
 
         resampInt = resampName + '.int'
 
-        ref_phase = phase_series[ref_ind, :, :].reshape(length, width)
-        sec_phase = phase_series[sec_ind, :, :].reshape(length, width)
-
-        ref_amplitude = amplitudes[ref_ind, :, :].reshape(length, width)
-        sec_amplitude = amplitudes[sec_ind, :, :].reshape(length, width)
-
-        ifg = (ref_amplitude * sec_amplitude) * np.exp(1j * (ref_phase - sec_phase))
-
         intImage = isceobj.createIntImage()
         intImage.setFilename(resampInt)
         intImage.setAccessMode('write')
@@ -98,12 +90,32 @@ def run_interferogram(inps, resampName):
         intImage.createImage()
 
         out_ifg = intImage.asMemMap(resampInt)
-        out_ifg[:, :, 0] = ifg[:, :]
+        box_size = 3000
+        num_row = int(np.ceil(length / box_size))
+        num_col = int(np.ceil(width / box_size))
+        for i in range(num_row):
+            for k in range(num_col):
+                row_1 = i * box_size
+                row_2 = i * box_size + box_size
+                col_1 = k * box_size
+                col_2 = k * box_size + box_size
+                if row_2 > length:
+                    row_2 = length
+                if col_2 > width:
+                    col_2 = width
+
+                ref_phase = phase_series[ref_ind, row_1:row_2, col_1:col_2].reshape(row_2 - row_1, col_2 - col_1)
+                sec_phase = phase_series[sec_ind, row_1:row_2, col_1:col_2].reshape(row_2 - row_1, col_2 - col_1)
+                ref_amplitude = amplitudes[ref_ind, row_1:row_2, col_1:col_2].reshape(row_2 - row_1, col_2 - col_1)
+                sec_amplitude = amplitudes[sec_ind, row_1:row_2, col_1:col_2].reshape(row_2 - row_1, col_2 - col_1)
+                ifg = np.sqrt(ref_amplitude * sec_amplitude) * np.exp(1j * (ref_phase - sec_phase))
+                out_ifg[row_1:row_2, col_1:col_2, 0] = ifg[:, :]
 
         intImage.renderHdr()
         intImage.finalizeImage()
 
     return
+
 
 def runFilter(infile, outfile, filterStrength):
     from mroipac.filter.Filter import Filter

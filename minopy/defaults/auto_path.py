@@ -233,6 +233,10 @@ def get_auto_path(processor, work_dir, template=dict()):
         var_dict['${int_type}'] = 'list'
     else:
         var_dict['${int_type}'] = template['minopy.interferograms.type']
+        if template['minopy.interferograms.type'] == 'delaunay':
+            var_dict['${int_type}'] += '_{}'.format(template['minopy.interferograms.delaunayBaselineRatio'])
+        elif template['minopy.interferograms.type'] == 'sequential':
+            var_dict['${int_type}'] += '_{}'.format(template['minopy.interferograms.numSequential'])
 
     if processor == 'isceStripmap':
         if template['minopy.load.metaFile'] == 'auto':

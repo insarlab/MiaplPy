@@ -13,7 +13,9 @@ def cmd_line_parse(iargs=None):
     parser = argparse.ArgumentParser(description='find the minimum number of connected good interferograms')
     parser.add_argument('-b', '--baselineDir', dest='baseline_dir', type=str, help='Baselines directory')
     parser.add_argument('-o', '--outFile', dest='out_file', type=str, default='./bestints.txt', help='Output text file')
-    parser.add_argument('-t', '--temporalBaseline', dest='t_threshold', default=60, type=int,
+    parser.add_argument('-r', '--baseline_ratio', dest='baseline_ratio', default=1, type=float,
+                        help='Ratio between temporal and perpendicular baseline (default = 1)')
+    parser.add_argument('-t', '--temporalBaseline', dest='t_threshold', default=120, type=int,
                         help='Temporal baseline threshold')
     parser.add_argument('-p', '--perpBaseline', dest='p_threshold', default=200, type=int,
                         help='Perpendicular baseline threshold')
@@ -34,6 +36,9 @@ def find_baselines(iargs=None):
         date_list = f.readlines()
         date_list = [dd.split('\n')[0] for dd in date_list]
 
+    min_baselines = min(baselines.values())
+    max_baselines = max(baselines.values())
+
     dates = []
     for date in dates0:
         if date in date_list:
@@ -43,48 +48,55 @@ def find_baselines(iargs=None):
 
     days = [(datetime.strptime(date, '%Y%m%d') - datetime.strptime(dates[0], '%Y%m%d')).days for date in dates]
 
+    temp2perp_scale = np.abs((max_baselines - min_baselines) / (np.nanmin(np.array(days)) - np.nanmax(np.array(days))))
+    days = [tbase * temp2perp_scale for tbase in days]
+
+    inps.t_threshold *= temp2perp_scale
+    multplier = np.sqrt(inps.baseline_ratio)
+    days = [x / multplier for x in days]
+
     pairtr = []
     for i, date in enumerate(dates):
-        pairtr.append([days[i], baselines[date]])
+        pairtr.append([days[i], baselines[date] * multplier])
 
     pairtr = np.array(pairtr)
     tri = Delaunay(pairtr, incremental=False)
 
-    q = np.zeros([len(dates), len(dates)])
+    qm = np.zeros([len(dates), len(dates)])
 
     for trp in pairtr[tri.simplices]:
-        x1 = int(trp[0][0])
-        x2 = int(trp[1][0])
-        x3 = int(trp[2][0])
+        x1 = trp[0][0]
+        x2 = trp[1][0]
+        x3 = trp[2][0]
         b1 = trp[0][1]
         b2 = trp[1][1]
         b3 = trp[2][1]
         if np.abs(x1 - x2) <= inps.t_threshold:
-            q[days.index(x1), days.index(x2)] = np.abs(b1 - b2)
-            q[days.index(x2), days.index(x1)] = np.abs(b1 - b2)
+            qm[days.index(x1), days.index(x2)] = np.abs(b1 - b2)
+            qm[days.index(x2), days.index(x1)] = np.abs(b1 - b2)
         if np.abs(x2 - x3) <= inps.t_threshold:
-            q[days.index(x2), days.index(x3)] = np.abs(b2 - b3)
-            q[days.index(x3), days.index(x2)] = np.abs(b2 - b3)
+            qm[days.index(x2), days.index(x3)] = np.abs(b2 - b3)
+            qm[days.index(x3), days.index(x2)] = np.abs(b2 - b3)
         if np.abs(x1 - x3) <= inps.t_threshold:
-            q[days.index(x1), days.index(x3)] = np.abs(b1 - b3)
-            q[days.index(x3), days.index(x1)] = np.abs(b1 - b3)
+            qm[days.index(x1), days.index(x3)] = np.abs(b1 - b3)
+            qm[days.index(x3), days.index(x1)] = np.abs(b1 - b3)
 
-    q[q > inps.p_threshold] = 0
+    qm[qm > inps.p_threshold] = 0
 
     #if inps.min_span_tree:
-    #    X = csr_matrix(q)
+    #    X = csr_matrix(qm)
     #    Tcsr = minimum_spanning_tree(X)
     #    A = Tcsr.toarray()
     #else:
     #    for i in range(len(dates)):
-    #        if len(np.nonzero(q[i, :])[0]) <= 1:
-    #            q[i, :] = 0
-    #    A = np.triu(q)
+    #        if len(np.nonzero(qm[i, :])[0]) <= 1:
+    #            qm[i, :] = 0
+    #    A = np.triu(qm)
 
     for i in range(len(dates)):
-        if len(np.nonzero(q[i, :])[0]) <= 1:
-            q[i, :] = 0
-    A = np.triu(q)
+        if len(np.nonzero(qm[i, :])[0]) <= 1:
+            qm[i, :] = 0
+    A = np.triu(qm)
 
     ind1, ind2 = np.where(A > 0)
     ifgdates = ['{}_{}\n'.format(dates[g], dates[h]) for g, h in zip(ind1, ind2)]
@@ -125,6 +137,12 @@ def get_baselines_dict(baseline_dir):
                 baselines[secondary] = baseline
     return baselines, dates
 
+def find_short_pbaseline_pair(baselines, date_list, ministack_size, last_index):
+    second_index = np.arange(last_index + 1, last_index + ministack_size)
+    diff_bselines = [np.abs(baselines[date_list[last_index-2]] - baselines[date_list[i]]) for i in second_index]
+    min_ind = np.min(diff_bselines)
+    pair = (date_list[last_index-2], date_list[second_index[diff_bselines.index(min_ind)]])
+    return pair
 
 def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baseline_dir=None):
     import matplotlib.pyplot as plt
@@ -153,7 +171,7 @@ def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baselin
         Y = d.split('\n')[0].split(',')[1:3]
         y1 = float(Y[0])
         y2 = float(Y[1])
-        plt.plot([x1, x2], [y1, y2], 'k*-')
+        plt.plot([x1, x2], [y1, y2], 'ko-', markersize=10)
 
     plt.xlabel('Time [years]')
     plt.ylabel('Perp Baseline [m]')
