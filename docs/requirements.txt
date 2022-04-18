@@ -1,4 +1,4 @@
-gcc_linux-64
+c-complier
 python>=3.6,<3.9
 cartopy
 cvxopt
