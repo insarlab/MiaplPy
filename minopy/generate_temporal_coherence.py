@@ -109,6 +109,8 @@ def main(iargs=None):
     length, width = stack_obj.length, stack_obj.width
 
     inps.invQualityFile = 'temporalCoherence.h5'
+    mintpy_mask_file = os.path.join(inps.work_dir, 'maskTempCoh.h5')
+
     quality_name = os.path.join(minopy_dir,
                                 'inverted/tempCoh_{}'.format(template['minopy.timeseries.tempCohType']))
     quality = np.memmap(quality_name, mode='r', dtype='float32', shape=(length, width))
@@ -137,6 +139,9 @@ def main(iargs=None):
     inv_quality[:, :] = quality[:, :]
     inv_quality[inv_quality <= 0] = np.nan
     inv_quality[water_mask < 0.5] = np.nan
+    if os.path.exists(mintpy_mask_file):
+        mintpy_mask = readfile.read(mintpy_mask_file, datasetName='mask')[0]
+        inv_quality[mintpy_mask == 0] = np.nan
 
     if not os.path.exists(inps.invQualityFile):
         metadata['UNIT'] = '1'

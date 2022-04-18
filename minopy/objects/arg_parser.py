@@ -401,8 +401,26 @@ class MinoPyParser:
                             help='Working directory (minopy)')
         parser.add_argument('-t', '--template', dest='template_file', type=str, default=None,
                             help='template file (default: smallbaselineApp.cfg)')
+        parser.add_argument('--tcoh', '--temp_coh', dest='temp_coh', default=None,
+                            help='use shadow mask to mask final results')
+        parser.add_argument('--mask-thres', '--mask-threshold', '--mt', dest='maskThreshold', metavar='NUM', type=float,
+                            default=0.5, help='threshold to generate mask for temporal coherence (default: %(default)s).')
         parser.add_argument('--shadow_mask', dest='shadow_mask', action='store_true',
                             help='use shadow mask to mask final results')
+        parser.add_argument('--min-norm-phase', dest='minNormVelocity', action='store_false',
+                            help=('Enable inversion with minimum-norm deformation phase,'
+                                  ' instead of the default minimum-norm deformation velocity.'))
+        parser.add_argument('--norm', dest='residualNorm', default='L1', choices=['L1', 'L2'],
+                            help='Optimization mehtod, L1 or L2 norm. (default: %(default)s).')
+        parser.add_argument('--smooth_factor', dest='L1_alpha', default=0.01,
+                            help='Smoothing factor for L1 inversion [0-1] default: 0.01.')
+        parser.add_argument('-w', '--weight-func', dest='weightFunc', default='var',
+                            choices={'var', 'fim', 'coh', 'no'},
+                            help='function used to convert coherence to weight for inversion:\n' +
+                                 'var - inverse of phase variance due to temporal decorrelation (default)\n' +
+                                 'fim - Fisher Information Matrix as weight' +
+                                 'coh - spatial coherence\n' +
+                                 'no  - no/uniform weight')
 
         return parser
 

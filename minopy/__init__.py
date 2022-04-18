@@ -13,7 +13,7 @@ sys.path.insert(1, minopy_path)
 sys.path.insert(1, os.path.join(minopy_path, 'defaults'))
 sys.path.insert(1, os.path.join(minopy_path, 'objects'))
 sys.path.insert(1, os.path.join(minopy_path, 'lib'))
-
+sys.path.insert(1, os.path.join(minopy_path, 'dev'))
 
 from minopy.version import *
 __version__ = release_version

@@ -35,7 +35,7 @@ dataType = np.complex64
 
 slcDatasetNames = ['slc']
 datasetUnitDict['slc'] = 'i'
-
+gdal.SetCacheMax(2**30)
 ########################################################################################
 
 
@@ -72,8 +72,8 @@ class slcStackDict:
             self.width = slcObj.width
 
         # update due to multilook
-        self.length = self.length // ystep
-        self.width = self.width // xstep
+        self.length = int(self.length // ystep)
+        self.width = int(self.width // xstep)
 
         return self.numSlc, self.length, self.width
 
@@ -164,7 +164,7 @@ class slcStackDict:
                     if not box:
                         box = (0, 0, self.width, self.length)
                     dsSlc = gdal.Open(fname + '.vrt', gdal.GA_ReadOnly)
-                    ds[i, :, :] = dsSlc.GetRasterBand(1).ReadAsArray(int(box[0]), int(box[1]), int(self.width), int(self.length))
+                    ds[i, :, :] = dsSlc.GetRasterBand(1).ReadAsArray(int(box[0]), int(box[1]), self.width, self.length)
 
                     self.bperp[i] = slcObj.get_perp_baseline()
                     prog_bar.update(i+1, suffix='{}'.format(self.dates[i][0]))

@@ -67,7 +67,13 @@ def main(iargs=None):
             sign = np.sign(latitude)
             latitude -= sign * dy
 
-            longitude += dx
+            sign = np.sign(longitude)
+
+            if atr['ORBIT_DIRECTION'] == 'Ascending':
+                longitude += sign * dx
+            else:
+                longitude -= sign * dx
+
             atr[key] = 'no'
             block = [0, latitude.shape[0], 0, latitude.shape[1]]
             writefile.write_hdf5_block(inps.geometry_file,
@@ -86,8 +92,14 @@ def main(iargs=None):
         else:
             sign = np.sign(latitude)
             latitude += sign * dy
-             
-            longitude -= dx
+
+            sign = np.sign(longitude)
+
+            if atr['ORBIT_DIRECTION'] == 'Ascending':
+                longitude -= sign * dx
+            else:
+                longitude += sign * dx
+
             atr[key] = 'yes'
             block = [0, latitude.shape[0], 0, latitude.shape[1]]
             writefile.write_hdf5_block(inps.geometry_file,

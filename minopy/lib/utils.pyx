@@ -1239,3 +1239,147 @@ cdef int ADtest_cy(cnp.ndarray[float, ndim=1] S1, cnp.ndarray[float, ndim=1] S2,
         res = 0
 
     return res
+
+cdef inline float[:,::1] transposemat(float[:, ::1] x):
+    cdef cnp.intp_t i, j
+    cdef cnp.intp_t n1 = x.shape[0]
+    cdef cnp.intp_t n2 = x.shape[1]
+    cdef float[:, ::1] y = np.zeros((n2, n1), dtype=np.float32)
+    for i in range(n1):
+        for j in range(n2):
+            y[j, i] = x[i, j]
+    return y
+
+cdef inline float[:, ::1] concatmat(float[:, :] x, float[:, :] y):
+    cdef cnp.intp_t i, j
+    cdef cnp.intp_t n1 = x.shape[0]
+    cdef cnp.intp_t n2 = x.shape[1]
+    cdef float[:, ::1] out = np.zeros((2 * n1, n2), dtype=np.float32)
+    for i in range(n2):
+        for j in range(n1):
+            out[j, i] = x[j, i]
+            out[j + n1, i] = y[j, i]
+
+    return out
+
+cdef inline float[::1] concatmat11(float[:] x, float[::1] y):
+    cdef cnp.intp_t i, j
+    cdef cnp.intp_t n1 = x.shape[0]
+    cdef float[::1] out = np.zeros(2 * n1, dtype=np.float32)
+    for i in range(n1):
+        out[i] = x[i]
+        out[i + n1] = y[i]
+    return out
+
+cdef inline float[:,::1] multiplymat22_float(float[:, ::1] x, float[:, ::1] y):
+    cdef cnp.intp_t s1 = x.shape[0]
+    cdef cnp.intp_t s2 = y.shape[1]
+    cdef float[:,::1] out = np.zeros((s1,s2), dtype=np.float32)
+    cdef cnp.intp_t i, t, m
+
+    for i in range(s1):
+        for t in range(s2):
+            for m in range(x.shape[1]):
+                out[i,t] += x[i,m] * y[m,t]
+
+    return out
+
+cdef inline float[::1] multiplymat21_float(float[:, ::1] x, float[::1] y):
+    cdef cnp.intp_t s1 = x.shape[0]
+    cdef cnp.intp_t s2 = x.shape[1]
+    cdef float[::1] out = np.zeros(s1, dtype=np.float32)
+    cdef cnp.intp_t i, t, m
+
+    for i in range(s1):
+        for m in range(s2):
+            out[i] += x[i,m] * y[m]
+    return out
+
+cdef inline float[::1] multiplymat21_fa(float[:, :] x, float[::1] y):
+    cdef cnp.intp_t s1 = x.shape[0]
+    cdef cnp.intp_t s2 = x.shape[1]
+    cdef float[::1] out = np.zeros(s1, dtype=np.float32)
+    cdef cnp.intp_t i, t, m
+
+    for i in range(s1):
+        for m in range(s2):
+            out[i] += x[i,m] * y[m]
+    return out
+
+cdef inline float[:, ::1] inv_diag_mat(float[::1] x):
+    cdef cnp.intp_t i, ns = x.shape[0]
+    cdef float[:, ::1] out = np.zeros((ns, ns), dtype=np.float32)
+    cdef float maxval
+    for i in range(ns):
+        out[i, i] = 1/x[i]
+    maxval = np.max(out)
+    for i in range(ns):
+        out[i, i] = out[i, i] / maxval
+    return out
+
+cdef inline float[::1] calc_residuals(float[::1] ifg, float[:,::1] G, float[::1] X):
+    cdef cnp.intp_t i, s1 = ifg.shape[0]
+    cdef float[::1] ifgp, res = np.zeros(s1, dtype=np.float32)
+    ifgp = multiplymat21_float(G, X)
+    for i in range(s1):
+        res[i] = abs(ifg[i] - ifgp[i])
+        if res[i] < 1e-5:
+            res[i] = 1e-5
+    return res
+
+cdef inline float calculate_diff_res_max(float[::1] x, float[::1] y):
+    cdef cnp.intp_t i, s1 = y.shape[0]
+    cdef float[::1] res = np.zeros(s1, dtype=np.float32)
+    cdef float out
+    for i in range(s1):
+       res[i] = abs(x[i] - y[i])
+    out = max(res)
+    return out
+
+cpdef tuple invert_L1_norm_c(cnp.ndarray[float, ndim=2] R, cnp.ndarray[float, ndim=2] Alpha,
+                             cnp.ndarray[float, ndim=1] y, int max_iter, float smooth_factor):
+    cdef cnp.intp_t i, ii, s1 = y.shape[0], s2=2*s1, s3 = R.shape[1]
+    cdef float[::1] ifg, X, ifg0=np.zeros(s1, dtype=np.float32)
+    cdef float[:, ::1] G, W
+    cdef float e1
+    if smooth_factor > 0:
+        ifg = concatmat11(y, ifg0)
+        G = concatmat(R, Alpha)
+        W = np.eye(s2, dtype=np.float32)
+    else:
+        ifg = np.zeros(s1, dtype=np.float32)
+        G = np.zeros((s1, s3), dtype=np.float32)
+        for i in range(s1):
+            ifg[i] = y[i]
+            for ii in range(s3):
+                G[i, ii] = R[i, ii]
+        W = np.eye(s1, dtype=np.float32)
+    X, e1 = iterate_L1_norm(ifg, G, W, max_iter)
+    return X, e1
+
+cdef inline tuple iterate_L1_norm(float[::1] ifg, float[:,::1] G, float[:,::1] W, int max_iter):
+    cdef cnp.intp_t i, ii, s2=ifg.shape[0]
+    cdef float[::1] Coef, X, res
+    cdef float[::1] res1 = np.ones(s2, dtype=np.float32)
+    cdef float[:, ::1] W1
+    cdef float [:, :] inv_Q
+    cdef float e1, diff_res
+
+    inv_Q = LA.pinv2(multiplymat22_float(multiplymat22_float(transposemat(G), W), G ))
+    Coef = multiplymat21_float(multiplymat22_float(transposemat(G), W), ifg)
+    X = multiplymat21_fa(inv_Q, Coef)
+    res = calc_residuals(ifg, G, X)
+    diff_res = calculate_diff_res_max(res, res1)
+    for ii in range(max_iter):
+        if diff_res <= 0.5:
+            break
+        W1 = inv_diag_mat(res)
+        inv_Q = LA.pinv2(multiplymat22_float(multiplymat22_float(transposemat(G), W1), G ))
+        Coef = multiplymat21_float(multiplymat22_float(transposemat(G), W1), ifg)
+        X = multiplymat21_fa(inv_Q, Coef)
+        res1 = calc_residuals(ifg, G, X)
+        diff_res = calculate_diff_res_max(res, res1)
+        for i in range(s2):
+            res[i] = res1[i]
+    e1 = np.sum(res)
+    return X, e1

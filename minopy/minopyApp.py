@@ -23,7 +23,7 @@ from minopy.defaults.auto_path import autoPath, PathFind
 import minopy.find_short_baselines as fb   # import find_baselines, plot_baselines
 from minopy.objects.utils import (check_template_auto_value,
                                   log_message, get_latest_template_minopy,
-                                  read_initial_info, find_one_year_interferograms)
+                                  read_initial_info)
 
 pathObj = PathFind()
 ###########################################################################################
@@ -123,8 +123,14 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         self.projectName = self.inps.projectName
 
-        self.run_dir = os.path.join(self.workDir, pathObj.rundir)
-        os.makedirs(self.run_dir, exist_ok=True)
+        #self.run_dir = os.path.join(self.workDir, pathObj.rundir)
+        #os.makedirs(self.run_dir, exist_ok=True)
+
+        name_ifg_network = self.template['minopy.interferograms.type']
+        if self.template['minopy.interferograms.type'] == 'delaunay':
+            name_ifg_network += '_{}'.format(self.template['minopy.interferograms.delaunayBaselineRatio'])
+        elif self.template['minopy.interferograms.type'] == 'sequential':
+            name_ifg_network += '_{}'.format(self.template['minopy.interferograms.numSequential'])
 
         name_ifg_network = self.template['minopy.interferograms.type']
         if self.template['minopy.interferograms.type'] == 'delaunay':
@@ -135,6 +141,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.out_dir_network = '{}/{}'.format(self.workDir,
                                               name_ifg_network + '_network')
         os.makedirs(self.out_dir_network, exist_ok=True)
+
+        self.run_dir = os.path.join(self.out_dir_network, pathObj.rundir)
+        os.makedirs(self.run_dir, exist_ok=True)
 
         self.azimuth_look = 1
         self.range_look = 1
@@ -414,27 +423,13 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
            
             if self.template['minopy.interferograms.type'] == 'mini_stacks':
                 os.makedirs(ifgram_dir, exist_ok='True')
-                mini_stack_size = int(self.template['minopy.interferograms.ministackSize'])
-                total_num_mini_stacks = self.num_images // mini_stack_size
-                bperp = fb.get_baselines_dict(baseline_dir)[0]
 
-                for i in range(total_num_mini_stacks):
-                    indx_ref = i * mini_stack_size
-                    last_ind = indx_ref + mini_stack_size + 1
-                    if i == total_num_mini_stacks - 1:
-                        last_ind = self.num_images
-
-                    indx_ref_1 = (last_ind - indx_ref) // 2 + indx_ref
-                    for t in range(indx_ref, last_ind):
-                        if t != indx_ref_1:
-                            pairs.append((self.date_list[indx_ref_1], self.date_list[t]))
-
-                    if i < total_num_mini_stacks-1:
-                        pairs.append(fb.find_short_pbaseline_pair(bperp, self.date_list, mini_stack_size, last_ind))
+                ref_date_month = int(self.template['minopy.interferograms.ministackRefMonth'])
+                pairs = fb.find_mini_stacks(self.date_list, baseline_dir, month=ref_date_month)
 
 
         if self.template['minopy.interferograms.oneYear'] in ['yes', True]:
-            one_years = find_one_year_interferograms(self.date_list)
+            one_years = fb.find_one_year_interferograms(self.date_list)
             pairs += one_years
 
         for pair in pairs:
@@ -479,7 +474,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         num_lin = 0
         for pair in self.pairs:
             out_dir = os.path.join(self.ifgram_dir, pair[0] + '_' + pair[1])
-            os.makedirs(out_dir, exist_ok='True')
+            #os.makedirs(out_dir, exist_ok='True')
 
             scp_args = '--reference {a1} --secondary {a2} --output_dir {a3} --azimuth_looks {a4} ' \
                        '--range_looks {a5} --filter_strength {a6} ' \
@@ -658,10 +653,20 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.org_custom_template:
             custom_template = self.org_custom_template
 
-        cmd = '{} network_inversion.py --template {} --work_dir {}'.format(self.text_cmd.strip("'"),
-                                                                       custom_template,
-                                                                       self.out_dir_network)
-        if self.template['minopy.timeseries.shadowMask'] in [True, 'yes']:
+        coh_file = os.path.join(self.workDir, 'inverted/tempCoh_{}'.format(self.template['minopy.timeseries.tempCohType']))
+
+        cmd = '{} network_inversion.py --template {} --temp_coh {} --mask-thres {}' \
+              ' --norm {} --smooth_factor {} --weight-func {} --work_dir {}'.format(self.text_cmd.strip("'"),
+                                                                 custom_template, coh_file,
+                                                                 self.template['minopy.timeseries.minTempCoh'],
+                                                                 self.template['minopy.timeseries.residualNorm'],
+                                                                 self.template['minopy.timeseries.L1smoothingFactor'],
+                                                                 self.template['minopy.timeseries.L2weightFunc'],
+                                                                 self.out_dir_network)
+        if not self.template['minopy.timeseries.minNormVelocity']:
+            cmd += ' --min-norm-phase '
+
+        if self.template['minopy.timeseries.shadowMask']:
             cmd += ' --shadow_mask'
 
         run_commands = [cmd]
