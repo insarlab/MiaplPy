@@ -15,7 +15,7 @@ import sys
 import time
 import shutil
 import math
-
+import datetime
 from mintpy.utils import writefile, readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from miaplpy.objects.arg_parser import MiaplPyParser
@@ -149,7 +149,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.connNum'])
 
         self.out_dir_network = '{}/{}'.format(self.workDir,
-                                              name_ifg_network + '_network')
+                                              'network_' + name_ifg_network)
         os.makedirs(self.out_dir_network, exist_ok=True)
 
         self.run_dir = os.path.join(self.out_dir_network, pathObj.rundir)
@@ -278,7 +278,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         scp_args = '--template {}'.format(self.templateFile)
         scp_args += ' --project_dir {} --work_dir {} '.format(os.path.dirname(self.workDir), self.workDir)
 
-        run_commands = ['{} load_slc_geometry.py {} --no_metadata_check\n'.format(self.text_cmd.strip("'"), scp_args)]
+        run_commands = ['{a} load_slc_geometry.py {b} --no_metadata_check\n'.format(a=self.text_cmd.strip("'"), b=scp_args)]
         run_commands = [cmd.lstrip() for cmd in run_commands]
 
         with open(run_file_load_slc, 'w+') as frun:
@@ -347,6 +347,8 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                                                      b=scp_args,
                                                                                      c=tmp_slc_stack)
                 run_commands.append(command_line)
+
+        run_commands = [cmd.lstrip() for cmd in run_commands]
 
         with open(run_inversion, 'w+') as frun:
             frun.writelines(run_commands)
@@ -512,6 +514,8 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         run_commands.append('wait\n\n')
 
+        run_commands = [cmd.lstrip() for cmd in run_commands]
+
         with open(run_ifgs, 'w+') as frun:
             frun.writelines(run_commands)
 
@@ -589,6 +593,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 run_commands.append(cmd)
 
         run_commands.append('wait\n\n')
+        run_commands = [cmd.lstrip() for cmd in run_commands]
 
         with open(run_file_unwrap, 'w+') as frun:
             frun.writelines(run_commands)
@@ -622,6 +627,9 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         run_commands = ['{} load_ifgram.py {}\n'.format(self.text_cmd.strip("'"), scp_args)]
         run_commands = run_commands[0].lstrip()
+
+        run_commands = [cmd.lstrip() for cmd in run_commands]
+
         os.makedirs(self.run_dir, exist_ok=True)
 
         with open(run_file_load_ifg, 'w+') as frun:
@@ -640,19 +648,20 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         custom_template = self.templateFile_mintpy
         if self.org_custom_template:
             custom_template = self.org_custom_template
-        run_commands = ['{} smallbaselineApp.py {} '.format(self.text_cmd.strip("'"), custom_template) +
+        run_commands_ifg = ['{} smallbaselineApp.py {} '.format(self.text_cmd.strip("'"), custom_template) +
                         '--start modify_network --stop correct_unwrap_error --dir {}\n'.format(self.out_dir_network)]
-        run_commands = run_commands[0].lstrip()
+        run_commands_ifg = run_commands_ifg[0].lstrip()
+
         os.makedirs(self.run_dir, exist_ok=True)
 
         with open(run_file_correct_unwrap, 'w+') as frun:
-            frun.writelines(run_commands)
+            frun.writelines(run_commands_ifg)
 
         if self.write_job or not job_obj is None:
             job_obj.num_bursts = 1
             job_obj.write_batch_jobs(batch_file=run_file_correct_unwrap)
 
-        return
+        return run_commands_ifg
 
     def run_network_inversion(self, sname, job_obj):
 
@@ -664,15 +673,16 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             custom_template = self.org_custom_template
 
         coh_file = os.path.join(self.workDir, 'inverted/tempCoh_{}'.format(self.template['miaplpy.timeseries.tempCohType']))
-
-        cmd = '{} network_inversion.py --template {} --temp_coh {} --mask-thres {}' \
-              ' --norm {} --smooth_factor {} --weight-func {} --work_dir {}'.format(self.text_cmd.strip("'"),
-                                                                 custom_template, coh_file,
-                                                                 self.template['miaplpy.timeseries.minTempCoh'],
-                                                                 self.template['miaplpy.timeseries.residualNorm'],
-                                                                 self.template['miaplpy.timeseries.L1smoothingFactor'],
-                                                                 self.template['miaplpy.timeseries.L2weightFunc'],
-                                                                 self.out_dir_network)
+        ifgramStack_file = os.path.join(self.out_dir_network, 'inputs/ifgramStack.h5')
+        cmd = '{} network_inversion.py {} --template {} --temp_coh {} --mask-thres {}  ' \
+              '--norm {} --smooth_factor {} --weight-func {} --work_dir {}'.format(self.text_cmd.strip("'"),
+                                     ifgramStack_file,
+                                     custom_template, coh_file,
+                                     self.template['miaplpy.timeseries.minTempCoh'],
+                                     self.template['miaplpy.timeseries.residualNorm'],
+                                     self.template['miaplpy.timeseries.L1smoothingFactor'],
+                                     self.template['miaplpy.timeseries.L2weightFunc'],
+                                     self.out_dir_network)
         if not self.template['miaplpy.timeseries.minNormVelocity']:
             cmd += ' --min-norm-phase '
 
@@ -681,6 +691,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         run_commands = [cmd]
         run_commands = run_commands[0].lstrip()
+
         os.makedirs(self.run_dir, exist_ok=True)
 
         with open(run_file_network_inversion, 'w+') as frun:
@@ -700,21 +711,21 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.org_custom_template:
             custom_template = self.org_custom_template
 
-        run_commands = ['{} smallbaselineApp.py {} --start correct_LOD --dir {}\n'.format(self.text_cmd.strip("'"),
+        run_commands_ts = ['{} smallbaselineApp.py {} --start correct_LOD --dir {}\n'.format(self.text_cmd.strip("'"),
                                                                                           custom_template,
                                                                                           self.out_dir_network)]
 
-        run_commands = run_commands[0].lstrip()
+        run_commands_ts = run_commands_ts[0].lstrip()
         os.makedirs(self.run_dir, exist_ok=True)
 
         with open(run_file_corrections, 'w+') as frun:
-            frun.writelines(run_commands)
+            frun.writelines(run_commands_ts)
 
         if self.write_job or not job_obj is None:
             job_obj.num_bursts = 1
             job_obj.write_batch_jobs(batch_file=run_file_corrections)
 
-        return
+        return run_commands_ts
 
     def run(self, steps=STEP_LIST):
         #import subprocess
@@ -740,13 +751,20 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             elif sname == 'load_ifgram':
                 self.run_load_ifg('load_ifgram', job_obj)
             elif sname == 'ifgram_correction':
-                self.run_ifgram_correction('ifgram_correction', job_obj)
+                run_commands_ifg = self.run_ifgram_correction('ifgram_correction', job_obj)
             elif sname == 'invert_network':
                 self.run_network_inversion('invert_network', job_obj)
             elif sname == 'timeseries_correction':
-                self.run_timeseries_correction('timeseries_correction', job_obj)
+                run_commands_ts = self.run_timeseries_correction('timeseries_correction', job_obj)
 
             run_file = os.path.join(self.run_dir, RUN_FILES[sname])
+            if sname == 'ifgram_correction':
+                dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+                print(dateStr + ' * ' + run_commands_ifg)
+            elif sname == 'timeseries_correction':
+                dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
+                print(dateStr + ' * ' + run_commands_ts)
+
             os.system('bash {}'.format(run_file))
 
         # go back to original directory

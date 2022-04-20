@@ -397,6 +397,7 @@ class MiaplPyParser:
     @staticmethod
     def network_inversion_parser():
         parser = argparse.ArgumentParser(description='Convert phase to range time series')
+        parser.add_argument('ifgramStackFile', help='interferograms stack file to be inverted')
         parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', required=True,
                             help='Working directory (miaplpy)')
         parser.add_argument('-t', '--template', dest='template_file', type=str, default=None,
@@ -412,7 +413,7 @@ class MiaplPyParser:
                                   ' instead of the default minimum-norm deformation velocity.'))
         parser.add_argument('--norm', dest='residualNorm', default='L1', choices=['L1', 'L2'],
                             help='Optimization mehtod, L1 or L2 norm. (default: %(default)s).')
-        parser.add_argument('--smooth_factor', dest='L1_alpha', default=0.01,
+        parser.add_argument('--smooth_factor', dest='L1_alpha', default=0.001,
                             help='Smoothing factor for L1 inversion [0-1] default: 0.01.')
         parser.add_argument('-w', '--weight-func', dest='weightFunc', default='var',
                             choices={'var', 'fim', 'coh', 'no'},

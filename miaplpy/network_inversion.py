@@ -4,7 +4,6 @@
 ############################################################
 import os
 import sys
-import time
 import datetime
 from miaplpy.objects.arg_parser import MiaplPyParser
 from mintpy.utils import readfile, utils as ut
@@ -33,7 +32,6 @@ def main(iargs=None):
         string = dateStr + " * " + msg
         print(string)
 
-    start_time = time.time()
     os.chdir(inps.work_dir)
     miaplpy_dir = os.path.dirname(inps.work_dir)
 
@@ -41,8 +39,6 @@ def main(iargs=None):
         inps.template_file = os.path.join(miaplpy_dir, 'smallbaselineApp.cfg')
 
     miaplpy_template_file = os.path.join(miaplpy_dir, 'miaplpyApp.cfg')
-    inps.ifgramStackFile = os.path.join(inps.work_dir, 'inputs/ifgramStack.h5')
-
     template = readfile.read_template(miaplpy_template_file)
 
     if template['miaplpy.timeseries.tempCohType'] == 'auto':
@@ -53,11 +49,10 @@ def main(iargs=None):
     ut.add_attribute(inps.ifgramStackFile, atr)
 
     # 1) invert ifgramStack for time-series
-    stack_file = ut.check_loaded_dataset(inps.work_dir, print_msg=False)[1]
     #wrapped_phase_series = os.path.join(miaplpy_dir, 'inverted/phase_series.h5')
-    iargs = [stack_file, '-t', inps.template_file, '--update', '--norm', inps.residualNorm,
+    iargs = [inps.ifgramStackFile, '-t', inps.template_file, '--update', '--norm', inps.residualNorm,
              '--tcoh', inps.temp_coh, '--mask-threshold', str(inps.maskThreshold),
-             '--smooth_factor', inps.L1_alpha] #, '--calc-cov']
+             '--smooth_factor', inps.L1_alpha]   #, '--calc-cov']
 
     if not inps.minNormVelocity:
         iargs += ['--min-norm-phase']
@@ -72,8 +67,6 @@ def main(iargs=None):
     print('\ngenerate_temporal_coherence.py', ' '.join(iargs))
     generate_temporal_coherence.main(iargs)
 
-    #m, s = divmod(time.time() - start_time, 60)
-    #print('time used: {:02.0f} mins {:02.1f} secs.\n'.format(m, s))
 
     return
 
