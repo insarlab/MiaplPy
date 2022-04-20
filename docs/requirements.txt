@@ -1,4 +1,4 @@
-c-complier
+c-compiler
 python>=3.6,<3.9
 cartopy
 cvxopt
