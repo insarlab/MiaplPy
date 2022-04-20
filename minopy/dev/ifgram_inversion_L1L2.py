@@ -22,9 +22,8 @@ from mintpy.objects import ifgramStack, cluster
 from mintpy.simulation import decorrelation as decor
 from mintpy.defaults.template import get_template_content
 from mintpy.utils import readfile, writefile, ptime, utils as ut, arg_group
-#from minopy.lib.utils import invert_L1_norm_c
 from minopy.objects.utils import write_layout_hdf5
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 
 # key configuration parameter name
@@ -1366,15 +1365,13 @@ def ifgram_inversion_patch(box, ifgram_file=None, wrappedIfgramStack=None, ref_p
     del stack_std
 
     ## 3. prepare output
-    wrapped_phase_ts = readfile.read(wrappedIfgramStack, datasetName='phase', box=box)[0]
-    wrapped_phase_ts = wrapped_phase_ts.reshape(num_date, -1)
-    ref_date_phase = wrapped_phase_ts[refIndx, :] #.reshape(1, -1)
-    for tt in range(num_date):
-        wrapped_phase_ts[tt, :] -= ref_date_phase
-
-    wrapped_phase_ts = np.angle(np.exp(1j*wrapped_phase_ts))
-
-    ts = wrapped_phase_ts + ts * 2 * np.pi
+    #wrapped_phase_ts = readfile.read(wrappedIfgramStack, datasetName='phase', box=box)[0]
+    #wrapped_phase_ts = wrapped_phase_ts.reshape(num_date, -1)
+    #ref_date_phase = wrapped_phase_ts[refIndx, :] #.reshape(1, -1)
+    #for tt in range(num_date):
+    #    wrapped_phase_ts[tt, :] -= ref_date_phase
+    #wrapped_phase_ts = np.angle(np.exp(1j*wrapped_phase_ts))
+    #ts = wrapped_phase_ts + ts * 2 * np.pi
 
     # 3.1 reshape
     ts = ts.reshape(num_date, num_row, num_col)
@@ -1552,7 +1549,7 @@ def ifgram_inversion(inps=None):
     ## 3. run the inversion / estimation and write to disk
 
     work_dir = os.getcwd()
-    out_dir_boxes = os.path.join(work_dir, 'inverted')
+    out_dir_boxes = os.path.join(work_dir, 'network_inverted')
     os.makedirs(out_dir_boxes, exist_ok=True)
 
     # 3.2 prepare the input arguments for *_patch()
@@ -1570,7 +1567,6 @@ def ifgram_inversion(inps=None):
         "residualNorm"      : inps.residualNorm,
         "temp_coherence"    : inps.temp_coh,
         "smoothing_factor"  : inps.L1_alpha,
-        "wrappedIfgramStack": inps.wrappedIfgramStack,
     }
 
 
@@ -1580,12 +1576,12 @@ def ifgram_inversion(inps=None):
     for i, box in enumerate(box_list):
         out_box_folder = os.path.join(out_dir_boxes, 'box_{:04.0f}'.format(i))
         os.makedirs(out_box_folder, exist_ok=True)
-        if os.path.exists(out_box_folder + '/working_flag.npy'):
-            continue
+        #if os.path.exists(out_box_folder + '/working_flag.npy'):
+        #    continue
         if os.path.exists(os.path.join(out_box_folder, 'num_inv_obs.npy')):
             continue
-        else:
-            np.save(out_box_folder + '/working_flag.npy', [1])
+        #else:
+        #    np.save(out_box_folder + '/working_flag.npy', [1])
 
         box_wid = box[2] - box[0]
         box_len = box[3] - box[1]
@@ -1628,7 +1624,7 @@ def ifgram_inversion(inps=None):
         np.save(out_box_folder + '/ts_cov.npy', ts_cov)
         np.save(out_box_folder + '/inv_quality.npy', inv_quality)
         np.save(out_box_folder + '/num_inv_obs.npy', num_inv_obs)
-        os.system('rm {}'.format(out_box_folder + '/working_flag.npy'))
+        #os.system('rm {}'.format(out_box_folder + '/working_flag.npy'))
 
     for i, box in enumerate(box_list):
         out_box_folder = os.path.join(out_dir_boxes, 'box_{:04.0f}'.format(i))
@@ -1695,6 +1691,7 @@ def ifgram_inversion(inps=None):
     # roll back to the original number of threads
     cluster.roll_back_num_threads(num_threads_dict)
 
+    os.system('rm -rf {}'.format(out_dir_boxes))
     m, s = divmod(time.time() - start_time, 60)
     print('time used: {:02.0f} mins {:02.1f} secs.\n'.format(m, s))
     return
