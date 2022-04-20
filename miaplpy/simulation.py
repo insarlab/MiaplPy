@@ -208,8 +208,8 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname): 
     EMI_est_resL = np.zeros([n_img, numr])
     PTA_est_resS = np.zeros([n_img, numr])
     PTA_est_resL = np.zeros([n_img, numr])
-    stbas_est_resS = np.zeros([n_img, numr])
-    stbas_est_resL = np.zeros([n_img, numr])
+    sbw_est_resS = np.zeros([n_img, numr])
+    sbw_est_resL = np.zeros([n_img, numr])
 
     EVD_seq_est_resS = np.zeros([n_img, numr])
     EVD_seq_est_resL = np.zeros([n_img, numr])
@@ -228,11 +228,11 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname): 
 
         time0 = time.time()
         ####
-        ph_stbas, noval, temp_quality = phase_linking_process_py(CCGsam_Sterm, 0, b'StBAS', False, 4)
-        stbas_est_resS[:, t:t + 1] = np.angle(np.array(ph_stbas).reshape(-1, 1) * np.exp(-1j * phas))
+        ph_sbw, noval, temp_quality = phase_linking_process_py(CCGsam_Sterm, 0, b'SBW', False, 4)
+        sbw_est_resS[:, t:t + 1] = np.angle(np.array(ph_sbw).reshape(-1, 1) * np.exp(-1j * phas))
         time01 = time.time()
-        ph_stbas, noval, temp_quality = phase_linking_process_py(CCGsam_Lterm, 0, b'StBAS', False, 4)
-        stbas_est_resL[:, t:t + 1] = np.angle(np.array(ph_stbas).reshape(-1, 1) * np.exp(-1j * phas))
+        ph_sbw, noval, temp_quality = phase_linking_process_py(CCGsam_Lterm, 0, b'SBW', False, 4)
+        sbw_est_resL[:, t:t + 1] = np.angle(np.array(ph_sbw).reshape(-1, 1) * np.exp(-1j * phas))
         time02 = time.time()
 
         ####
@@ -328,8 +328,8 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname): 
     rmsemat_est[:, 10] = EST_rms(PTA_seq_est_resS)
     rmsemat_est[:, 11] = EST_rms(PTA_seq_est_resL)
 
-    rmsemat_est[:, 12] = EST_rms(stbas_est_resS)
-    rmsemat_est[:, 13] = EST_rms(stbas_est_resL)
+    rmsemat_est[:, 12] = EST_rms(sbw_est_resS)
+    rmsemat_est[:, 13] = EST_rms(sbw_est_resL)
 
     out_time = np.mean(Timesmat, axis=1)
     out_time_name = outname.split('.npy')[0] + '_time.npy'

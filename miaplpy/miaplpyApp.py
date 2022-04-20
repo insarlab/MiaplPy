@@ -140,13 +140,13 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.template['miaplpy.interferograms.networkType'] == 'delaunay':
             name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.delaunayBaselineRatio'])
         elif self.template['miaplpy.interferograms.networkType'] == 'sequential':
-            name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.numSequential'])
+            name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.connNum'])
 
         name_ifg_network = self.template['miaplpy.interferograms.networkType']
         if self.template['miaplpy.interferograms.networkType'] == 'delaunay':
             name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.delaunayBaselineRatio'])
         elif self.template['miaplpy.interferograms.networkType'] == 'sequential':
-            name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.numSequential'])
+            name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.connNum'])
 
         self.out_dir_network = '{}/{}'.format(self.workDir,
                                               name_ifg_network + '_network')
@@ -329,7 +329,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 a1=self.template['miaplpy.inversion.phaseLinkingMethod'],
                 a2=self.template['miaplpy.inversion.shpTest'],
                 a3=self.num_workers, a4=self.template['miaplpy.inversion.ministackSize'],
-                a5=self.template['miaplpy.inversion.stbas_numCon'],
+                a5=self.template['miaplpy.inversion.sbw_connNum'],
                 a6=self.template['miaplpy.inversion.PsNumShp'])
 
             if not self.template['miaplpy.inversion.mask'] in [None, 'None']:
@@ -414,9 +414,9 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 pairs.append((line.split('_')[0], line.split('\n')[0].split('_')[1]))
         else:
             if self.template['miaplpy.interferograms.networkType'] == 'sequential':
-                ifgram_dir += '_{}'.format(self.template['miaplpy.interferograms.numSequential'])
+                ifgram_dir += '_{}'.format(self.template['miaplpy.interferograms.connNum'])
                 os.makedirs(ifgram_dir, exist_ok='True')
-                num_seq = int(self.template['miaplpy.interferograms.numSequential'])
+                num_seq = int(self.template['miaplpy.interferograms.connNum'])
                 for t in range(0, num_seq-1):
                     for l in range(t + 1, num_seq):
                         pairs.append((self.date_list[t], self.date_list[l]))

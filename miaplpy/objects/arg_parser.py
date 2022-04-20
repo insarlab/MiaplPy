@@ -171,7 +171,7 @@ class MiaplPyParser:
         if len(inps.run_steps) > 0:
             # for single step - compact version info
             if len(inps.run_steps) == 1:
-                print(miaplpy.version.release_description)
+                print(miaplpy.version.version_description)
             else:
                 print(miaplpy.version.logo)
             print('--RUN-at-{}--'.format(datetime.datetime.now()))

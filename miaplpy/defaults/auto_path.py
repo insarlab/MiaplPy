@@ -232,11 +232,11 @@ def get_auto_path(processor, work_dir, template=dict()):
     if not template['miaplpy.interferograms.list'] in [None, 'None', 'auto']:
         var_dict['${int_type}'] = 'list'
     else:
-        var_dict['${int_type}'] = template['miaplpy.interferograms.type']
-        if template['miaplpy.interferograms.type'] == 'delaunay':
+        var_dict['${int_type}'] = template['miaplpy.interferograms.networkType']
+        if template['miaplpy.interferograms.networkType'] == 'delaunay':
             var_dict['${int_type}'] += '_{}'.format(template['miaplpy.interferograms.delaunayBaselineRatio'])
-        elif template['miaplpy.interferograms.type'] == 'sequential':
-            var_dict['${int_type}'] += '_{}'.format(template['miaplpy.interferograms.numSequential'])
+        elif template['miaplpy.interferograms.networkType'] == 'sequential':
+            var_dict['${int_type}'] += '_{}'.format(template['miaplpy.interferograms.connNum'])
 
     if processor == 'isceStripmap':
         if template['miaplpy.load.metaFile'] == 'auto':

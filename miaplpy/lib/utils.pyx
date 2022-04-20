@@ -532,10 +532,10 @@ cdef inline tuple phase_linking_process_cy(float complex[:, ::1] ccg_sample, int
     cdef int status
 
     coh_mat = est_corr_cy(ccg_sample)
-    if method.decode('utf-8') == 'StBAS':
+    if method.decode('utf-8') == 'SBW':
         coh_mat = mask_diag(coh_mat, lag)
 
-    if method.decode('utf-8') == 'PTA' or method.decode('utf-8') == 'sequential_PTA' or method.decode('utf-8')=='StBAS':
+    if method.decode('utf-8') == 'PTA' or method.decode('utf-8') == 'sequential_PTA' or method.decode('utf-8')=='SBW':
         status, abscoh = regularize_matrix_cy(absmat2(coh_mat))
         if status == 0:
             res = PTA_L_BFGS_cy(coh_mat, abscoh)
@@ -572,10 +572,10 @@ cpdef tuple phase_linking_process_py(float complex[:, ::1] ccg_sample, int stepp
     cdef int status
 
     coh_mat = est_corr_cy(ccg_sample)
-    if method.decode('utf-8') == 'StBAS':
+    if method.decode('utf-8') == 'SBW':
         coh_mat = mask_diag(coh_mat, lag)
 
-    if method.decode('utf-8') == 'PTA' or method.decode('utf-8') == 'sequential_PTA' or method.decode('utf-8')=='StBAS':
+    if method.decode('utf-8') == 'PTA' or method.decode('utf-8') == 'sequential_PTA' or method.decode('utf-8')=='SBW':
         status, abscoh = regularize_matrix_cy(absmat2(coh_mat))
         if status == 0:
             res = PTA_L_BFGS_cy(coh_mat, abscoh)
