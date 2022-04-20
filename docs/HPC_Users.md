@@ -4,23 +4,23 @@ In this workflow, you need to create jobs and then run them in order
 
 To create jobs, run:
 ```
-minopyApp.py $PWD/PichinchaSenDT142.template --dir minopy --jobfiles
+miaplpyApp.py $PWD/PichinchaSenDT142.template --dir miaplpy --jobfiles
 ```
 After the jobs are created, you may run them with one of the appropriate submit commands:
 ```
-submit_jobs.bash $PWD/PichinchaSenDT142.template --minopy
-(submit_jobs.bash $PWD/PichinchaSenDT142.template --dostep minopy)
+submit_jobs.bash $PWD/PichinchaSenDT142.template --miaplpy
+(submit_jobs.bash $PWD/PichinchaSenDT142.template --dostep miaplpy)
 ```
 `submit_jobs.bash` commmand can be used for running individual jobs in run_files:
 
 ```
-sbatch_jobs.bash minopy/run_files/run_01_minopy_load_data 
-submit_jobs.bash minopy/run_files/run_02_minopy_phase_linking
-submit_jobs.bash minopy/run_files/run_03_minopy_concatenate_patch
-submit_jobs.bash minopy/run_files/run_04_minopy_generate_ifgram
-submit_jobs.bash minopy/run_files/run_05_minopy_unwrap_ifgram
-submit_jobs.bash minopy/run_files/run_06_minopy_load_ifgram
-submit_jobs.bash minopy/run_files/run_07_mintpy_ifgram_Correction 
-submit_jobs.bash minopy/run_files/run_08_minopy_invert_network
-submit_jobs.bash minopy/run_files/run_09_mintpy_timeseries_correction
+sbatch_jobs.bash miaplpy/{unwrapping_network}/run_files/run_01_miaplpy_load_data 
+submit_jobs.bash miaplpy/{unwrapping_network}/run_files/run_02_miaplpy_phase_linking
+submit_jobs.bash miaplpy/{unwrapping_network}/run_files/run_03_miaplpy_concatenate_patch
+submit_jobs.bash miaplpy/{unwrapping_network}/run_files/run_04_miaplpy_generate_ifgram
+submit_jobs.bash miaplpy/{unwrapping_network}/run_files/run_05_miaplpy_unwrap_ifgram
+submit_jobs.bash miaplpy/{unwrapping_network}/run_files/run_06_miaplpy_load_ifgram
+submit_jobs.bash miaplpy/{unwrapping_network}/run_files/run_07_miaplpy_ifgram_Correction 
+submit_jobs.bash miaplpy/{unwrapping_network}/run_files/run_08_miaplpy_invert_network
+submit_jobs.bash miaplpy/{unwrapping_network}/run_files/run_09_miaplpy_timeseries_correction
 ```

@@ -1,4 +1,4 @@
-## Install MiNoPy
+## Install MiaplPy
 
 #### 1. Set the following environment variables in your source file. It could be ~/.bash_profile file for bash user or ~/.cshrc file for csh/tcsh user.
 
@@ -14,18 +14,18 @@ export PATH=${PATH}:${MINTPY_HOME}/mintpy
 export PYAPS_HOME=~/tools/PyAPS
 export PYTHONPATH=${PYTHONPATH}:${PYAPS_HOME}
 
-#---------- MiNoPy ------------------##
-export MINOPY_HOME=~/tools/MiNoPy
-export PYTHONPATH=${PYTHONPATH}:${MINOPY_HOME}
-export PATH=${PATH}:${MINOPY_HOME}/minopy
-export PATH=${PATH}:${MINOPY_HOME}/snaphu/bin
+#---------- MiaplPy ------------------##
+export MIAPLPY_HOME=~/tools/MiaplPy
+export PYTHONPATH=${PYTHONPATH}:${MIAPLPY_HOME}
+export PATH=${PATH}:${MIAPLPY_HOME}/miaplpy
+export PATH=${PATH}:${MIAPLPY_HOME}/snaphu/bin
 
 ```
 #### 2. Download
 
 ```
 cd ~/tools
-git clone https://github.com/geodesymiami/MiNoPy.git
+git clone https://github.com/insarlap/MiaplPy.git
 git clone https://github.com/insarlab/MintPy.git
 git clone https://github.com/yunjunz/PyAPS.git
 ```
@@ -50,35 +50,35 @@ chmod +x $miniconda_version
 ~/tools/miniconda3/bin/conda init bash
 ```
 
-Run the following in your terminal to install the dependencies to a new environment minopy (recommended):
+Run the following in your terminal to install the dependencies to a new environment miaplpy (recommended):
 
 ```
-conda env create -f $MINOPY_HOME/docs/conda_env.yml
-conda activate minopy
+conda env create -f $MIAPLPY_HOME/docs/conda_env.yml
+conda activate miaplpy
 ```
 Or run the following in your terminal to install the dependencies to your custom environment, the default is base:
 
 ```
-conda install --yes -c conda-forge --file ~/tools/MiNoPy/docs/requirements.txt
+conda install --yes -c conda-forge --file ~/tools/MiaplPy/docs/requirements.txt
 $CONDA_PREFIX/bin/pip install git+https://github.com/insarlab/PySolid.git
 $CONDA_PREFIX/bin/pip install git+https://github.com/tylere/pykml.git
 ```
 
-#### 4. Setup MiNoPy
+#### 4. Setup MiaplPy
 
 I. Compile
 ```
-cd $MINOPY_HOME/minopy/lib;
+cd $MIAPLPY_HOME/miaplpy/lib;
 python setup.py
 ```
 II. Install [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/) 
 ```
-cd $MINOPY_HOME;
+cd $MIAPLPY_HOME;
 wget --no-check-certificate  https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/snaphu-v2.0.4.tar.gz
 tar -xvf snaphu-v2.0.4.tar.gz
 mv snaphu-v2.0.4 snaphu;
 rm snaphu-v2.0.4.tar.gz;
-sed -i 's/\/usr\/local/$(MINOPY_HOME)\/snaphu/g' snaphu/src/Makefile
+sed -i 's/\/usr\/local/$(MIAPLPY_HOME)\/snaphu/g' snaphu/src/Makefile
 cd snaphu/src; make
 ```
 

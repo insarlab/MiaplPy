@@ -1,9 +1,9 @@
 [![Language](https://img.shields.io/badge/python-3.6%2B-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-GPLv3-yellow.svg)](https://github.com/geodesymiami/MiNoPy/blob/main/LICENSE)
-[![Version](https://img.shields.io/badge/version-v0.2.0-yellowgreen.svg)](https://github.com/geodesymiami/MiNoPy/releases)
+[![License](https://img.shields.io/badge/license-GPLv3-yellow.svg)](https://github.com/insarlab/MiaplPy/blob/main/LICENSE)
+[![Version](https://img.shields.io/badge/version-v0.2.0-yellowgreen.svg)](https://github.com/insarlab/MiaplPy/releases)
 
 
-## MiNoPy ##
+## MiaplPy ##
 *MIami NOn linear phase linking in PYthon*
 
 An open source python package of InSAR processing with Non Linear phase inversion in full resolution. It reads a stack of coregistered SLCs and
@@ -20,23 +20,23 @@ THIS IS RESEARCH CODE PROVIDED TO YOU "AS IS" WITH NO WARRANTIES OF CORRECTNESS.
 
 The workflow starts with reading coregistered SLCs, then performs an inversion to get wrapped phase time series.
 Interferograms are then unwrapped and different corrections are applied on the final time series.
-Everything is followed by defined steps in the `minopyApp.py` and the input is a text file containing adjustable options (configuration file)
-Starting the software will create two configuration files in minopy folder: `minopyApp.cfg` and `custom_smallbaselineApp.cfg`
+Everything is followed by defined steps in the `miaplpyApp.py` and the input is a text file containing adjustable options (configuration file)
+Starting the software will create two configuration files in miaplpy folder: `miaplpyApp.cfg` and `custom_smallbaselineApp.cfg`
 Use `custom_smallbaselineApp.cfg` only for mintpy corrections. 
 
 examples:
 
 ```
-- minopyApp.py config_file
-- minopyApp.py config_file --start load_data --stop unwrap_ifgram
-- minopyApp.py config_file --dostep generate_ifgram
+- miaplpyApp.py config_file
+- miaplpyApp.py config_file --start load_data --stop unwrap_ifgram
+- miaplpyApp.py config_file --dostep generate_ifgram
 ```
 
-Use `minopyApp.py config_file --runfiles` to create run files, you may then run them one by one manually
+Use `miaplpyApp.py config_file --runfiles` to create run files, you may then run them one by one manually
 
-Use `minopyApp.py -H` for a complete list of required options.
+Use `miaplpyApp.py -H` for a complete list of required options.
 
-Use `minopyApp.py -h` for a help on the steps you need to run 
+Use `miaplpyApp.py -h` for a help on the steps you need to run 
 
 -- Note:
 Inversion step may take long time depending on the number of pixels in the subset area you are processing and number of images. 
@@ -51,12 +51,12 @@ Size: ~318 Mb\
 wget https://zenodo.org/record/6039250/files/PichinchaSenDT142.zip
 unzip PichinchaSenDT142.zip
 cd PichinchaSenDT142
-minopyApp.py PichinchaSenDT142.txt --dir ./minopy
+miaplpyApp.py PichinchaSenDT142.txt --dir ./miaplpy
 ```
 
-#### Example tutorial in jupyter notebook [nbviewer](https://nbviewer.org/github/geodesymiami/MiNoPy_notebooks/blob/main/minopyApp.ipynb)
+#### Example tutorial in jupyter notebook [nbviewer](https://nbviewer.org/github/insarlab/MiaplPy_notebooks/blob/main/miaplpyApp.ipynb)
 
-#### [Brief description of the steps](https://github.com/geodesymiami/MiNoPy/blob/main/docs/steps_guide.md)
+#### [Brief description of the steps](https://github.com/geodesymiami/MiaplPy/blob/main/docs/steps_guide.md)
 
 #### [Guide for HPC users](./HPC_Users.md)
 
