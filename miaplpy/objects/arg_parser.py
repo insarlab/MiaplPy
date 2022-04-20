@@ -430,7 +430,7 @@ class MiaplPyParser:
         STEP_LIST = [
             'load_data',
             'phase_linking',
-            'concatenate_patch',
+            'concatenate_patches',
             'generate_ifgram',
             'unwrap_ifgram',
             'load_ifgram',

@@ -30,7 +30,7 @@ pathObj = PathFind()
 STEP_LIST = [
     'load_data',
     'phase_linking',
-    'concatenate_patch'
+    'concatenate_patches'
     'generate_ifgram',
     'unwrap_ifgram',
     'load_ifgram',
@@ -38,9 +38,19 @@ STEP_LIST = [
     'invert_network',
     'timeseries_correction']
 
+STEP_NUMBERS = {'load_data': '1',
+                'phase_linking': '2',
+                'concatenate_patches': '3',
+                'generate_ifgram': '4',
+                'unwrap_ifgram': '5',
+                'load_ifgram': '6',
+                'ifgram_correction': '7',
+                'invert_network': '8',
+                'timeseries_correction': '9'}
+
 RUN_FILES = {'load_data': 'run_01_miaplpy_load_data',
              'phase_linking': 'run_02_miaplpy_phase_linking',
-             'concatenate_patch': 'run_03_miaplpy_concatenate_patch',
+             'concatenate_patches': 'run_03_miaplpy_concatenate_patches',
              'generate_ifgram': 'run_04_miaplpy_generate_ifgram',
              'unwrap_ifgram': 'run_05_miaplpy_unwrap_ifgram',
              'load_ifgram': 'run_06_miaplpy_load_ifgram',
@@ -126,16 +136,16 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         #self.run_dir = os.path.join(self.workDir, pathObj.rundir)
         #os.makedirs(self.run_dir, exist_ok=True)
 
-        name_ifg_network = self.template['miaplpy.interferograms.type']
-        if self.template['miaplpy.interferograms.type'] == 'delaunay':
+        name_ifg_network = self.template['miaplpy.interferograms.networkType']
+        if self.template['miaplpy.interferograms.networkType'] == 'delaunay':
             name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.delaunayBaselineRatio'])
-        elif self.template['miaplpy.interferograms.type'] == 'sequential':
+        elif self.template['miaplpy.interferograms.networkType'] == 'sequential':
             name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.numSequential'])
 
-        name_ifg_network = self.template['miaplpy.interferograms.type']
-        if self.template['miaplpy.interferograms.type'] == 'delaunay':
+        name_ifg_network = self.template['miaplpy.interferograms.networkType']
+        if self.template['miaplpy.interferograms.networkType'] == 'delaunay':
             name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.delaunayBaselineRatio'])
-        elif self.template['miaplpy.interferograms.type'] == 'sequential':
+        elif self.template['miaplpy.interferograms.networkType'] == 'sequential':
             name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.numSequential'])
 
         self.out_dir_network = '{}/{}'.format(self.workDir,
@@ -236,7 +246,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             job_obj = None
         self.run_load_data('load_data', job_obj)
         self.run_phase_linking('phase_linking', job_obj)
-        self.run_phase_linking('concatenate_patch', job_obj)
+        self.run_phase_linking('concatenate_patches', job_obj)
         self.run_interferogram('generate_ifgram', job_obj)
         self.run_unwrap('unwrap_ifgram', job_obj)
         self.run_load_ifg('load_ifgram', job_obj)
@@ -305,7 +315,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             a0=self.workDir, a1=self.template['miaplpy.inversion.rangeWindow'],
             a2=self.template['miaplpy.inversion.azimuthWindow'], a3=self.template['miaplpy.inversion.patchSize'])
 
-        if sname == 'concatenate_patch':
+        if sname == 'concatenate_patches':
             command_line = '{a} phase_linking.py {b} --slc_stack {c} --concatenate\n'.format(
                 a=self.text_cmd.strip("'"), b=scp_args, c=slc_stack)
 
@@ -368,7 +378,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             ifgram_dir = ifgram_dir + '_list'
             os.makedirs(ifgram_dir, exist_ok='True')
         else:
-            ifgram_dir = ifgram_dir + '_{}'.format(ifg_dir_names[self.template['miaplpy.interferograms.type']])
+            ifgram_dir = ifgram_dir + '_{}'.format(ifg_dir_names[self.template['miaplpy.interferograms.networkType']])
 
 
 
@@ -378,7 +388,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             index = int(self.num_images // 2)
             reference_date = self.date_list[index]
 
-        if self.template['miaplpy.interferograms.type'] == 'delaunay' and \
+        if self.template['miaplpy.interferograms.networkType'] == 'delaunay' and \
             self.template['miaplpy.interferograms.list'] in [None, 'None']:
 
             ifgram_dir += '_{}'.format(self.template['miaplpy.interferograms.delaunayBaselineRatio'])
@@ -403,7 +413,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             for line in lines:
                 pairs.append((line.split('_')[0], line.split('\n')[0].split('_')[1]))
         else:
-            if self.template['miaplpy.interferograms.type'] == 'sequential':
+            if self.template['miaplpy.interferograms.networkType'] == 'sequential':
                 ifgram_dir += '_{}'.format(self.template['miaplpy.interferograms.numSequential'])
                 os.makedirs(ifgram_dir, exist_ok='True')
                 num_seq = int(self.template['miaplpy.interferograms.numSequential'])
@@ -414,14 +424,14 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
                     for t in range(1, num_seq + 1):
                         pairs.append((self.date_list[i - t], self.date_list[i]))
 
-            if self.template['miaplpy.interferograms.type'] == 'single_reference':
+            if self.template['miaplpy.interferograms.networkType'] == 'single_reference':
                 os.makedirs(ifgram_dir, exist_ok='True')
                 indx = self.date_list.index(reference_date)
                 for i in range(0, len(self.date_list)):
                     if not indx == i:
                         pairs.append((self.date_list[indx], self.date_list[i]))
            
-            if self.template['miaplpy.interferograms.type'] == 'mini_stacks':
+            if self.template['miaplpy.interferograms.networkType'] == 'mini_stacks':
                 os.makedirs(ifgram_dir, exist_ok='True')
 
                 ref_date_month = int(self.template['miaplpy.interferograms.ministackRefMonth'])
@@ -709,8 +719,11 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
     def run(self, steps=STEP_LIST):
         #import subprocess
         for sname in steps:
-            if not sname in ['correct_unwrap_error', 'mintpy_corrections']:
-                print('\n\n******************** step - {} ********************'.format(sname))
+            if not sname in ['ifgram_correction', 'timeseries_correction']:
+                print('\n\n<><><><><><><><><> step {} - {} (MiaplPy) <><><><><><><><><><>'.format(STEP_NUMBERS[sname], sname))
+            else:
+                print('\n\n****************** step {} - {} (MintPy) *********************'.format(STEP_NUMBERS[sname], sname))
+
             job_obj = None
             if sname == 'load_data':
                 self.run_load_data('load_data', job_obj)
@@ -718,8 +731,8 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 slc_stack = self.run_phase_linking('phase_linking', job_obj)
                 if self.copy_to_tmp:
                     os.system('cp {} /tmp'.format(slc_stack))
-            elif sname == 'concatenate_patch':
-                self.run_phase_linking('concatenate_patch', job_obj)
+            elif sname == 'concatenate_patches':
+                self.run_phase_linking('concatenate_patches', job_obj)
             elif sname == 'generate_ifgram':
                 self.run_interferogram('generate_ifgram', job_obj)
             elif sname == 'unwrap_ifgram':
