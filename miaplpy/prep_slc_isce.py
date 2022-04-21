@@ -22,7 +22,7 @@ def enablePrint():
     sys.stdout = sys.__stdout__
 
 blockPrint()
-import isce
+
 from isceobj.Planet.Planet import Planet
 import glob
 import shelve
@@ -38,6 +38,7 @@ EXAMPLE = """example:
   prep_slc_isce.py -s ./merged/SLC -m .merged/SLC/20190510/referenceShelve/data.dat -b ./baselines -g ./merged/geom_reference  #for stripmapStack
   """
 
+GEOMETRY_PREFIXS = ['hgt', 'lat', 'lon', 'los', 'shadowMask', 'waterMask', 'incLocal']
 
 def create_parser():
     """Command line parser."""
@@ -58,6 +59,10 @@ def create_parser():
                         help=' directory with baselines ')
     parser.add_argument('-g', '--geometry-dir', dest='geometryDir', type=str, default=None,
                         help=' directory with geometry files ')
+    parser.add_argument('--geom-files', dest='geometryFiles', type=str, nargs='*',
+                        default=['{}.rdr'.format(i) for i in GEOMETRY_PREFIXS],
+                        help='List of geometry file basenames. Default: %(default)s.\n'
+                             'All geometry files need to be in the same directory.')
     parser.add_argument('--force', dest='update_mode', action='store_false',
                         help='Force to overwrite all .rsc metadata files.')
     return parser
@@ -82,6 +87,7 @@ def load_product(xmlname):
     return obj
 
 
+'''
 def extract_tops_metadata(xml_file):
     """Read metadata from xml file for Sentinel-1/TOPS
     Parameters: xml_file : str, path of the .xml file, i.e. reference/IW1.xml
@@ -199,9 +205,10 @@ def extract_stripmap_metadata(meta_file):
     metadata['beam_mode'] = 'SM'
     return metadata, frame
 
+'''
 
 def extract_multilook_number(geom_dir, metadata=dict()):
-    '''
+
     for fbase in ['hgt','lat','lon','los']:
         fbase = os.path.join(geom_dir, fbase)
         fnames = glob.glob('{}*.rdr'.format(fbase)) + glob.glob('{}*.geo'.format(fbase))
@@ -219,6 +226,7 @@ def extract_multilook_number(geom_dir, metadata=dict()):
         if key not in metadata:
             metadata[key] = 1
     return metadata
+'''
 
 def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=True):
     """Extract metadata from ISCE stack products
@@ -236,31 +244,45 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
         return readfile.read_roipac_rsc(rsc_file)
 
     # 1. extract metadata from XML / shelve file
-    fbase = os.path.basename(meta_file)
-    if fbase.startswith("IW"):
+    processor = isce_utils.get_processor(meta_file)
+
+    if processor == 'tops':
         print('extract metadata from ISCE/topsStack xml file:', meta_file)
-        #metadata = extract_tops_metadata(meta_file)[0]
-        metadata = isce_utils.extract_tops_metadata(meta_file)[0]
+        metadata, frame = isce_utils.extract_tops_metadata(meta_file)
         metadata['sensor_type'] = 'tops'
-    elif fbase.startswith("data"):
+
+    elif processor == 'alosStack':
         print('extract metadata from ISCE/stripmapStack shelve file:', meta_file)
-        #metadata = extract_stripmap_metadata(meta_file)[0]
-        metadata = isce_utils.extract_stripmap_metadata(meta_file)[0]
+        metadata, frame = isce_utils.extract_stripmap_metadata(meta_file)
         metadata['sensor_type'] = 'stripmap'
-    elif fbase.endswith(".xml"):
-        #metadata = extract_stripmap_metadata(meta_file)[0]
-        metadata = isce_utils.extract_stripmap_metadata(meta_file)[0]
+
+    elif processor == 'stripmaps':
+        print('extract metadata from ISCE/stripmapStack data file:', meta_file)
+        metadata, frame = isce_utils.extract_stripmap_metadata(meta_file)[0]
 
     else:
         raise ValueError("unrecognized ISCE metadata file: {}".format(meta_file))
 
     # 2. extract metadata from geometry file
     if geom_dir:
-        metadata = isce_utils.extract_geometry_metadata(geom_dir, metadata)
+        if processor != 'alosStack':
+            metadata = isce_utils.extract_geometry_metadata(geom_dir, metadata)
+
+    # update pixel_size for full resolution data
+    metadata['rangePixelSize'] /= metadata['RLOOKS']
+    metadata['azimuthPixelSize'] /= metadata['ALOOKS']
+    metadata['RLOOKS'] = 1
+    metadata['ALOOKS'] = 1
+    # NCORRLOOKS for coherence calibration
+    rgfact = float(metadata['rangeResolution']) / float(metadata['rangePixelSize'])
+    azfact = float(metadata['azimuthResolution']) / float(metadata['azimuthPixelSize'])
+    metadata['NCORRLOOKS'] = metadata['RLOOKS'] * metadata['ALOOKS'] / (rgfact * azfact)
+    ##
 
     # 3. common metadata
     metadata['PROCESSOR'] = 'isce'
-    metadata['ANTENNA_SIDE'] = '-1'
+    if 'ANTENNA_SIDE' not in metadata.keys():
+        metadata['ANTENNA_SIDE'] = '-1'
 
     # convert all value to string format
     for key, value in metadata.items():
@@ -345,84 +367,141 @@ def read_baseline_timeseries(baseline_dir, beam_mode='IW'):
 
 
 #########################################################################
-def prepare_geometry(geom_dir, metadata=dict(), update_mode=True):
+def prepare_geometry(geom_dir, geom_files=[], metadata=dict(), processor='tops', update_mode=True):
     """Prepare and extract metadata from geometry files"""
+
     print('prepare .rsc file for geometry files')
     # grab all existed files
 
-    isce_files = ['hgt', 'lat', 'lon', 'los', 'shadowMask', 'incLocal']
-    isce_files = [os.path.join(os.path.abspath(geom_dir), x + '.rdr.full.xml') for x in isce_files]
-    # isce_files = [os.path.join(os.path.abspath(geom_dir), '{}.rdr.full.xml'.format(i))
-    #              for i in ['hgt', 'lat', 'lon', 'los', 'shadowMask', 'incLocal']]
-    if not os.path.exists(isce_files[0]):
-        isce_files = ['hgt', 'lat', 'lon', 'los', 'shadowMask', 'incLocal']
-        isce_files = [os.path.join(os.path.abspath(geom_dir), x + '.rdr.xml') for x in isce_files]
+    # default file basenames
+    if not geom_files:
+        if processor in ['tops', 'stripmap']:
+            geom_files = ['{}.rdr.full.xml'.format(i) for i in GEOMETRY_PREFIXS]
 
-    isce_files = [i for i in isce_files if os.path.isfile(i)]
+        elif processor in ['alosStack']:
+            alooks = metadata['ALOOKS']
+            rlooks = metadata['RLOOKS']
+            fexts = ['.hgt', '.lat', '.lon', '.los', '.wbd']
+            geom_files = ['*_{}rlks_{}alks{}.full'.format(rlooks, alooks, fext) for fext in fexts]
+
+        else:
+            raise Exception('unknown processor: {}'.format(processor))
+
+    # get absolute file paths
+    geom_files = [os.path.join(geom_dir, i) for i in geom_files]
+
+    if not os.path.exists(geom_files[0]):
+        geom_files = [os.path.join(os.path.abspath(geom_dir), x + '.rdr.xml') for x in GEOMETRY_PREFIXS]
+
+    geom_files = [i for i in geom_files if os.path.isfile(i)]
+
     # write rsc file for each file
-    for isce_file in isce_files:
+    for geom_file in geom_files:
         # prepare metadata for current file
-        geom_metadata = read_attribute(isce_file.split('.xml')[0], metafile_ext='.xml')
+        geom_metadata = read_attribute(geom_file.split('.xml')[0], metafile_ext='.xml')
         geom_metadata.update(metadata)
         # write .rsc file
-        rsc_file = isce_file.split('.xml')[0]+'.rsc'
+        rsc_file = geom_file.split('.xml')[0]+'.rsc'
         writefile.write_roipac_rsc(geom_metadata, rsc_file,
                                    update_mode=update_mode,
                                    print_msg=True)
     return metadata
 
 
-def prepare_stack(inputDir, filePattern, metadata=dict(), baseline_dict=dict(), update_mode=True):
-    print('prepare .rsc file for ', filePattern)
+def prepare_stack(inputDir, filePattern, processor='tops', metadata=dict(), baseline_dict=dict(), update_mode=True):
+
     if not os.path.exists(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern + '.xml'))[0]):
         filePattern = filePattern.split('.full')[0]
-    isce_files = sorted(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern + '.xml')))
+    print('preparing RSC file for ', filePattern)
+
+    if processor in ['tops', 'stripmap']:
+        isce_files = sorted(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern + '.xml')))
+    elif processor == 'alosStack':
+        isce_files = sorted(glob.glob(os.path.join(os.path.abspath(inputDir), filePattern + '.xml')))    # not sure
+    else:
+        raise ValueError('Un-recognized ISCE stack processor: {}'.format(processor))
+
     if len(isce_files) == 0:
         raise FileNotFoundError('no file found in pattern: {}'.format(filePattern))
-    slc_dates = np.sort(os.listdir(inputDir))
+
     # write .rsc file for each interferogram file
     num_file = len(isce_files)
+    slc_dates = np.sort(os.listdir(inputDir))
     prog_bar = ptime.progressBar(maxValue=num_file)
     for i in range(num_file):
-        isce_file = isce_files[i].split('.xml')[0]
         # prepare metadata for current file
+        isce_file = isce_files[i].split('.xml')[0]
+        dates = [slc_dates[0], os.path.basename(os.path.dirname(isce_file))]
         slc_metadata = read_attribute(isce_file, metafile_ext='.xml')
         slc_metadata.update(metadata)
-        dates = [slc_dates[0], os.path.basename(os.path.dirname(isce_file))]
         slc_metadata = add_slc_metadata(slc_metadata, dates, baseline_dict)
 
         # write .rsc file
-        rsc_file = isce_file+'.rsc'
+        rsc_file = isce_file + '.rsc'
         writefile.write_roipac_rsc(slc_metadata, rsc_file,
                                    update_mode=update_mode,
                                    print_msg=False)
-        prog_bar.update(i+1, suffix='{}_{}'.format(dates[0], dates[1]))
+        prog_bar.update(i + 1, suffix='{}_{}'.format(dates[0], dates[1]))
     prog_bar.close()
+
+
     return
 
+
+def gen_random_baseline_timeseries(dset_dir, dset_file, max_bperp=10):
+    """Generate a baseline time series with random values.
+    """
+    # list of dates
+    fnames = glob.glob(os.path.join(dset_dir, '*', dset_file))
+    date12s = sorted([os.path.basename(os.path.dirname(x)) for x in fnames])
+    date1s = [x.split('_')[0] for x in date12s]
+    date2s = [x.split('_')[1] for x in date12s]
+    date_list = sorted(list(set(date1s + date2s)))
+
+    # list of bperp
+    bperp_list = [0] + np.random.randint(-max_bperp, max_bperp, len(date_list)-1).tolist()
+
+    # prepare output
+    bDict = {}
+    for date_str, bperp in zip(date_list, bperp_list):
+        bDict[date_str] = [bperp, bperp]
+
+    return bDict
 
 #########################################################################
 def main(iargs=None):
     inps = cmd_line_parse(iargs)
+    inps.processor = isce_utils.get_processor(inps.metaFile)
 
     # read common metadata
     metadata = {}
     if inps.metaFile:
+        rsc_file = os.path.join(os.path.dirname(inps.metaFile), 'data.rsc')
         metadata = extract_isce_metadata(inps.metaFile,
                                          geom_dir=inps.geometryDir,
+                                         rsc_file=rsc_file,
                                          update_mode=inps.update_mode)
 
     # prepare metadata for geometry file
     if inps.geometryDir:
         metadata = prepare_geometry(inps.geometryDir,
                                     metadata=metadata,
+                                    processor=inps.processor,
                                     update_mode=inps.update_mode)
 
     # read baseline info
     baseline_dict = {}
     if inps.baselineDir:
+        baseline_dict = isce_utils.read_baseline_timeseries(inps.baselineDir,
+                                                            processor=inps.processor)
+
+    ''' 
+    # read baseline info
+    baseline_dict = {}
+    if inps.baselineDir:
         baseline_dict = read_baseline_timeseries(inps.baselineDir,
                                                  beam_mode=metadata['beam_mode'])
+    '''
 
     # prepare metadata for ifgram file
     if inps.slcDir and inps.slcFiles:
@@ -430,6 +509,7 @@ def main(iargs=None):
             prepare_stack(inps.slcDir, namePattern,
                           metadata=metadata,
                           baseline_dict=baseline_dict,
+                          processor=inps.processor,
                           update_mode=inps.update_mode)
     print('Done.')
     return
