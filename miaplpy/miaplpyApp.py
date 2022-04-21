@@ -187,6 +187,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 self.metadata['WIDTH'] = int(self.metadata['WIDTH'])
 
             self.ifgram_dir, self.pairs = self.get_interferogram_pairs()
+            os.makedirs(self.ifgram_dir, exist_ok=True)
 
         if 'sensor_type' in self.metadata:
             self.sensor_type = self.metadata['sensor_type']
@@ -378,7 +379,6 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if not self.template['miaplpy.interferograms.list'] in [None, 'None', 'auto']:
             ifgram_dir = ifgram_dir + '_list'
-            os.makedirs(ifgram_dir, exist_ok='True')
         else:
             ifgram_dir = ifgram_dir + '_{}'.format(ifg_dir_names[self.template['miaplpy.interferograms.networkType']])
 
@@ -394,7 +394,6 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             self.template['miaplpy.interferograms.list'] in [None, 'None']:
 
             ifgram_dir += '_{}'.format(self.template['miaplpy.interferograms.delaunayBaselineRatio'])
-            os.makedirs(ifgram_dir, exist_ok='True')
 
             scp_args = ' -b {} -o {} --temporalBaseline {} --perpBaseline {} --date_list {} --baseline_ratio {}'.format(
                 baseline_dir, short_baseline_ifgs, self.template['miaplpy.interferograms.delaunayTempThresh'],
@@ -417,7 +416,6 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         else:
             if self.template['miaplpy.interferograms.networkType'] == 'sequential':
                 ifgram_dir += '_{}'.format(self.template['miaplpy.interferograms.connNum'])
-                os.makedirs(ifgram_dir, exist_ok='True')
                 num_seq = int(self.template['miaplpy.interferograms.connNum'])
                 for t in range(0, num_seq-1):
                     for l in range(t + 1, num_seq):
@@ -427,15 +425,12 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
                         pairs.append((self.date_list[i - t], self.date_list[i]))
 
             if self.template['miaplpy.interferograms.networkType'] == 'single_reference':
-                os.makedirs(ifgram_dir, exist_ok='True')
                 indx = self.date_list.index(reference_date)
                 for i in range(0, len(self.date_list)):
                     if not indx == i:
                         pairs.append((self.date_list[indx], self.date_list[i]))
            
             if self.template['miaplpy.interferograms.networkType'] == 'mini_stacks':
-                os.makedirs(ifgram_dir, exist_ok='True')
-
                 ref_date_month = int(self.template['miaplpy.interferograms.ministackRefMonth'])
                 pairs = fb.find_mini_stacks(self.date_list, baseline_dir, month=ref_date_month)
 
@@ -558,7 +553,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             out_dir = os.path.join(self.ifgram_dir, pair[0] + '_' + pair[1])
             #if float(self.template['miaplpy.interferograms.filterStrength']) > 0:
             #    corr_file = os.path.join(out_dir, 'filt_fine.cor')
-            os.makedirs(out_dir, exist_ok='True')
+            #os.makedirs(out_dir, exist_ok='True')
 
             scp_args = '--ifg {a1} --coherence {a2} --unwrapped_ifg {a3} '\
                        '--max_discontinuity {a4} --init_method {a5} --length {a6} ' \
