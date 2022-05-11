@@ -48,7 +48,7 @@ Area: Pichincha volcano, Ecuador\
 Dataset: Sentinel-1 Descending Track 142, 46 acquisitions, 2016.04.19 - 2017.12.28\
 Size: ~318 Mb\
 ```
-wget https://zenodo.org/record/6039250/files/PichinchaSenDT142.zip
+wget https://zenodo.org/record/6539952/files/PichinchaSenDT142.zip
 unzip PichinchaSenDT142.zip
 cd PichinchaSenDT142
 miaplpyApp.py PichinchaSenDT142.txt --dir ./miaplpy
@@ -56,7 +56,7 @@ miaplpyApp.py PichinchaSenDT142.txt --dir ./miaplpy
 
 #### Example tutorial in jupyter notebook [nbviewer](https://nbviewer.org/github/insarlab/MiaplPy_notebooks/blob/main/miaplpyApp.ipynb)
 
-#### [Brief description of the steps](https://github.com/geodesymiami/MiaplPy/blob/main/docs/steps_guide.md)
+#### [Brief description of the steps](https://github.com/insarlab/MiaplPy/blob/main/docs/steps_guide.md)
 
 #### [Guide for HPC users](./HPC_Users.md)
 
