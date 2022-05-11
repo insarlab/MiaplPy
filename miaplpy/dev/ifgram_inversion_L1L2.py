@@ -1691,8 +1691,12 @@ def ifgram_inversion(inps=None):
     # roll back to the original number of threads
     cluster.roll_back_num_threads(num_threads_dict)
 
+<<<<<<< HEAD:miaplpy/dev/ifgram_inversion_L1L2.py
     if os.path.exists(out_dir_boxes):
         os.system('rm -rf {}'.format(out_dir_boxes))
+=======
+    os.system('rm -rf {}'.format(out_dir_boxes))
+>>>>>>> main:minopy/dev/ifgram_inversion_L1L2.py
     m, s = divmod(time.time() - start_time, 60)
     print('time used: {:02.0f} mins {:02.1f} secs.\n'.format(m, s))
     return
