@@ -166,7 +166,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.text_cmd in [None, 'None']:
             self.text_cmd = ''
 
-        self.num_workers = int(self.template['miaplpy.multiprocessing.numProcessor'])
+        self.num_workers = int(self.template['miaplpy.multiprocessing.numCores'])
         if not self.write_job:
             num_cpu = os.cpu_count()
             if self.num_workers > num_cpu:
