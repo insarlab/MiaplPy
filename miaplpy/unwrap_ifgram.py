@@ -55,8 +55,9 @@ def main(iargs=None):
     time0 = time.time()
 
     inps.work_dir = os.path.dirname(inps.input_ifg)
-    if not os.path.exists(inps.work_dir + '/filt_fine.unw.conncomp.vrt'):
 
+    if not os.path.exists(inps.work_dir + '/filt_fine.unw.conncomp.vrt'):
+       
         unwObj = Snaphu(inps)
         do_tiles, metadata = unwObj.need_to_split_tiles()
 

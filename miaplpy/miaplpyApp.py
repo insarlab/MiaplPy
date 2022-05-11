@@ -537,7 +537,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         run_commands = []
         num_cpu = os.cpu_count()
-        ntiles = self.num_pixels // 40000000
+        ntiles = self.num_pixels // np.int(self.template['miaplpy.unwrap.snaphu.tileNumPixels'])
         if ntiles == 0:
             ntiles = 1
         num_cpu = num_cpu // ntiles
@@ -621,9 +621,8 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         scp_args += ' --output {a}/inputs/ifgramStack.h5 {a}/inputs/geometryRadar.h5 {a}/inputs/geometryGeo.h5'.format(a=self.out_dir_network)
 
         run_commands = ['{} load_ifgram.py {}\n'.format(self.text_cmd.strip("'"), scp_args)]
+        
         run_commands = run_commands[0].lstrip()
-
-        run_commands = [cmd.lstrip() for cmd in run_commands]
 
         os.makedirs(self.run_dir, exist_ok=True)
 
