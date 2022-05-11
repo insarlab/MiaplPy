@@ -13,7 +13,8 @@ are not required at this step. You only need SLC and geometry files. If your dir
 convention, you may set `miaplpy.load.autoPath` to `yes` and it will automatically read the data. 
 Also you need to set subset area by specifying bounding box in `miaplpy.subset.lalo`. 
 Processing time would be a matter if large subset is selected. 
-After setting up your template file, run following command to load data. It will call the `load_slc.py` script. 
+After setting up your template file, run following command to load data. It will call the `load_slc_geometry.py` script. 
+The loaded data are created in `miaplpy/inputs` and consist of `geometryRadar.h5` and `slcStack.h5`. The reference and baseline folders are copied here for easier access and independent run from project data.  
 ```
 miaplpyApp.py $PWD/PichinchaSenDT142.txt --dostep load_data --dir $PWD/miaplpy
 ```
@@ -27,7 +28,9 @@ your processing system availability which will be the number of parallel jobs.
 All options begining with `miaplpy.inversion.*` are used in this step. Patch size is the dimension
 of your patches, for example 200 by 200 as default. ministack size is the number of images used for inverting 
 each mini stack. Range and Azimuth window are the size of searching window to find SHPs. 
-Statistical test to find SHPs can be selected among KS (default), AD and ttest. Following command will call `phase_inversion.py` script
+Statistical test to find SHPs can be selected among KS (default), AD and ttest. Following command will call `phase_inversion.py` script.
+The outputs of this step are the linked phase series, phase linking temporal coherence, SHP map also PS mask, top eigen value percentage and amplitude dispersion index for PS analysis. 
+All outputs are in patches in `miaplpy/inverted/PATCHES` folder and if this step runs out of time or stops for any reason, it will continue from where it stopped by rerunning this step. 
 
 ```
 miaplpyApp.py $PWD/PichinchaSenDT142.txt --dostep phase_linking --dir $PWD/miaplpy
@@ -38,14 +41,31 @@ miaplpyApp.py $PWD/PichinchaSenDT142.txt --dostep phase_linking --dir $PWD/miapl
 ```
 miaplpyApp.py $PWD/PichinchaSenDT142.txt --dostep concatenate_patch --dir $PWD/miaplpy
 ```
+The outputs are: 
+```
+miaplpy/inverted/phase_series.h5` 
+miaplpy/inverted/tempCoh_full
+miaplpy/inverted/tempCoh_average
+miaplpy/inverted/top_eigenvalues
+miaplpy/inverted/amp_dipersion_index
+miaplpy/maskPS.h5
+``` 
 
-4. After phase linking you have the single reference interferograms in a stack called `phase_series.h5`. You need to unwrap the interferograms for time series analysis but unwrapping is not easy specially when you have large temporal baselines. We like to unwrap minimum number of interferograms but the most correlated ones. In MiaplPy you can select which pairs to unwrap and for that you write selected pairs from the stack to separate ifgram directories. Use options starting with `miaplpy.interferograms.*` in template to select your network of interferograms to unwrap. The available options are: single reference, mini_stacks and sequential. You may also write your own selected list in a text file and set the path to `miaplpy.interferograms.list`. For sequential pairs (more than 2 connections), you can later perform both `bridging` and `phase_closure` unwrap error corrections of MintPy but for other pair networks you may only run `bridging`. Following command will call `generate_ifgram.py` script.
-
+4. After phase linking you have the single reference interferograms in a stack called `phase_series.h5`. 
+You need to unwrap the interferograms for time series analysis. 
+In MiaplPy you can select which pairs to unwrap. Use options starting with `miaplpy.interferograms.*` in template to select your network of interferograms to unwrap. 
+The available options are: single reference, Delaunay, mini_stacks and sequential. You may also write your own selected list in a text file and set the path to `miaplpy.interferograms.list`.  
+Single reference network is suggested for coherent areas and Delaunay network is suggested for study areas with more decorrelation. 
+Following command will call `generate_ifgram.py` script.
+The outputs are the interferograms in `miaplpy/inverted/interferograms_*` folder. Generally filtering of the interferograms is not suggested but there are options for filtering before unwrapping and if you filter you can remove the filter
 ```
 miaplpyApp.py $PWD/PichinchaSenDT142.txt --dostep generate_ifgram --dir $PWD/miaplpy
 ```
 
-5. The next step would be to unwrap the selected pairs. We use [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/) for unwrapping and you can set some options starting with `miaplpy.unwrap.*` in template. Following command will call `unwrap_ifgram.py` script.
+5. The next step would be to unwrap the selected pairs. 
+We use [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/) for unwrapping and you can set some options starting with `miaplpy.unwrap.*` in template. 
+If the study area is large, you can use tile mode of SNAPHU by setting number of pixels for each tile.
+Following command will call `unwrap_ifgram.py` script.
 
 ```
 miaplpyApp.py $PWD/PichinchaSenDT142.txt --dostep unwrap_ifgram --dir $PWD/miaplpy
@@ -57,20 +77,25 @@ You can now use `miaplpy.load.*` options in template specified for interferogram
 ```
 miaplpyApp.py $PWD/PichinchaSenDT142.txt --dostep load_ifgram --dir $PWD/miaplpy
 ```
-s
-7. At this step you will run the modify network, reference point selection and correct unwrap error using MintPy. Use the corresponding mintpy template options `mintpy.unwrapError.*`. Following command will call `smallbaselineApp.py` script from MintPy.
+
+7. At this step you will run the modify network, reference point selection and correct unwrap error using MintPy. 
+Use the corresponding mintpy template options `mintpy.unwrapError.*` in the `custom_smallbaselineApp.cfg` config file. 
+Following command will call `smallbaselineApp.py` script from MintPy.
 
 ```
 miaplpyApp.py $PWD/PichinchaSenDT142.txt --dostep ifgram_correction --dir $PWD/miaplpy
 ```
 
-8. Now you need to convert phase to range change (time series). The temporal coherence threshold can be set for this step using `miaplpy.timeseries.minTempCoh` and you can use water mask by setting `miaplpy.timeseries.waterMask`. Following command will call `network_inversion.py` script.
+8. Now you need to invert the interferograms to unwrapped time series and convert to range-change. 
+The temporal coherence threshold can be set for this step using `miaplpy.timeseries.minTempCoh` and you can use water mask by setting `miaplpy.timeseries.waterMask`. 
+Following command will call `network_inversion.py` script.
 
 ```
 miaplpyApp.py $PWD/PichinchaSenDT142.txt --dostep invert_network --dir $PWD/miaplpy
-```s
+```
 
-9. Finally, the time series is ready for different corrections including, tropospheric and topographic corrections. At this step you can use MintPy starting `correct_LOD` or run the following. It will call `smallbaselineApp.py` script from MintPy.
+9. Finally, the time series is ready for different corrections including, tropospheric and topographic corrections. 
+At this step you can use MintPy starting `correct_LOD` or run the following. It will call `smallbaselineApp.py` script from MintPy.
 
 
 ```
@@ -79,7 +104,8 @@ miaplpyApp.py $PWD/PichinchaSenDT142.txt --dostep timeseries_correction --dir $P
 
 
 #### Post processing (Optional) ####
-You can correct geolocation by running the following command but you need to do it after topographic residual correction step in MintPy. Also geocoding must be done after this post processing.
+You can correct geolocation by running the following command but you need to do it after topographic residual correction step in MintPy. 
+Also geocoding must be done after this post processing.
 
 ```
 correct_geolocation.py -g ./miaplpy/inputs/geometryRadar.h5 -d ./miaplpy/demErr.h5
