@@ -1,19 +1,19 @@
 # Contributing Guidelines
 
-(Following is a copy of guidlines from MintPy modified for MiNoPy)\
+(Following is a copy of guidlines from MintPy modified for MiaplPy)\
 This document is inspired by similar instructions from numpy, GMT, ISCE, gdal and jupyterhub. 
-If you're reading this section, you're probably interested in contributing to MiNoPy. Welcome and thanks for your interest in contributing! 
+If you're reading this section, you're probably interested in contributing to MiaplPy. Welcome and thanks for your interest in contributing! 
 
-These are several ways to contribute to the MiNoPy project:
+These are several ways to contribute to the MiaplPy project:
 
 * Writing or proofreading documentation (including tutorials and examples in jupyter-notebooks)
-* Submitting bug reports or feature requests on [GitHub issue](https://github.com/geodesymiami/minopy/issues)
+* Submitting bug reports or feature requests on [GitHub issue](https://github.com/insarlap/miaplpy/issues)
 * Suggesting or implementing tests
 * Fixing typos or bugs in code
 * Writing code for everyone to use
 * Giving feedback about the projects (including giving feedback about the contribution process)
 
-If you get stuck at any point you can open an [issue on GitHub](https://github.com/geodesymiami/minopy/issues) or comment on any open issue or pull request.
+If you get stuck at any point you can open an [issue on GitHub](https://github.com/insarlap/miaplpy/issues) or comment on any open issue or pull request.
 
 For more information on contributing to open source projects, [GitHub's own guide](https://guides.github.com/activities/contributing-to-open-source/)
 is a great starting point if you are new to version control. 
@@ -22,14 +22,14 @@ is a great starting point if you are new to version control.
 
 #### 1. If you are a first-time contributor: ####
 
-+ Go to https://github.com/geodesymiami/minopy.git and click "fork" button to create your own copy of the project.
++ Go to https://github.com/insarlab/miaplpy.git and click "fork" button to create your own copy of the project.
 
 + Clone the project to your local computer and add the upstream repository:
 
    ```
-   git clone https://github.com/your_user_name/minopy.git
+   git clone https://github.com/your_user_name/miaplpy.git
    cd MintPy
-   git remote add upstream https://github.com/geodesymiami/minopy.git
+   git remote add upstream https://github.com/geodesymiami/miaplpy.git
    ```
 
 + Now, `git remote -v` will show two remote repositories named:
@@ -39,7 +39,7 @@ is a great starting point if you are new to version control.
 
 #### 2. Develop your contribution: ####
 
-+ **Open an [issue](https://github.com/geodesymiami/minopy/issues) first** if you plan to introduce a new feature or to change funcationality, we may have easier ways to help you implement it. 
++ **Open an [issue](https://github.com/geodesymiami/miaplpy/issues) first** if you plan to introduce a new feature or to change funcationality, we may have easier ways to help you implement it. 
 If there is already an issue that matches your idea, leave a comment there instead to let us know what you plan to do. For bug fixes, documentation updates, etc., this is generally not necessary.
 
 + Pull the latest changes from upstream:
@@ -115,4 +115,4 @@ It takes about 10 mins to finish.
 
 ## Things you should NOT do ##
 
-(For anyone with push rights to github.com/geodesymiami/minopy) Never modify a commit or the history of anything that has been committed to the `main` branch.
+(For anyone with push rights to github.com/insarlab/miaplpy) Never modify a commit or the history of anything that has been committed to the `main` branch.
