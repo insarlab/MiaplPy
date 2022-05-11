@@ -56,7 +56,7 @@ miaplpyApp.py PichinchaSenDT142.txt --dir ./miaplpy
 
 #### Example tutorial in jupyter notebook [nbviewer](https://nbviewer.org/github/insarlab/MiaplPy_notebooks/blob/main/miaplpyApp.ipynb)
 
-#### [Brief description of the steps](https://github.com/geodesymiami/MiaplPy/blob/main/docs/steps_guide.md)
+#### [Brief description of the steps](https://github.com/insarlab/MiaplPy/blob/main/docs/steps_guide.md)
 
 #### [Guide for HPC users](./HPC_Users.md)
 
