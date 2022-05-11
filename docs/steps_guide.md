@@ -23,7 +23,7 @@ miaplpyApp.py $PWD/PichinchaSenDT142.txt --dostep load_data --dir $PWD/miaplpy
 In this step full network of wrapped phase series will be inverted using non-linear 
 phase linking methods including EVD, EMI, PTA, sequential_EVD, sequential_EMI (default) and 
 sequential_PTA. It will process the data in parallel by dividing the subset into patches. 
-You may set the number of workers in configuration file `miaplpy.multiprocessing.numProcessor` depending on 
+You may set the number of workers in configuration file `miaplpy.multiprocessing.numCores` depending on 
 your processing system availability which will be the number of parallel jobs. 
 All options begining with `miaplpy.inversion.*` are used in this step. Patch size is the dimension
 of your patches, for example 200 by 200 as default. ministack size is the number of images used for inverting 
