@@ -79,7 +79,7 @@ miaplpy.load.ionoFile       = auto  #[path2iono_file], optional
 EXAMPLE = """example:
   load_ifgram.py -t PichinchaSenDT142.tempalte
   load_ifgram.py -t miaplpyApp.cfg
-  load_ifgram.py -t miaplpyApp.cfg PichinchaSenDT142.template --project PichinchaSenDT142
+  load_ifgram.py -t miaplpyApp.cfg PichinchaSenDT142.txt --project PichinchaSenDT142
   load_ifgram.py -H #Show example input template for ISCE/ROI_PAC/GAMMA products
 """
 

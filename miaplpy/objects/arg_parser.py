@@ -241,9 +241,9 @@ class MiaplPyParser:
         """
 
         EXAMPLE = """example:
-          load_slc.py -t PichinchaSenDT142.template
+          load_slc.py -t PichinchaSenDT142.txt
           load_slc.py -t miaplpyApp.cfg
-          load_slc.py -t PichinchaSenDT142.template --project_dir $SCRATCH/PichinchaSenDT142
+          load_slc.py -t PichinchaSenDT142.txt --project_dir $SCRATCH/PichinchaSenDT142
           load_slc.py -H #Show example input template for ISCE/ROI_PAC/GAMMA products
         """
 
@@ -454,9 +454,9 @@ class MiaplPyParser:
               miaplpyApp.py  -h / --help                       # help 
               miaplpyApp.py  -H                                # print    default template options
               # Run with --start/stop/step options
-              miaplpyApp.py PichinchaSenDT142.template --dostep  load_data       # run the step 'download' only
-              miaplpyApp.py PichinchaSenDT142.template --start load_data         # start from the step 'download' 
-              miaplpyApp.py PichinchaSenDT142.template --stop  unwrap_ifgram    # end after step 'interferogram'
+              miaplpyApp.py PichinchaSenDT142.txt --dostep  load_data       # run the step 'download' only
+              miaplpyApp.py PichinchaSenDT142.txt --start load_data         # start from the step 'download' 
+              miaplpyApp.py PichinchaSenDT142.txt --stop  unwrap_ifgram    # end after step 'interferogram'
               """
         parser = argparse.ArgumentParser(description='Routine Time Series Analysis for MiaplPy',
                                          formatter_class=argparse.RawTextHelpFormatter,
