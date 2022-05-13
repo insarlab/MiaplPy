@@ -23,6 +23,7 @@ def enablePrint():
 
 blockPrint()
 
+import isce
 from isceobj.Planet.Planet import Planet
 import glob
 import shelve
