@@ -4,7 +4,7 @@
 
 
 ## MiaplPy ##
-*MIami NOn linear phase linking in PYthon*
+*MIAmi Phase Linking in PYthon*
 
 An open source python package of InSAR processing with Non Linear phase inversion in full resolution. It reads a stack of coregistered SLCs and
 produces time series of surface deformation. This package depends on MintPy for time series corrections.
