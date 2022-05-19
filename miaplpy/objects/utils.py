@@ -477,10 +477,9 @@ def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='
             if not mintpyTemplateDict['mintpy.subset.yx'] == 'no':
                 templateDict['miaplpy.subset.yx'] = mintpyTemplateDict['mintpy.subset.yx']
                 status = 'run'
-
         for key in common_keys:
             if templateDict['miaplpy.' + key] == 'no':
-                if not mintpyTemplateDict['mintpy.' + key] == 'no':
+                if not mintpyTemplateDict['mintpy.' + key] in ['no', False]:
                     templateDict['miaplpy.' + key] = mintpyTemplateDict['mintpy.' + key]
                     status = 'run'
 
@@ -490,7 +489,6 @@ def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='
             status = 'run'
 
         common_keys = ['miaplpy.' + key for key in common_keys] + ['miaplpy.subset.lalo', 'miaplpy.subset.yx']
-
         if status == 'run':
             tmp_file = templateFile + '.tmp'
             f_tmp = open(tmp_file, 'w')
@@ -499,7 +497,12 @@ def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='
                 if not line.startswith(('%', '#')) and len(c) > 1:
                     key = c[0]
                     if key in common_keys and templateDict[key]:
-                        new_value_str = '= ' + templateDict[key]
+                        s_value = templateDict[key]
+                        if s_value == True:
+                            s_value = 'yes'
+                        elif s_value == False:
+                            s_value = 'no'
+                        new_value_str = '= ' + s_value
                         value = str.replace(c[1], '\n', '').split("#")[0].strip()
                         value = value.replace('*', '\*')  # interpret * as character
                         old_value_str = re.findall('=' + '[\s]*' + value, line)[0]
@@ -510,7 +513,6 @@ def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='
 
             # Overwrite exsting original template file
             shutil.move(tmp_file, templateFile)
-
     # Change yes --> True and no --> False
     specialValues = {'yes': True,
                      'True': True,
