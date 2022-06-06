@@ -551,7 +551,7 @@ class slcDict:
             return data
         else:
             # data, metadata = read_binary_file(fname, datasetName=datasetName, box=box)
-            metadata = read_binary_file(fname, datasetName=datasetName)
+            metadata = read_binary_file(fname, datasetName=datasetName, attributes_only=True)
             return fname, metadata
 
     def get_size(self, family='slc'):

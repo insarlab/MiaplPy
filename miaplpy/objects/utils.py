@@ -650,7 +650,7 @@ def read_hdf5_file(fname, datasetName=None, box=None):
 
 
 #########################################################################
-def read_binary_file(fname, datasetName=None, box=None):
+def read_binary_file(fname, datasetName=None, box=None, attributes_only=False):
 
     """Read data from binary file, such as .unw, .cor, etc.
     Parameters: fname : str, path/name of binary file
@@ -802,14 +802,16 @@ def read_binary_file(fname, datasetName=None, box=None):
 
     else:
         print('Unknown InSAR processor.')
-
-    # reading
-    data = read_image(fname, box=box, band=band)
-
+    
     if 'DATA_TYPE' not in atr:
         atr['DATA_TYPE'] = data_type
-
-    return data, atr
+    
+    if attributes_only:
+        return atr
+    else:
+        # reading
+        data = read_image(fname, box=box, band=band)
+        return data, atr
 
 
 
