@@ -51,7 +51,6 @@ def get_phase_linking_coherence_mask(template, work_dir):
         atr = {}
         atr['miaplpy.timeseries.minTempCoh'] = tcoh_min
         ut.add_attribute(mask_file, atr)
-        ut.add_attribute(mask_file, atr)
 
     # check number of pixels selected in mask file for following analysis
     #num_pixel = np.sum(readfile.read(mask_file)[0] != 0.)
