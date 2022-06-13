@@ -252,13 +252,13 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
         metadata['sensor_type'] = 'tops'
 
     elif processor == 'alosStack':
-        print('extract metadata from ISCE/stripmapStack shelve file:', meta_file)
-        metadata, frame = isce_utils.extract_stripmap_metadata(meta_file)
-        metadata['sensor_type'] = 'stripmap'
+        print('extract metadata from ISCE/alosStack xml file:', meta_file)
+        metadata, frame = isce_utils.extract_alosStack_metadata(meta_file)
+        metadata['sensor_type'] = 'alos2'
 
-    elif processor == 'stripmaps':
+    elif processor == 'stripmap':
         print('extract metadata from ISCE/stripmapStack data file:', meta_file)
-        metadata, frame = isce_utils.extract_stripmap_metadata(meta_file)[0]
+        metadata, frame = isce_utils.extract_stripmap_metadata(meta_file)
 
     else:
         raise ValueError("unrecognized ISCE metadata file: {}".format(meta_file))
