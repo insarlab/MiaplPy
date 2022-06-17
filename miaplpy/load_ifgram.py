@@ -367,7 +367,9 @@ def main(iargs=None):
             extraDict['PLATFORM'] = atr['PLATFORM']
 
     # initiate objects
-    inpsDict['ds_name2key'] = datasetName2templateKey
+    inpsDict['dset_name2template_key'] = datasetName2templateKey
+    inpsDict['only_load_geometry'] = False
+    inpsDict['only_load_ionosphere'] = False
     stackObj = mld.read_inps_dict2ifgram_stack_dict_object(inpsDict)
 
     # prepare wirte
@@ -378,7 +380,7 @@ def main(iargs=None):
         os.makedirs(inps.outdir)
         print('create directory: {}'.format(inps.outdir))
     # write
-    if stackObj and mld.update_object(inps.outfile[0], stackObj, box,
+    if stackObj and mld.run_or_skip(inps.outfile[0], stackObj, box,
                                      updateMode=updateMode, xstep=inpsDict['xstep'],
                                      ystep=inpsDict['ystep']):
         print('-'*50)
@@ -401,7 +403,7 @@ def main(iargs=None):
             shutil.copyfile(geometry_file, os.path.join(work_dir, 'inputs/{}'.format(geometry_file_2)))
     else:
         geomRadarObj, geomGeoObj = mld.read_inps_dict2geometry_dict_object(inpsDict)
-        if geomRadarObj and mld.update_object(inps.outfile[1], geomRadarObj, box,
+        if geomRadarObj and mld.run_or_skip(inps.outfile[1], geomRadarObj, box,
                                           updateMode=updateMode,
                                           xstep=inpsDict['xstep'],
                                           ystep=inpsDict['ystep']):
@@ -414,7 +416,7 @@ def main(iargs=None):
                                     compression='lzf',
                                     extra_metadata=extraDict)
 
-        if geomGeoObj and mld.update_object(inps.outfile[2], geomGeoObj, boxGeo,
+        if geomGeoObj and mld.run_or_skip(inps.outfile[2], geomGeoObj, boxGeo,
                                         updateMode=updateMode,
                                         xstep=inpsDict['xstep'],
                                         ystep=inpsDict['ystep']):
