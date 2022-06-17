@@ -113,13 +113,6 @@ def extract_tops_metadata(xml_file):
     metadata['trackNumber'] = burst.trackNumber
     metadata['orbitNumber'] = burst.orbitNumber
 
-    #copied from MintPy isce_utils.py
-    try:
-        metadata['PLATFORM'] = sensor.standardize_sensor_name(obj.spacecraftName)
-    except:
-        if os.path.basename(xml_file).startswith('IW'):
-            metadata['PLATFORM'] = 'sen'
-
     time_seconds = (burst.burstStartUTC.hour * 3600.0 +
                     burst.burstStartUTC.minute * 60.0 +
                     burst.burstStartUTC.second)
@@ -191,9 +184,6 @@ def extract_stripmap_metadata(meta_file):
     metadata['trackNumber'] = frame.trackNumber
     metadata['orbitNumber'] = frame.orbitNumber
 
-    #copied from MintPy isce_utils.py
-    metadata['PLATFORM'] = sensor.standardize_sensor_name(frame.platform.getSpacecraftName())
-
     time_seconds = (frame.sensingStart.hour * 3600.0 +
                     frame.sensingStart.minute * 60.0 +
                     frame.sensingStart.second)
@@ -261,6 +251,12 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
         print('extract metadata from ISCE/topsStack xml file:', meta_file)
         metadata, frame = isce_utils.extract_tops_metadata(meta_file)
         metadata['sensor_type'] = 'tops'
+        #copied from MintPy isce_utils.py
+     try:
+        metadata['PLATFORM'] = sensor.standardize_sensor_name(obj.spacecraftName)
+     except:
+        if os.path.basename(xml_file).startswith('IW'):
+            metadata['PLATFORM'] = 'sen'
 
     elif processor == 'alosStack':
         print('extract metadata from ISCE/alosStack xml file:', meta_file)
@@ -270,6 +266,8 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
     elif processor == 'stripmap':
         print('extract metadata from ISCE/stripmapStack data file:', meta_file)
         metadata, frame = isce_utils.extract_stripmap_metadata(meta_file)
+        #copied from MintPy isce_utils.py
+        metadata['PLATFORM'] = sensor.standardize_sensor_name(frame.platform.getSpacecraftName())
 
     else:
         raise ValueError("unrecognized ISCE metadata file: {}".format(meta_file))
