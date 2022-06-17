@@ -372,7 +372,7 @@ def main(iargs=None):
     inpsDict['only_load_ionosphere'] = False
     stackObj = mld.read_inps_dict2ifgram_stack_dict_object(inpsDict)
 
-    # prepare wirte
+    # prepare write
     updateMode, comp, box, boxGeo = print_write_setting(inpsDict)
     box = None
     boxGeo = None
