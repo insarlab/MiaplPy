@@ -251,17 +251,18 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
         print('extract metadata from ISCE/topsStack xml file:', meta_file)
         metadata, frame = isce_utils.extract_tops_metadata(meta_file)
         metadata['sensor_type'] = 'tops'
-     #copied from MintPy isce_utils.py
-     try:
-        metadata['PLATFORM'] = sensor.standardize_sensor_name(obj.spacecraftName)
-     except:
-        if os.path.basename(xml_file).startswith('IW'):
-            metadata['PLATFORM'] = 'sen'
+        #copied from MintPy isce_utils.py
+        try:
+            metadata['PLATFORM'] = sensor.standardize_sensor_name(obj.spacecraftName)
+        except:
+            if os.path.basename(xml_file).startswith('IW'):
+                metadata['PLATFORM'] = 'sen'
 
     elif processor == 'alosStack':
         print('extract metadata from ISCE/alosStack xml file:', meta_file)
         metadata, frame = isce_utils.extract_alosStack_metadata(meta_file)
         metadata['sensor_type'] = 'alos2'
+        #copied from MintPy isce_utils.py
         metadata['PLATFORM'] = sensor.standardize_sensor_name('alos2')
 
     elif processor == 'stripmap':
