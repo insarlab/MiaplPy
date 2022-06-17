@@ -30,6 +30,7 @@ import argparse
 import numpy as np
 from miaplpy.objects.utils import read_attribute, read
 from mintpy.utils import isce_utils, ptime, readfile, writefile, utils as ut
+from mintpy.objects import sensor
 enablePrint()
 
 
@@ -112,6 +113,13 @@ def extract_tops_metadata(xml_file):
     metadata['trackNumber'] = burst.trackNumber
     metadata['orbitNumber'] = burst.orbitNumber
 
+    #copied from MintPy isce_utils.py
+    try:
+        metadata['PLATFORM'] = sensor.standardize_sensor_name(obj.spacecraftName)
+    except:
+        if os.path.basename(xml_file).startswith('IW'):
+            metadata['PLATFORM'] = 'sen'
+
     time_seconds = (burst.burstStartUTC.hour * 3600.0 +
                     burst.burstStartUTC.minute * 60.0 +
                     burst.burstStartUTC.second)
@@ -182,6 +190,9 @@ def extract_stripmap_metadata(meta_file):
         metadata['polarization'] = metadata['polarization'][2:4]
     metadata['trackNumber'] = frame.trackNumber
     metadata['orbitNumber'] = frame.orbitNumber
+
+    #copied from MintPy isce_utils.py
+    metadata['PLATFORM'] = sensor.standardize_sensor_name(frame.platform.getSpacecraftName())
 
     time_seconds = (frame.sensingStart.hour * 3600.0 +
                     frame.sensingStart.minute * 60.0 +
