@@ -304,7 +304,7 @@ def prepare_metadata(inpsDict):
             if baseline_dir:
                 cmd += ' -b {b} '.format(b=baseline_dir)
             if obs_dir is not None:
-                cmd += ' -d {d} -f {f} '.format(d=obs_dir, f=obs_file)
+                cmd += ' -f {d}'.format(f=obs_file)
             print(cmd)
             os.system(cmd)
         except:
@@ -369,10 +369,13 @@ def main(iargs=None):
     # initiate objects
     inpsDict['dset_name2template_key'] = datasetName2templateKey
     inpsDict['only_load_geometry'] = False
-    inpsDict['only_load_ionosphere'] = False
-    stackObj = mld.read_inps_dict2ifgram_stack_dict_object(inpsDict)
+    if 'miaplpy.load.unwFile' in datasetName2templateKey.values():
+        datasetName2templateKey['unwrapMintPy'] = 'mintpy.load.unwFile'
+    elif 'miaplpy.load.ionUnwFile' in datasetName2templateKey.values():
+        datasetName2templateKey['ionMintPy'] = 'mintpy.load.ionUnwFile'
+    stackObj = mld.read_inps_dict2ifgram_stack_dict_object(inpsDict, datasetName2templateKey)
 
-    # prepare write
+    # prepare wirte
     updateMode, comp, box, boxGeo = print_write_setting(inpsDict)
     box = None
     boxGeo = None
