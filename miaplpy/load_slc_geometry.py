@@ -82,7 +82,14 @@ def main(iargs=None):
 
     # prepare write
     #updateMode, comp, box, boxGeo, xyStep, xyStepGeo = mut.print_write_setting(iDict)
-    updateMode, comp, box, boxGeo = mld.print_write_setting(iDict)
+    #updateMode, comp, box, boxGeo = mld.print_write_setting(iDict)
+    updateMode = iDict['updateMode']
+    comp = iDict['compression']
+    box = iDict['box']
+    if not iDict.get('geocoded', False):
+         boxGeo = iDict['box4geo_lut']
+    else:
+         boxGeo = box
 
     if any([stackObj, geomRadarObj, geomGeoObj]) and not os.path.isdir(inps.out_dir):
         os.makedirs(inps.out_dir)
