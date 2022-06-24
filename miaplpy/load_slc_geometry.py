@@ -82,14 +82,21 @@ def main(iargs=None):
 
     # prepare write
     #updateMode, comp, box, boxGeo, xyStep, xyStepGeo = mut.print_write_setting(iDict)
-    updateMode, comp, box, boxGeo = mld.print_write_setting(iDict)
+    #updateMode, comp, box, boxGeo = mld.print_write_setting(iDict)
+    updateMode = iDict['updateMode']
+    comp = iDict['compression']
+    box = iDict['box']
+    if not iDict.get('geocoded', False):
+         boxGeo = iDict['box4geo_lut']
+    else:
+         boxGeo = box
 
     if any([stackObj, geomRadarObj, geomGeoObj]) and not os.path.isdir(inps.out_dir):
         os.makedirs(inps.out_dir)
         print('create directory: {}'.format(inps.out_dir))
 
     # write
-    if stackObj and mld.update_object(inps.out_file[0], stackObj, box, updateMode=updateMode,
+    if stackObj and mld.run_or_skip(inps.out_file[0], stackObj, box, updateMode=updateMode,
                                       xstep=iDict['xstep'], ystep=iDict['ystep']):
         print('-' * 50)
         stackObj.write2hdf5(outputFile=inps.out_file[0],
@@ -100,7 +107,7 @@ def main(iargs=None):
                             compression=comp,
                             extra_metadata=extraDict)
 
-    if geomRadarObj and mld.update_object(inps.out_file[1], geomRadarObj, box, updateMode=updateMode,
+    if geomRadarObj and mld.run_or_skip(inps.out_file[1], geomRadarObj, box, updateMode=updateMode,
                                           xstep=iDict['xstep'], ystep=iDict['ystep']):
         print('-' * 50)
         geomRadarObj.write2hdf5(outputFile=inps.out_file[1],
@@ -111,7 +118,7 @@ def main(iargs=None):
                                 compression='lzf',
                                 extra_metadata=extraDict)
 
-    if geomGeoObj and mld.update_object(inps.out_file[2], geomGeoObj, boxGeo, updateMode=updateMode,
+    if geomGeoObj and mld.run_or_skip(inps.out_file[2], geomGeoObj, boxGeo, updateMode=updateMode,
                                         xstep=iDict['xstep'], ystep=iDict['ystep']):
         print('-' * 50)
         geomGeoObj.write2hdf5(outputFile=inps.out_file[2],
