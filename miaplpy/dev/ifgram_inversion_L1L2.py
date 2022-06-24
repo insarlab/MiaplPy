@@ -22,7 +22,7 @@ from mintpy.objects import ifgramStack, cluster
 from mintpy.simulation import decorrelation as decor
 from mintpy.defaults.template import get_template_content
 from mintpy.utils import readfile, writefile, ptime, utils as ut, arg_group
-from miaplpy.objects.utils import write_layout_hdf5
+from miaplpy.objects.utils import
 #import matplotlib.pyplot as plt
 
 
@@ -196,16 +196,16 @@ def cmd_line_parse(iargs=None):
     # --output option
     if not inps.outfile:
         if inps.obsDatasetName.startswith('unwrapPhase'):
-            inps.outfile = ['timeseries.h5', 'temporalCoherence.h5', 'numInvIfgram.h5']
+            if os.path.basename(inps.ifgramStackFile).startswith('ion'):
+                inps.outfile = ['timeseriesIon.h5', 'temporalCoherenceIon.h5', 'numInvIon.h5']
+            else:
+                inps.outfile = ['timeseries.h5', 'temporalCoherence.h5', 'numInvIfgram.h5']
 
         elif inps.obsDatasetName.startswith('azimuthOffset'):
             inps.outfile = ['timeseriesAz.h5', 'residualInvAz.h5', 'numInvOffAz.h5']
 
         elif inps.obsDatasetName.startswith('rangeOffset'):
             inps.outfile = ['timeseriesRg.h5', 'residualInvRg.h5', 'numInvOffRg.h5']
-
-        elif inps.obsDatasetName.startswith('ion'):
-            inps.outfile = ['timeseriesIon.h5', 'temporalCoherenceIon.h5', 'numInvIon.h5']
 
         else:
             raise ValueError('un-recognized input observation dataset name: {}'.format(inps.obsDatasetName))
@@ -227,14 +227,11 @@ def read_template2inps(template_file, inps):
     for key in keyList:
         value = template[key_prefix+key]
         if key in ['weightFunc', 'maskDataset', 'minNormVelocity']:
-        # if key in ['maskDataset']:
             iDict[key] = value
         elif value:
             if key in ['maskThreshold', 'minRedundancy']:
-            # if key in ['minRedundancy']:
                 iDict[key] = float(value)
             elif key in ['residualNorm', 'waterMaskFile']:
-            #elif key in ['waterMaskFile']:
                 iDict[key] = value
 
     # computing configurations
@@ -488,21 +485,25 @@ def estimate_timeseries(A, B, Alpha, y0, tbase_diff, weight_sqrt=None, min_norm_
 
     ##### skip invalid phase/offset value [NaN]
     y, [A, B, weight_sqrt, Alpha] = skip_invalid_obs(y, mat_list=[A, B, weight_sqrt, Alpha])
-    nz_flag = None
-    if min_norm_velocity:
-        if np.min(np.sum(B != 0., axis=0)) < min_redundancy:
-            nz_flag = np.sum(B != 0., axis=0) != 0
-            B = B[:, nz_flag]
-            Alpha = Alpha[:, nz_flag]
-            tbase_diff = tbase_diff[nz_flag]
-    else:
-        # check 1 - network redundancy: skip inversion if < threshold
-        if np.min(np.sum(A != 0., axis=0)) < min_redundancy:
-            nz_flag = np.sum(A != 0., axis=0) != 0
-            A = A[:, nz_flag]
-            Alpha = Alpha[:, nz_flag]
+    #nz_flag = None
+    #if min_norm_velocity:
+    #    if np.min(np.sum(B != 0., axis=0)) < min_redundancy:
+    #        nz_flag = np.sum(B != 0., axis=0) != 0
+    #        B = B[:, nz_flag]
+    #        Alpha = Alpha[:, nz_flag]
+    #        tbase_diff = tbase_diff[nz_flag]
+    #else:
+    #    # check 1 - network redundancy: skip inversion if < threshold
+    #    if np.min(np.sum(A != 0., axis=0)) < min_redundancy:
+    #        nz_flag = np.sum(A != 0., axis=0) != 0
+    #        A = A[:, nz_flag]
+    #        Alpha = Alpha[:, nz_flag]
 
-        #return ts, inv_quality, num_inv_obs
+    #    #return ts, inv_quality, num_inv_obs
+
+    # check 1 - network redundancy: skip inversion if < threshold
+    if np.min(np.sum(A != 0., axis=0)) < min_redundancy:
+        return ts, inv_quality, num_inv_obs
 
 
     # check 2 - matrix invertability (for WLS only because OLS contains it already)
@@ -547,15 +548,17 @@ def estimate_timeseries(A, B, Alpha, y0, tbase_diff, weight_sqrt=None, min_norm_
 
             # assemble time-series
             ts_diff = X * np.tile(tbase_diff, (1, num_pixel))
-            if not nz_flag is None:
-                ts_flag = np.concatenate(([False], nz_flag))
-                ts_flag_2 = (1 - ts_flag).astype(np.bool)
-                ts[ts_flag, :] = np.cumsum(ts_diff, axis=0).astype(int)
-                ts[ts_flag_2, :] = np.nan
-                if np.sum(~np.isnan(ts)) > 2:
-                    ts[0, :] = 0
-            else:
-                ts[1:, :] = np.cumsum(ts_diff, axis=0).astype(int)
+            ts[1:, :] = np.cumsum(ts_diff, axis=0)
+
+            #if not nz_flag is None:
+            #    ts_flag = np.concatenate(([False], nz_flag))
+            #    ts_flag_2 = (1 - ts_flag).astype(np.bool)
+            #    ts[ts_flag, :] = np.cumsum(ts_diff, axis=0).astype(int)
+            #    ts[ts_flag_2, :] = np.nan
+            #    if np.sum(~np.isnan(ts)) > 2:
+            #        ts[0, :] = 0
+            #else:
+            #    ts[1:, :] = np.cumsum(ts_diff, axis=0).astype(int)
 
         else:
             ##### min-norm displacement
@@ -583,22 +586,22 @@ def estimate_timeseries(A, B, Alpha, y0, tbase_diff, weight_sqrt=None, min_norm_
 
             # assemble time-series
             if refIndx:
-                ts_flag = np.concatenate((nz_flag[0:refIndx], [False], nz_flag[refIndx+1::]))
-                ts_flag_2 = (1 - ts_flag).astype(np.bool)
-                ts[ts_flag, :] = X
-                ts[ts_flag_2, :] = np.nan
-                if np.sum(~np.isnan(ts)) > 2:
-                    ts[refIndx] = 0
-                #ts[0:refIndx, :] = X[0:refIndx]
-                #ts[refIndx+1::, :] = X[refIndx::]
+                #ts_flag = np.concatenate((nz_flag[0:refIndx], [False], nz_flag[refIndx+1::]))
+                #ts_flag_2 = (1 - ts_flag).astype(np.bool)
+                #ts[ts_flag, :] = X
+                #ts[ts_flag_2, :] = np.nan
+                #if np.sum(~np.isnan(ts)) > 2:
+                #    ts[refIndx] = 0
+                ts[0:refIndx, :] = X[0:refIndx]
+                ts[refIndx+1::, :] = X[refIndx::]
             else:
-                ts_flag = np.concatenate(([False], nz_flag))
-                ts_flag_2 = (1 - ts_flag).astype(np.bool)
-                ts[ts_flag, :] = X
-                ts[ts_flag_2, :] = np.nan
-                if np.sum(~np.isnan(ts)) > 2:
-                    ts[0] = 0
-                #ts[1:, :] = X
+                #ts_flag = np.concatenate(([False], nz_flag))
+                #ts_flag_2 = (1 - ts_flag).astype(np.bool)
+                #ts[ts_flag, :] = X
+                #ts[ts_flag_2, :] = np.nan
+                #if np.sum(~np.isnan(ts)) > 2:
+                #    ts[0] = 0
+                ts[1:, :] = X
 
     except linalg.LinAlgError:
         pass
@@ -748,7 +751,7 @@ def calc_inv_quality(G, X, y, e2, inv_quality_name='temporalCoherence', weight_s
 
 
 ###################################### File IO ############################################
-def split2boxes(ifgram_file, max_memory=4, print_msg=True):
+def split2boxes_sm(ifgram_file, max_memory=4, print_msg=True):
     """Split into chunks in rows to reduce memory usage
     Parameters: dataset_shape - tuple of 3 int
                 max_memory    - float, max memory to use in GB
@@ -786,7 +789,7 @@ def split2boxes(ifgram_file, max_memory=4, print_msg=True):
 
     return box_list, num_box
 
-def split2boxes_old(ifgram_file, max_memory=4, print_msg=True):
+def split2boxes(ifgram_file, max_memory=4, print_msg=True):
     """Split into chunks in rows to reduce memory usage
     Parameters: dataset_shape - tuple of 3 int
                 max_memory    - float, max memory to use in GB
@@ -1081,6 +1084,7 @@ def ifgram_inversion_patch(box, ifgram_file=None, wrappedIfgramStack=None, ref_p
     ## debug on a specific pixel
     #y, x = 555, 612
     #box = (x, y, x+1, y+1)
+
 
     ## 1. input info
 
@@ -1393,21 +1397,21 @@ def ifgram_inversion_patch(box, ifgram_file=None, wrappedIfgramStack=None, ref_p
     if obs_ds_name.startswith(('unwrapPhase','ion')):
         phase2range = -1 * float(stack_obj.metadata['WAVELENGTH']) / (4.*np.pi)
         ts *= phase2range
-        ts_cov = ts_cov * np.abs(phase2range ** 2) if calc_cov else ts_cov
+        ts_cov = ts_cov * np.abs(phase2range) if calc_cov else ts_cov
         print('converting LOS phase unit from radian to meter')
 
     elif (obs_ds_name == 'azimuthOffset') & (stack_obj.metadata['PROCESSOR'] != 'cosicorr'):
         az_pixel_size = ut.azimuth_ground_resolution(stack_obj.metadata)
         az_pixel_size /= float(stack_obj.metadata['ALOOKS'])
         ts *= az_pixel_size
-        ts_cov = ts_cov * (az_pixel_size ** 2) if calc_cov else ts_cov
+        ts_cov = ts_cov * az_pixel_size if calc_cov else ts_cov
         print('converting azimuth offset unit from pixel ({:.2f} m) to meter'.format(az_pixel_size))
 
     elif (obs_ds_name == 'rangeOffset') & (stack_obj.metadata['PROCESSOR'] != 'cosicorr'):
         rg_pixel_size = float(stack_obj.metadata['RANGE_PIXEL_SIZE'])
         rg_pixel_size /= float(stack_obj.metadata['RLOOKS'])
         ts *= -1 * rg_pixel_size
-        ts_cov = ts_cov * (rg_pixel_size ** 2) if calc_cov else ts_cov
+        ts_cov = ts_cov * rg_pixel_size if calc_cov else ts_cov
         print('converting range offset unit from pixel ({:.2f} m) to meter'.format(rg_pixel_size))
 
     return ts, ts_cov, inv_quality, num_inv_obs, box
@@ -1506,8 +1510,6 @@ def ifgram_inversion(inps=None):
     print('number of columns : {}'.format(width))
 
     ## 2. prepare output
-    # 2.0 split ifgram_file into blocks to save memory
-    box_list, num_box = split2boxes(inps.ifgramStackFile, max_memory=inps.maxMemory)
 
     # 2.1 metadata
     meta = dict(stack_obj.metadata)
@@ -1557,6 +1559,9 @@ def ifgram_inversion(inps=None):
 
     ## 3. run the inversion / estimation and write to disk
 
+    # 3.1 split ifgram_file into blocks to save memory
+    box_list, num_box = split2boxes(inps.ifgramStackFile, max_memory=inps.maxMemory)
+
     work_dir = os.getcwd()
     out_dir_boxes = os.path.join(work_dir, 'network_inverted')
     os.makedirs(out_dir_boxes, exist_ok=True)
@@ -1577,9 +1582,6 @@ def ifgram_inversion(inps=None):
         "temp_coherence"    : inps.temp_coh,
         "smoothing_factor"  : inps.L1_alpha,
     }
-
-
-    print('------- finished parallel processing -------\n\n')
 
     # 3.3 invert / write block-by-block
     for i, box in enumerate(box_list):
@@ -1650,7 +1652,6 @@ def ifgram_inversion(inps=None):
         # time-series - 3D
 
         block = [0, num_date, box[1], box[3], box[0], box[2]]
-        # ts = np.ma.MaskedArray(ts, mask=~np.isnan(ts))
         writefile.write_hdf5_block(inps.tsFile,
                                    data=ts,
                                    datasetName='timeseries',
