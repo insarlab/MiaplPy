@@ -235,7 +235,7 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
                 rsc_file  : str, output file name of ROIPAC format rsc file
     Returns:    metadata  : dict
     """
-
+    
     if not rsc_file:
         rsc_file = os.path.join(os.path.dirname(meta_file), 'data.rsc')
 
@@ -266,11 +266,11 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
     # 2. extract metadata from geometry file
     if geom_dir:
         if processor != 'alosStack':
-            metadata = isce_utils.extract_geometry_metadata(geom_dir, metadata)
-
+            metadata = isce_utils.extract_geometry_metadata(geom_dir, metadata, fext_list=['.rdr.full','.geo.full'])
+    
     # update pixel_size for full resolution data
-    metadata['rangePixelSize'] /= metadata['RLOOKS']
-    metadata['azimuthPixelSize'] /= metadata['ALOOKS']
+    #metadata['rangePixelSize'] /= metadata['RLOOKS']
+    #metadata['azimuthPixelSize'] /= metadata['ALOOKS']
     metadata['RLOOKS'] = 1
     metadata['ALOOKS'] = 1
     # NCORRLOOKS for coherence calibration
