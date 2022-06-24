@@ -304,7 +304,7 @@ def prepare_metadata(inpsDict):
             if baseline_dir:
                 cmd += ' -b {b} '.format(b=baseline_dir)
             if obs_dir is not None:
-                cmd += ' -f {d}'.format(f=obs_file)
+                cmd += ' -f {f} '.format(f=obs_dir + '/*/' + obs_file)
             print(cmd)
             os.system(cmd)
         except:
