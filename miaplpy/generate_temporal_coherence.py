@@ -109,6 +109,8 @@ def main(iargs=None):
 
     inps.invQualityFile = 'temporalCoherence.h5'
     mintpy_mask_file = os.path.join(inps.work_dir, 'maskTempCoh.h5')
+    os.system('cp {} {}'.format(os.path.join(inps.work_dir, 'temporalCoherence.h5'),
+                                os.path.join(inps.work_dir, 'temporalCoherence_mintpy.h5')))
 
     quality_name = os.path.join(miaplpy_dir,
                                 'inverted/tempCoh_{}'.format(template['miaplpy.timeseries.tempCohType']))
