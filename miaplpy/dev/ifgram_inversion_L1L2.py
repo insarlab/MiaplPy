@@ -226,15 +226,15 @@ def read_template2inps(template_file, inps):
     keyList = [i for i in list(iDict.keys()) if key_prefix+i in template.keys()]
     for key in keyList:
         value = template[key_prefix+key]
-        # if key in ['weightFunc', 'maskDataset', 'minNormVelocity']:
-        if key in ['maskDataset']:
+        if key in ['weightFunc', 'maskDataset', 'minNormVelocity']:
+        # if key in ['maskDataset']:
             iDict[key] = value
         elif value:
-            #if key in ['maskThreshold', 'minRedundancy']:
-            if key in ['minRedundancy']:
+            if key in ['maskThreshold', 'minRedundancy']:
+            # if key in ['minRedundancy']:
                 iDict[key] = float(value)
-            # elif key in ['residualNorm', 'waterMaskFile']:
-            elif key in ['waterMaskFile']:
+            elif key in ['residualNorm', 'waterMaskFile']:
+            #elif key in ['waterMaskFile']:
                 iDict[key] = value
 
     # computing configurations
@@ -1076,6 +1076,7 @@ def ifgram_inversion_patch(box, ifgram_file=None, wrappedIfgramStack=None, ref_p
 
     stack_obj = ifgramStack(ifgram_file)
     stack_obj.open(print_msg=False)
+    stack_dir, stack_base = os.path.split(ifgram_file)    
 
     ## debug on a specific pixel
     #y, x = 555, 612
@@ -1202,11 +1203,11 @@ def ifgram_inversion_patch(box, ifgram_file=None, wrappedIfgramStack=None, ref_p
         mask *= np.array(waterMask, dtype=np.bool_)
         del waterMask
 
-    if temp_coherence:
-        tcoh = readfile.read(temp_coherence, box=box)[0].flatten()
-        mask_tcoh = np.ones(tcoh.shape, dtype=np.bool_)
-        mask_tcoh[tcoh < mask_threshold] = False
-        mask *= mask_tcoh
+    #if temp_coherence:
+    #    tcoh = readfile.read(temp_coherence, box=box)[0].flatten()
+    #    mask_tcoh = np.ones(tcoh.shape, dtype=np.bool_)
+    #    mask_tcoh[tcoh < mask_threshold] = False
+    #    mask *= mask_tcoh
 
     # 1.3.2 - Mask for NaN value in ALL ifgrams
     print('skip pixels with {} = NaN in all interferograms'.format(obs_ds_name))
@@ -1214,17 +1215,26 @@ def ifgram_inversion_patch(box, ifgram_file=None, wrappedIfgramStack=None, ref_p
 
     # 1.3.3 Mask for zero quality measure (average spatial coherence/SNR)
     # usually due to lack of data in the processing
-    stack_quality_file = os.path.join(os.path.dirname(ifgram_file), '../avgSpatialCoh.h5')
-    inv_quality_name = 'temporalCoherence'
     if 'offset' in obs_ds_name.lower():
-        stack_quality_file = os.path.join(os.path.dirname(ifgram_file), '../avgSpatialSNR.h5')
         inv_quality_name = 'residual'
+        stack_quality_file = os.path.join(stack_dir, '../avgSpatialSNR.h5')
 
-    if stack_quality_file and os.path.isfile(stack_quality_file):
-        print('skip pixels with zero value in file: {}'.format(os.path.basename(stack_quality_file)))
-        quality = readfile.read(stack_quality_file, box=box)[0].flatten()
-        mask *= quality != 0.
-        del quality
+    elif stack_base.startswith('ion'):
+        inv_quality_name = 'temporalCoherence'
+        stack_quality_file = os.path.join(stack_dir, '../avgSpatialCohIon.h5')
+
+    else:
+        inv_quality_name = 'temporalCoherence'
+        stack_quality_file = os.path.join(stack_dir, '../avgSpatialCoh.h5')
+
+    if os.path.isfile(stack_quality_file):
+        atr_stack = readfile.read_attribute(stack_quality_file)
+        len_stack, wid_stack = int(atr_stack['LENGTH']), int(atr_stack['WIDTH'])
+        if (len_stack, wid_stack) == (stack_obj.length, stack_obj.width):
+            print('skip pixels with zero value in file: {}'.format(os.path.basename(stack_quality_file)))
+            quality = readfile.read(stack_quality_file, box=box)[0].flatten()
+            mask *= quality != 0.
+            del quality
 
     # invert pixels on mask 1+2
     num_pixel2inv = int(np.sum(mask))
@@ -1509,8 +1519,7 @@ def ifgram_inversion(inps=None):
     meta['REF_DATE'] = date_list[0]
 
     # 2.2 instantiate time-series
-    dates = np.array(date_list, dtype=np.string_)
-    box_check = np.array(num_box, dtype=np.bool_)
+    dates = np.array(date_list, dtype=np.string_) 
     pbase = stack_obj.get_perp_baseline_timeseries(dropIfgram=True)
     ds_name_dict = {
         "date"       : [dates.dtype, (num_date,), dates],
@@ -1641,7 +1650,7 @@ def ifgram_inversion(inps=None):
         # time-series - 3D
 
         block = [0, num_date, box[1], box[3], box[0], box[2]]
-        ts = np.ma.MaskedArray(ts, mask=~np.isnan(ts))
+        # ts = np.ma.MaskedArray(ts, mask=~np.isnan(ts))
         writefile.write_hdf5_block(inps.tsFile,
                                    data=ts,
                                    datasetName='timeseries',
