@@ -22,7 +22,7 @@ from mintpy.objects import ifgramStack, cluster
 from mintpy.simulation import decorrelation as decor
 from mintpy.defaults.template import get_template_content
 from mintpy.utils import readfile, writefile, ptime, utils as ut, arg_group
-from miaplpy.objects.utils import
+from miaplpy.objects.utils import write_layout_hdf5
 #import matplotlib.pyplot as plt
 
 
