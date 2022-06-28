@@ -108,7 +108,7 @@ def main(iargs=None):
     length, width = stack_obj.length, stack_obj.width
 
     inps.invQualityFile = 'temporalCoherence.h5'
-    mintpy_mask_file = os.path.join(inps.work_dir, 'maskTempCoh.h5')
+    #mintpy_mask_file = os.path.join(inps.work_dir, 'maskTempCoh.h5')
     os.system('cp {} {}'.format(os.path.join(inps.work_dir, 'temporalCoherence.h5'),
                                 os.path.join(inps.work_dir, 'temporalCoherence_mintpy.h5')))
 
@@ -140,9 +140,9 @@ def main(iargs=None):
     inv_quality[:, :] = quality[:, :]
     inv_quality[inv_quality <= 0] = np.nan
     inv_quality[water_mask < 0.5] = np.nan
-    if os.path.exists(mintpy_mask_file):
-        mintpy_mask = readfile.read(mintpy_mask_file, datasetName='mask')[0]
-        inv_quality[mintpy_mask == 0] = np.nan
+    #if os.path.exists(mintpy_mask_file):
+        #mintpy_mask = readfile.read(mintpy_mask_file, datasetName='mask')[0]
+        #inv_quality[mintpy_mask == 0] = np.nan
 
     if not os.path.exists(inps.invQualityFile):
         metadata['UNIT'] = '1'
