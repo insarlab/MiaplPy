@@ -256,7 +256,7 @@ cpdef inline double optphase_cy(double[::1] x0, float complex[:, ::1] inverse_ga
     n = x0.shape[0]
     x = expmati(np.float32(x0))
     for i in range(n):
-        x[i] = x[i] - conjf(x[0])
+        x[i] = x[i] * conjf(x[0])
     y = multiplymat12(conjmat1(x), inverse_gam)
     u = multiplymat11(y, x)
     out = cabsf(clogf(u))
