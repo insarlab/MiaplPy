@@ -25,7 +25,7 @@ export PATH=${PATH}:${MIAPLPY_HOME}/snaphu/bin
 
 ```
 cd ~/tools
-git clone https://github.com/insarlap/MiaplPy.git
+git clone https://github.com/insarlab/MiaplPy.git
 git clone https://github.com/insarlab/MintPy.git
 git clone https://github.com/yunjunz/PyAPS.git
 ```
