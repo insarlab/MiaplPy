@@ -15,14 +15,14 @@ import numpy as np
 from miaplpy.objects.arg_parser import MiaplPyParser
 from mintpy.utils import readfile, ptime, utils as ut
 from mintpy.objects import (
-    datasetUnitDict,
+    DSET_UNIT_DICT,
     geometry,
-    geometryDatasetNames,
+    GEOMETRY_DSET_NAMES,
     giantIfgramStack,
     giantTimeseries,
-    ifgramDatasetNames,
+    IFGRAM_DSET_NAMES,
     ifgramStack,
-    timeseriesDatasetNames,
+    TIMESERIES_DSET_NAMES,
     timeseries,
     HDFEOS
 )
@@ -414,17 +414,17 @@ def read_attribute(fname, datasetName=None, standardize=True, metafile_ext=None)
     # UNIT
     k = atr['FILE_TYPE'].replace('.', '')
     if k == 'ifgramStack':
-        if datasetName and datasetName in datasetUnitDict.keys():
-            atr['UNIT'] = datasetUnitDict[datasetName]
+        if datasetName and datasetName in DSET_UNIT_DICT.keys():
+            atr['UNIT'] = DSET_UNIT_DICT[datasetName]
         else:
             atr['UNIT'] = 'radian'
 
-    elif datasetName and datasetName in datasetUnitDict.keys():
-        atr['UNIT'] = datasetUnitDict[datasetName]
+    elif datasetName and datasetName in DSET_UNIT_DICT.keys():
+        atr['UNIT'] = DSET_UNIT_DICT[datasetName]
 
     elif 'UNIT' not in atr.keys():
-        if k in datasetUnitDict.keys():
-            atr['UNIT'] = datasetUnitDict[k]
+        if k in DSET_UNIT_DICT.keys():
+            atr['UNIT'] = DSET_UNIT_DICT[k]
         else:
             atr['UNIT'] = '1'
 
@@ -433,10 +433,10 @@ def read_attribute(fname, datasetName=None, standardize=True, metafile_ext=None)
     if k == 'slc':
         atr['UNIT'] = 'i'
     elif 'UNIT' not in atr.keys():
-        if datasetName and datasetName in datasetUnitDict.keys():
-            atr['UNIT'] = datasetUnitDict[datasetName]
-        elif k in datasetUnitDict.keys():
-            atr['UNIT'] = datasetUnitDict[k]
+        if datasetName and datasetName in DSET_UNIT_DICT.keys():
+            atr['UNIT'] = DSET_UNIT_DICT[datasetName]
+        elif k in DSET_UNIT_DICT.keys():
+            atr['UNIT'] = DSET_UNIT_DICT[k]
         else:
             atr['UNIT'] = '1'
 

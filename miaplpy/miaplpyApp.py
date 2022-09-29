@@ -202,8 +202,11 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.org_custom_template:
             # Update default template file based on custom template
             print('update default template based on input custom template')
-            self.templateFile = ut.update_template_file(self.templateFile, self.customTemplate)
+            if not 'mintpy.load.processor' in self.customTemplate and 'miaplpy.load.processor' in self.customTemplate:
+                self.customTemplate['mintpy.load.processor'] = self.customTemplate['miaplpy.load.processor']
 
+            self.templateFile = ut.update_template_file(self.templateFile, self.customTemplate)
+            self.templateFile_mintpy = ut.update_template_file(self.templateFile_mintpy, self.customTemplate)
         # 2) backup custome/default template file in inputs/pic folder
         for backup_dirname in ['inputs']:
             backup_dir = os.path.join(self.workDir, backup_dirname)
@@ -214,7 +217,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             for tfile in [self.org_custom_template, self.templateFile]:
                 if tfile and ut.run_or_skip(out_file=os.path.join(backup_dir, os.path.basename(tfile)),
                                             in_file=tfile,
-                                            check_readable=False,
+                                            readable=False,
                                             print_msg=False) == 'run':
                     shutil.copy2(tfile, backup_dir)
                     print('copy {} to {:<8} directory for backup.'.format(os.path.basename(tfile),

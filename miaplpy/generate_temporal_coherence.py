@@ -11,7 +11,7 @@ from miaplpy.objects.arg_parser import MiaplPyParser
 from mintpy.objects import ifgramStack, cluster
 from mintpy.utils import writefile, readfile, utils as ut
 import h5py
-from mintpy import generate_mask
+from mintpy.cli import generate_mask
 
 ############################################################
 
@@ -29,7 +29,10 @@ def get_phase_linking_coherence_mask(template, work_dir):
 
     mask_file = os.path.join(work_dir, 'maskTempCoh.h5')
 
-    tcoh_min = float(template['miaplpy.timeseries.minTempCoh'])
+    if 'miaplpy.timeseries.minTempCoh' in template:
+        tcoh_min = float(template['miaplpy.timeseries.minTempCoh'])
+    else:
+        tcoh_min = 0.5
 
     scp_args = '{} -m {} --nonzero -o {} --update'.format(tcoh_file, tcoh_min, mask_file)
     print('generate_mask.py', scp_args)

@@ -11,9 +11,9 @@ import argparse
 import warnings
 import shutil
 from miaplpy.defaults import auto_path
-from mintpy.objects import (geometryDatasetNames,
+from mintpy.objects import (GEOMETRY_DSET_NAMES,
                             geometry,
-                            ifgramDatasetNames,
+                            IFGRAM_DSET_NAMES,
                             ifgramStack,
                             sensor)
 from mintpy import load_data as mld
@@ -340,7 +340,6 @@ def main(iargs=None):
     inps = cmd_line_parse(iargs)
 
     dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
-
     if not iargs is None:
         msg = os.path.basename(__file__) + ' ' + ' '.join(iargs[:])
         string = dateStr + " * " + msg
@@ -433,6 +432,9 @@ def main(iargs=None):
 
 
     # check loading result
+    if not os.path.exists(os.path.join(work_dir, 'smallbaselineApp.cfg')):
+        shutil.copyfile(os.path.join(os.path.dirname(work_dir), 'custom_smallbaselineApp.cfg'),
+                        os.path.join(work_dir, 'smallbaselineApp.cfg'))
     load_complete, stack_file, geom_file = ut.check_loaded_dataset(work_dir=work_dir, print_msg=True)[0:3]
 
     # add custom metadata (optional)
