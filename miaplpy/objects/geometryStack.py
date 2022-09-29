@@ -16,9 +16,9 @@ try:
 except ImportError:
     raise ImportError('Could not import skimage!')
 
-from mintpy.objects import (dataTypeDict,
-                            geometryDatasetNames,
-                            ifgramDatasetNames)
+from mintpy.objects import (DATA_TYPE_DICT,
+                            GEOMETRY_DSET_NAMES,
+                            IFGRAM_DSET_NAMES)
 from mintpy.utils import readfile, ptime, utils as ut, attribute as attr
 from mintpy.objects.stackDict import geometryDict as GDict, read_isce_bperp_file
 
@@ -140,7 +140,7 @@ class geometryDict(GDict):
         #group = f.create_group(groupName)
         #print('create group   /{}'.format(groupName))
 
-        maxDigit = max([len(i) for i in geometryDatasetNames])
+        maxDigit = max([len(i) for i in GEOMETRY_DSET_NAMES])
         length, width = self.get_size(box=box, xstep=xstep, ystep=ystep)
         #self.length, self.width = self.get_size()
 

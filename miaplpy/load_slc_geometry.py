@@ -7,7 +7,7 @@ import os
 import glob
 import sys
 import datetime
-from mintpy.objects import (geometryDatasetNames,
+from mintpy.objects import (GEOMETRY_DSET_NAMES,
                             geometry,
                             sensor)
 from miaplpy.objects.slcStack import slcStack
@@ -155,7 +155,7 @@ def read_inps_dict2geometry_dict_object(inpsDict):
 
     maxDigit = max([len(i) for i in list(datasetName2templateKey.keys())])
     dsPathDict = {}
-    for dsName in [i for i in geometryDatasetNames
+    for dsName in [i for i in GEOMETRY_DSET_NAMES
                    if i in datasetName2templateKey.keys()]:
         key = datasetName2templateKey[dsName]
         if key in inpsDict.keys():
@@ -179,7 +179,7 @@ def read_inps_dict2geometry_dict_object(inpsDict):
                                                        path=files[0]))
 
     # Check required dataset
-    dsName0 = geometryDatasetNames[0]
+    dsName0 = GEOMETRY_DSET_NAMES[0]
     if dsName0 not in dsPathDict.keys():
         print('WARNING: No reqired {} data files found!'.format(dsName0))
 

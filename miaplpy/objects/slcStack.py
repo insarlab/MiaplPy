@@ -18,9 +18,9 @@ try:
 except ImportError:
     raise ImportError('Could not import skimage!')
 
-from mintpy.objects import (dataTypeDict,
-                            geometryDatasetNames,
-                            datasetUnitDict)
+from mintpy.objects import (DATA_TYPE_DICT,
+                            GEOMETRY_DSET_NAMES,
+                            DSET_UNIT_DICT)
 
 from mintpy.utils import readfile, ptime, utils as ut,  attribute as attr
 from miaplpy.objects.utils import read_attribute
@@ -34,7 +34,7 @@ CPX_ZERO = np.complex64(0.0)
 dataType = np.complex64
 
 slcDatasetNames = ['slc']
-datasetUnitDict['slc'] = 'i'
+DSET_UNIT_DICT['slc'] = 'i'
 gdal.SetCacheMax(2**30)
 ########################################################################################
 

@@ -40,7 +40,7 @@ def main(iargs=None):
     with h5py.File(inps.geometry_stack, 'r') as ds:
         if 'shadowMask' in ds.keys():
             args_shm = '{} shadowMask -m 0.5 --revert -o {}'.format(inps.geometry_stack, shadow_mask)
-            mintpy.generate_mask.main(args_shm.split())
+            mintpy.cli.generate_mask.main(args_shm.split())
         else:
             print('There is no shadow mask in geometryRadar.h5, all values set to 1')
             args_shm = '{} -m -1 -o {}'.format(corr_file, shadow_mask)
@@ -102,7 +102,7 @@ def plot_masks(miaplpy_dir):
     for item in files:
         if os.path.exists(item):
             plt_args = '{} --nodisplay --noverbose --save -o {}'.format(item, item.split('.')[0] + '.png')
-            mintpy.view.main(plt_args.split())
+            mintpy.cli.view.main(plt_args.split())
     return
 
 
