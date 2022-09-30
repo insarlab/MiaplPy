@@ -350,7 +350,7 @@ def main(iargs=None):
         print(string)
 
     work_dir = os.path.dirname(inps.outdir)
-    #os.chdir(work_dir)
+    os.chdir(os.path.dirname(inps.template_file[0]))
 
     # read input options
     inpsDict = read_inps2dict(inps)
