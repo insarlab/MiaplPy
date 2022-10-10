@@ -28,18 +28,7 @@ dependencies:
   - cython
   - setuptools
   - pulp
-  - pip:
-    - git+https://github.com/insarlab/PySolid.git
-    - git+https://github.com/tylere/pykml.git
-  # pyaps dependencies
-  - cdsapi
-  - ecCodes
-  - netcdf4
-  - pygrib
-  - pyhdf
-  # pyresample dependencies
+  - pyaps3>=0.3
+  - pykml>=0.2
   - pyresample
-  - openmp
-  - pykdtree
-  - xarray
-  - zarr
+  - pysolid

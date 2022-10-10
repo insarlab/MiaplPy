@@ -8,11 +8,7 @@ if [ -z ${PYTHONPATH+x} ]; then export PYTHONPATH=""; fi
 ##--------- MintPy ------------------##
 export MINTPY_HOME=~/tools/MintPy
 export PYTHONPATH=${PYTHONPATH}:${MINTPY_HOME}
-export PATH=${PATH}:${MINTPY_HOME}/mintpy
-
-##--------- PyAPS -------------------##
-export PYAPS_HOME=~/tools/PyAPS
-export PYTHONPATH=${PYTHONPATH}:${PYAPS_HOME}
+export PATH=${PATH}:${MINTPY_HOME}/mintpy/cli
 
 #---------- MiaplPy ------------------##
 export MIAPLPY_HOME=~/tools/MiaplPy
@@ -27,7 +23,6 @@ export PATH=${PATH}:${MIAPLPY_HOME}/snaphu/bin
 cd ~/tools
 git clone https://github.com/insarlab/MiaplPy.git
 git clone https://github.com/insarlab/MintPy.git
-git clone https://github.com/yunjunz/PyAPS.git
 ```
 
 #### 3. install dependencies
@@ -60,8 +55,6 @@ Or run the following in your terminal to install the dependencies to your custom
 
 ```
 conda install --yes -c conda-forge --file ~/tools/MiaplPy/docs/requirements.txt
-$CONDA_PREFIX/bin/pip install git+https://github.com/insarlab/PySolid.git
-$CONDA_PREFIX/bin/pip install git+https://github.com/tylere/pykml.git
 ```
 
 #### 4. Setup MiaplPy
@@ -83,4 +76,4 @@ cd snaphu/src; make
 ```
 
 ### Notes
-Please read notes on [PyAPS](https://github.com/yunjunz/PyAPS) and [PySolid](https://github.com/insarlab/PySolid) from [GitHub/MintPy](https://github.com/insarlab/MintPy/blob/main/docs/installation.md) 
+Please read notes on [PyAPS](https://github.com/insarlab/PyAPS) from [GitHub/MintPy](https://github.com/insarlab/MintPy/blob/main/docs/installation.md) 

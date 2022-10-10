@@ -18,18 +18,10 @@ isce2
 cython
 setuptools
 pulp
-# pyaps dependencies
-cdsapi
-ecCodes
-netcdf4
-pygrib
-pyhdf
-# pyresample dependencies
+pyaps3>=0.3
+pykml>=0.2
 pyresample
-openmp
-pykdtree
-xarray
-zarr
+pysolid
 # MinSAR dependencies
 git
 natsort
