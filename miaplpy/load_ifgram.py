@@ -10,20 +10,20 @@ import glob
 import argparse
 import warnings
 import shutil
-from miaplpy.defaults import auto_path
+import datetime
+import importlib
+
 from mintpy.objects import (GEOMETRY_DSET_NAMES,
                             geometry,
                             IFGRAM_DSET_NAMES,
                             ifgramStack,
                             sensor)
 from mintpy import load_data as mld
-from mintpy.objects.stackDict import (geometryDict,
-                                      ifgramStackDict,
-                                      ifgramDict)
 from mintpy.utils import readfile, ptime, utils as ut
+from miaplpy.defaults import auto_path
 from miaplpy.objects.utils import check_template_auto_value, read_subset_template2box
-from mintpy import subset
-import datetime
+
+
 
 #################################################################
 datasetName2templateKey = {'unwrapPhase'     : 'miaplpy.load.unwFile',
@@ -268,16 +268,16 @@ def read_subset_box(inpsDict):
 
 def prepare_metadata(inpsDict):
     processor = inpsDict['processor']
-    script_name = 'prep_{}.py'.format(processor)
+    script_name = importlib.import_module('mintpy.cli.prep_{}'.format(processor))
+
     print('-'*50)
     print('prepare metadata files for {} products'.format(processor))
 
     if processor in ['gamma', 'roipac', 'snap']:
         for key in [i for i in inpsDict.keys() if (i.startswith('miaplpy.load.') and i.endswith('File'))]:
             if len(glob.glob(str(inpsDict[key]))) > 0:
-                cmd = '{} {}'.format(script_name, inpsDict[key])
-                print(cmd)
-                os.system(cmd)
+                script_name.main([inpsDict[key]])
+
 
     elif processor == 'isce':
         meta_files = sorted(glob.glob(inpsDict['miaplpy.load.metaFile']))
@@ -300,13 +300,13 @@ def prepare_metadata(inpsDict):
                 obs_file = None
 
             # command line
-            cmd = '{s} -m {m} -g {g}'.format(s=script_name, m=meta_file, g=geom_dir)
+            cmd = '-m {m} -g {g}'.format(m=meta_file, g=geom_dir)
             if baseline_dir:
                 cmd += ' -b {b} '.format(b=baseline_dir)
             if obs_dir is not None:
                 cmd += ' -f {f} '.format(f=obs_dir + '/*/' + obs_file)
-            print(cmd)
-            os.system(cmd)
+            script_name.main(cmd.split())
+
         except:
             pass
     return
@@ -382,6 +382,7 @@ def main(iargs=None):
         os.makedirs(inps.outdir)
         print('create directory: {}'.format(inps.outdir))
     # write
+
     if stackObj and mld.run_or_skip(inps.outfile[0], stackObj, box,
                                      updateMode=updateMode, xstep=inpsDict['xstep'],
                                      ystep=inpsDict['ystep']):
@@ -435,6 +436,7 @@ def main(iargs=None):
     if not os.path.exists(os.path.join(work_dir, 'smallbaselineApp.cfg')):
         shutil.copyfile(os.path.join(os.path.dirname(work_dir), 'custom_smallbaselineApp.cfg'),
                         os.path.join(work_dir, 'smallbaselineApp.cfg'))
+
     load_complete, stack_file, geom_file = ut.check_loaded_dataset(work_dir=work_dir, print_msg=True)[0:3]
 
     # add custom metadata (optional)
