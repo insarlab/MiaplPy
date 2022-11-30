@@ -10,26 +10,34 @@ import os
 import sys
 import time
 import argparse
+
 import h5py
 import numpy as np
 from scipy import linalg
-from mintpy.objects import timeseries, geometry, cluster
+
+from mintpy.objects import cluster, geometry, timeseries
+from mintpy.utils import ptime, readfile, time_func, utils as ut, writefile
+
 from mintpy.defaults.template import get_template_content
-from mintpy.utils import arg_group, ptime, time_func, readfile, writefile, utils as ut
-#from ifgram_inversion_old import estimate_timeseries_std
+from mintpy.utils import arg_utils
+
+# from mintpy.utils import ptime, readfile, utils1 as ut
 
 # key configuration parameter name
 key_prefix = 'mintpy.topographicResidual.'
-configKeys = [
+config_keys = [
     'polyOrder',
     'phaseVelocity',
     'stepFuncDate',
     'excludeDate',
 ]
 
-
-############################################################################
 TEMPLATE = get_template_content('correct_topography')
+
+REFERENCE = """reference:
+  Fattahi, H., and F. Amelung (2013), DEM Error Correction in InSAR Time Series,
+    IEEE Trans. Geosci. Remote Sens., 51(7), 4249-4259, doi:10.1109/TGRS.2012.2227761.
+"""
 
 EXAMPLE = """example:
   # correct DEM error with pixel-wise geometry parameters [slow]
@@ -43,22 +51,18 @@ EXAMPLE = """example:
   mask.py demErr.h5 -m maskTempCoh.h5 -o demErr_msk.h5
   add.py demErr_msk.h5 dem.h5 -o demNew.h5
 """
-
-REFERENCE = """reference:
-  Fattahi, H., and F. Amelung (2013), DEM Error Correction in InSAR Time Series,
-  IEEE TGRS, 51(7), 4249-4259, doi:10.1109/TGRS.2012.2227761.
-"""
+############################################################################
 
 
-def create_parser():
-    parser = argparse.ArgumentParser(description='DEM Error (Topographic Residual) Correction',
-                                     formatter_class=argparse.RawTextHelpFormatter,
-                                     epilog='{}\n{}\n{}'.format(REFERENCE, TEMPLATE, EXAMPLE))
+def create_parser(subparsers=None):
+    synopsis = 'DEM Error (Topographic Residual) Correction'
+    epilog = REFERENCE + '\n' + TEMPLATE + '\n' + EXAMPLE
+    name = __name__.split('.')[-1]
+    parser = arg_utils.create_argument_parser(
+        name, synopsis=synopsis, description=synopsis, epilog=epilog, subparsers=subparsers)
 
     parser.add_argument('timeseries_file',
                         help='Timeseries file to be corrrected')
-    parser.add_argument('--std', dest='timeseries_std_file', default=None,
-                        help='timeseries standard deviation')
     parser.add_argument('-g', '--geometry', dest='geom_file',
                         help='geometry file including datasets:\n'+
                              'incidence angle\n'+
@@ -88,38 +92,42 @@ def create_parser():
                              '1) output timeseries file already exists, readable '+
                              'and newer than input interferograms file\n' +
                              '2) all configuration parameters are the same.')
-    defo_model.add_argument('-n', '--num_img', dest='num_img', type=int, default=None,
-                            help='Number of images to use.')
     # computing
-    parser = arg_group.add_memory_argument(parser)
-    parser = arg_group.add_parallel_argument(parser)
+    parser = arg_utils.add_memory_argument(parser)
+    parser = arg_utils.add_parallel_argument(parser)
 
     return parser
 
 
 def cmd_line_parse(iargs=None):
     """Command line parser."""
+    # parse
     parser = create_parser()
     inps = parser.parse_args(args=iargs)
 
+    # check
     if inps.template_file:
         inps = read_template2inps(inps.template_file, inps)
 
-    # --cluster and --num-worker option
+    # check: --cluster and --num-worker option
     inps.numWorker = str(cluster.DaskCluster.format_num_worker(inps.cluster, inps.numWorker))
     if inps.cluster and inps.numWorker == '1':
         print('WARNING: number of workers is 1, turn OFF parallel processing and continue')
         inps.cluster = None
 
-    # ignore non-existed exclude_date.txt
+    # check: --ex option (ignore non-existed exclude_date.txt)
     if inps.excludeDate == 'exclude_date.txt' and not os.path.isfile(inps.excludeDate):
         inps.excludeDate = []
 
+    # check: --poly-order option
     if inps.polyOrder < 1:
         raise argparse.ArgumentTypeError("Minimum polynomial order is 1")
 
+    # default: --output
     if not inps.outfile:
-        inps.outfile = '{}_demErr.h5'.format(os.path.splitext(inps.timeseries_file)[0])
+        fbase = os.path.splitext(inps.timeseries_file)[0]
+        inps.outfile = f'{fbase}_demErr.h5'
+
     return inps
 
 
@@ -131,7 +139,7 @@ def run_or_skip(inps):
     # check output file
     if not os.path.isfile(inps.outfile):
         flag = 'run'
-        print('1) output file {} NOT found.'.format(inps.outfile))
+        print(f'1) output file {inps.outfile} NOT found.')
     else:
         # check if time-series file is partly written using file size
         # since time-series file is not compressed
@@ -140,10 +148,10 @@ def run_or_skip(inps):
         fsize = os.path.getsize(inps.outfile)
         if fsize <= fsize_ref:
             flag = 'run'
-            print('1) output file {} is NOT fully written.'.format(inps.outfile))
+            print(f'1) output file {inps.outfile} is NOT fully written.')
 
         else:
-            print('1) output file {} already exists.'.format(inps.outfile))
+            print(f'1) output file {inps.outfile} already exists.')
 
             # check modification time
             infiles = [inps.timeseries_file]
@@ -153,34 +161,32 @@ def run_or_skip(inps):
             to = os.path.getmtime(inps.outfile)
             if ti > to:
                 flag = 'run'
-                print('2) output file is NOT newer than input file: {}.'.format(infiles))
+                print(f'2) output file is NOT newer than input file: {infiles}.')
             else:
-                print('2) output file is newer than input file: {}.'.format(infiles))
+                print(f'2) output file is newer than input file: {infiles}.')
 
     # check configuration
     if flag == 'skip':
         date_list_all = timeseries(inps.timeseries_file).get_date_list()
         inps.excludeDate = read_exclude_date(inps.excludeDate, date_list_all, print_msg=False)[1]
         meta = readfile.read_attribute(inps.outfile)
-        if any(str(vars(inps)[key]) != meta.get(key_prefix+key, 'None') for key in configKeys):
+        if any(str(vars(inps)[key]) != meta.get(key_prefix+key, 'None') for key in config_keys):
             flag = 'run'
-            print('3) NOT all key configuration parameters are the same:{}'.format(configKeys))
+            print(f'3) NOT all key configuration parameters are the same:{config_keys}')
         else:
-            print('3) all key configuration parameters are the same:{}'.format(configKeys))
+            print(f'3) all key configuration parameters are the same:{config_keys}')
 
     # result
-    print('run or skip: {}.'.format(flag))
+    print(f'run or skip: {flag}.')
     return flag
 
 
 ############################################################################
-def read_template2inps(template_file, inps=None):
+def read_template2inps(template_file, inps):
     """Read input template file into inps.excludeDate"""
-    if not inps:
-        inps = cmd_line_parse()
     iDict = vars(inps)
     print('read options from template file: '+os.path.basename(template_file))
-    template = readfile.read_template(template_file)
+    template = readfile.read_template(template_file, skip_chars=['[', ']'])
     template = ut.check_template_auto_value(template)
 
     # Read template option
@@ -193,8 +199,7 @@ def read_template2inps(template_file, inps=None):
             if key in ['polyOrder']:
                 iDict[key] = int(value)
             elif key in ['excludeDate','stepFuncDate']:
-                value = value.replace('[','').replace(']','').replace(',', ' ')
-                iDict[key] = ptime.yyyymmdd(value.split())
+                iDict[key] = ptime.yyyymmdd(value.split(','))
 
     # computing configurations
     dask_key_prefix = 'mintpy.compute.'
@@ -243,11 +248,11 @@ def get_design_matrix4defo(inps):
     msg += '\nordinal least squares (OLS) inversion with L2-norm minimization on: phase'
     if inps.phaseVelocity:
         msg += ' velocity'
-    msg += "\ntemporal deformation model: polynomial order = {}".format(inps.polyOrder)
+    msg += f"\ntemporal deformation model: polynomial order = {inps.polyOrder}"
     if inps.stepFuncDate:
-        msg += "\ntemporal deformation model: step functions at {}".format(inps.stepFuncDate)
+        msg += f"\ntemporal deformation model: step functions at {inps.stepFuncDate}"
     if inps.periodic:
-        msg += "\ntemporal deformation model: periodic functions of {} yr".format(inps.periodic)
+        msg += f"\ntemporal deformation model: periodic functions of {inps.periodic} yr"
     msg += '\n'+'-'*80
     print(msg)
 
@@ -261,6 +266,7 @@ def get_design_matrix4defo(inps):
     ts_obj = timeseries(inps.timeseries_file)
     date_list = ts_obj.get_date_list()
     seconds = ts_obj.get_metadata().get('CENTER_LINE_UTC', 0)
+
     # compose design matrix
     G_defo = time_func.get_design_matrix4time_func(date_list, model, seconds=seconds)
 
@@ -296,17 +302,17 @@ def read_geometry(ts_file, geom_file=None, box=None):
 
         # 0/3D perp baseline
         if 'bperp' in geom_obj.datasetNames:
-            print('read 3D bperp from {} file: {} ...'.format(geom_obj.name, os.path.basename(geom_obj.file)))
-            dset_list = ['bperp-{}'.format(d) for d in ts_obj.dateList]
+            print(f'read 3D bperp from {geom_obj.name} file: {os.path.basename(geom_obj.file)} ...')
+            dset_list = [f'bperp-{d}' for d in ts_obj.dateList]
             pbase = geom_obj.read(datasetName=dset_list, box=box, print_msg=False).reshape((ts_obj.numDate, -1))
             pbase -= np.tile(pbase[ts_obj.refIndex, :].reshape(1, -1), (ts_obj.numDate, 1))
         else:
-            print('read mean bperp from {} file'.format(ts_obj.name))
+            print(f'read mean bperp from {ts_obj.name} file')
             pbase = ts_obj.pbase.reshape((-1, 1))
 
     # 0D geometry
     else:
-        print('read mean incidenceAngle, slantRangeDistance, bperp value from {} file'.format(ts_obj.name))
+        print(f'read mean incidenceAngle, slantRangeDistance, bperp value from {ts_obj.name} file')
         inc_angle = ut.incidence_angle(ts_obj.metadata, dimension=0)
         range_dist = ut.range_distance(ts_obj.metadata, dimension=0)
         pbase = ts_obj.pbase.reshape((-1, 1))
@@ -315,320 +321,74 @@ def read_geometry(ts_file, geom_file=None, box=None):
     return sin_inc_angle, range_dist, pbase
 
 
-def estimate_dem_error(ts0, G0, tbase, date_flag=None, phase_velocity=False, stack_std0=None):
+def estimate_dem_error(ts0, G0, tbase, date_flag=None, phase_velocity=False):
     """Estimate DEM error with least square optimization.
     Parameters: ts0            - 2D np.array in size of (numDate, numPixel), original displacement time-series
                 G0             - 2D np.array in size of (numDate, numParam), design matrix in [G_geom, G_defo]
                 tbase          - 2D np.array in size of (numDate, 1), temporal baseline
                 date_flag      - 1D np.array in bool data type, mark the date used in the estimation
                 phase_velocity - bool, use phase history or phase velocity for minimization
-                stack_std0     - 2D np.ndarray in size of (numDate, num_pixel), std of timeseries
     Returns:    delta_z        - 2D np.array in size of (1,       numPixel) estimated DEM residual
                 ts_cor         - 2D np.array in size of (numDate, numPixel),
                                     corrected timeseries = tsOrig - delta_z_phase
                 ts_res         - 2D np.array in size of (numDate, numPixel),
                                     residual timeseries = tsOrig - delta_z_phase - defModel
-    Example:    delta_z, ts_cor, ts_res = estimate_dem_error(ts, G, tbase, date_flag)
+                dem_err_std    - 2D np.array in size of (1,       numPixel) estimated DEM residual std
+    Example:    delta_z, ts_cor, ts_res, dem_err_std = estimate_dem_error(ts, G, tbase, date_flag)
     """
-
-    # weight_sqrt = 1/std
-    # stack_std = std
-    num_date = G0.shape[0]
-    weight_sqrt = None
-    rcond = 1e-5
-    if not stack_std0 is None:
-        stack_std = stack_std0.reshape(num_date, -1)
-        stack_std = stack_std[date_flag, :]
-        stack_std[stack_std < rcond] = rcond
-        weight_sqrt = 1. / stack_std
-        weight_sqrt[np.isnan(weight_sqrt)] = 100.
-        weight_sqrt[weight_sqrt < 0.005] = 0.005
-    else:
-        stack_std = None
-
-    ts0 = ts0.reshape(num_date, -1)
-
     if len(ts0.shape) == 1:
         ts0 = ts0.reshape(-1, 1)
     if date_flag is None:
         date_flag = np.ones(ts0.shape[0], np.bool_)
 
     # Prepare Design matrix G and observations ts for inversion
+
     G = G0[date_flag, :]
     ts = ts0[date_flag, :]
-
     if phase_velocity:
-        tbase = tbase[date_flag, :]
-        G = np.diff(G, axis=0) / np.diff(tbase, axis=0)
-        ts = np.diff(ts, axis=0) / np.diff(tbase, axis=0)
+        tbase_diff = np.diff(tbase[date_flag], axis=0).reshape(-1, 1)
+        ts = np.diff(ts, axis=0) / np.repeat(tbase_diff, ts.shape[1], axis=1)
+        G = np.diff(G, axis=0) / np.repeat(tbase_diff, G.shape[1], axis=1)
+        G = np.delete(G, 1, 1)
 
     # Inverse using L-2 norm to get unknown parameters X
     # X = [delta_z, constC, vel, acc, deltaAcc, ..., step1, step2, ...]
     # equivalent to X = np.dot(np.dot(np.linalg.inv(np.dot(G.T, G)), G.T), ts)
     #               X = np.dot(np.linalg.pinv(G), ts)
+    X, e2 = linalg.lstsq(G, ts, cond=1e-15)[0:2]
 
-    ## Sara start
-    num_pixels = ts0.shape[1]
-    if weight_sqrt is None:
-        X, e2 = linalg.lstsq(G, ts, cond=1e-15)[0:2]
-
-    else:
-        if num_pixels == 1:
-            X = linalg.lstsq(np.multiply(G, weight_sqrt),
-                             np.multiply(ts, weight_sqrt), cond=1e-15)[0]
-        else:
-            X = np.zeros((1, num_pixels), dtype=np.float32)
-            print('estimating dem error  via WLS pixel-by-pixel ...')
-            prog_bar = ptime.progressBar(maxValue=num_pixels)
-            for idx in range(num_pixels):
-                X[idx] = linalg.lstsq(np.multiply(G, weight_sqrt[:, idx]),
-                                      np.multiply(ts[:, idx], weight_sqrt[:, idx]), cond=1e-15)[0]
-                prog_bar.update(idx + 1, every=200, suffix='{}/{} pixels'.format(idx + 1, num_pixels))
-
-    # Sara end
-    #X = linalg.lstsq(G, ts, cond=1e-15)[0]
     # Prepare Outputs
     delta_z = X[0, :]
     ts_cor = ts0 - np.dot(G0[:, 0].reshape(-1, 1), delta_z.reshape(1, -1))
-    ts_res = ts0 - np.dot(G0, X)
+    # ts_res = ts0 - np.dot(G0, X)
 
-    ## Sara start
-    min_redundancy = 1.
-    if stack_std is None:
-        #print('estimating time function STD from time-series fitting residual ...')
+    # calculate dem std
+    if len(e2) == 0:
+        dem_err_std = np.nan
+    else:
+        num_date = G.shape[0]
         num_param = X.shape[0]
         G_inv = linalg.inv(np.dot(G.T, G))
         m_var = e2.reshape(1, -1) / (num_date - num_param)
         dem_err_std = np.sqrt(np.dot(np.diag(G_inv).reshape(-1, 1), m_var))[0]
-    else:
-        if num_pixels > 1:
-            dem_err_std = np.zeros((1, num_pixels), np.float32)
-            for idx in range(num_pixels):
-                dem_err_std[idx] = estimate_dem_err_std(G,
-                                              y=ts[:, idx],
-                                              y_std=stack_std[:, idx],
-                                              min_redundancy=min_redundancy)[0]
-        else:
-            dem_err_std = estimate_dem_err_std(G, y=ts, y_std=stack_std, min_redundancy=min_redundancy)[0]
 
-
-    ## Sara end
     # for debug
     debug_mode = False
     if debug_mode:
-        import matplotlib.pyplot as plt
-        fig, (ax1, ax2, ax3, ax4) = plt.subplots(nrows=4, ncols=1, figsize=(8, 8))
-        ts_all = np.hstack((ts0, ts_res, ts_cor))
-        ymin = np.min(ts_all)
-        ymax = np.max(ts_all)
-        ax1.plot(ts0, '.');           ax1.set_ylim((ymin, ymax)); ax1.set_title('Original  Timeseries')
-        ax2.plot(ts_cor, '.');        ax2.set_ylim((ymin, ymax)); ax2.set_title('Corrected Timeseries')
-        ax3.plot(ts_res, '.');        ax3.set_ylim((ymin, ymax)); ax3.set_title('Fitting Residual')
-        ax4.plot(ts_cor-ts_res, '.'); ax4.set_ylim((ymin, ymax)); ax4.set_title('Fitted Deformation Model')
+        from matplotlib import pyplot as plt
+        _, axs = plt.subplots(nrows=4, ncols=1, figsize=(8, 8), sharex=True, sharey=sharey)
+        titles = ['Original TS', 'Corrected TS', 'Fitting residual', 'Fitted defo model']
+        # for ax, data, title in zip(axs, [ts0, ts_cor, ts_res, ts_cor - ts_res], titles):
+        for ax, data, title in zip(axs, [ts0, ts_cor], titles):
+            ax.plot(data, '.')
+            ax.set_title(title)
         plt.show()
 
-    return delta_z, ts_cor, ts_res, dem_err_std
-
-def skip_invalid_obs(obs, mat_list):
-    """Skip invalid observations in the stack of phase/offset and update corresponding matrices.
-    This applies to the pixel-wised inversion only, because the region-wised inversion has valid obs in all pairs.
-    Parameters: obs      - 2D np.ndarray in size of (num_pair, num_pixel),
-                           observations (phase / offset) of all interferograms with no-data value: NaN.
-                mat_list - list of 2D np.ndarray in size of (num_pair, *) or None
-    Returns:    obs / mat_list
-    """
-    if np.any(np.isnan(obs)):
-        # get flag matrix
-        flag = (~np.isnan(obs[:, 0])).flatten()
-
-        # update obs
-        obs = obs[flag, :]
-
-        # update list of matrice
-        for i, mat in enumerate(mat_list):
-            if mat is not None:
-                mat_list[i] = mat[flag, :]
-
-    return obs, mat_list
+    # return delta_z, ts_cor, ts_res, dem_err_std
+    return delta_z, ts_cor, dem_err_std
 
 
-def estimate_dem_err_std(G, y, y_std, rcond=1e-5, min_redundancy=1.0):
-    """Estimate the DEM error covariance from network of STD via linear propagation.
-    Pixel by pixel only.
-
-    For a system of linear equations: A X = y, propagate the STD from y to X.
-
-    Parameters: G      - 2D np.ndarray in size of (num_date, num_param), design matrix (unknowns are defined by fitting polynomial)
-                y      - 2D np.ndarray in size of (num_date, 1), stack of obs
-                y_std  - 2D np.ndarray in size of (num_date, 1), stack of obs std. dev.
-    Returns:    ts_cov - 2D np.ndarray in size of (num_param, num_param), Unknowns std. dev.
-    """
-
-    y = y.reshape(G.shape[0], -1)
-    y_std = y_std.reshape(G.shape[0], -1)
-
-    # initial output value
-    dem_err_std = np.zeros((G.shape[1], G.shape[1]), dtype=np.float32)
-
-    # skip invalid phase/offset value [NaN]
-    y, [G, y_std] = skip_invalid_obs(y, mat_list=[G, y_std])
-
-    # check network redundancy: skip calculation if < threshold
-    if np.min(np.sum(G != 0., axis=0)) < min_redundancy:
-        return np.diag(dem_err_std)
-
-    Gplus = linalg.pinv(G)
-    stack_cov = np.diag(np.square(y_std.flatten()))
-    dem_err_var = np.diag(np.linalg.multi_dot([Gplus, stack_cov, Gplus.T])).astype(np.float32)
-    #ts_var[ts_var < rcond] = rcond
-
-    # TS var. --> TS std. dev.
-    dem_err_std = np.sqrt(dem_err_var)
-
-    return dem_err_std
-
-
-def read_ts_std(fname, box=None, datasetName=None, print_msg=True, xstep=1, ystep=1, data_type=None):
-    """Read one dataset and its attributes from input file.
-        Parameters: fname       : str, path of file to read
-                    datasetName : str or list of str, slice names
-                    box         : 4-tuple of int area to read, defined in (x0, y0, x1, y1) in pixel coordinate
-                    x/ystep     : int, number of pixels to pick/multilook for each output pixel
-                    data_type   : numpy data type, e.g. np.float32, np.bool_, etc.
-        Returns:    data        : 2/3/4D matrix in numpy.array format, return None if failed
-                    atr         : dictionary, attributes of data, return None if failed
-
-    """
-    # metadata
-    dsname4atr = None  # used to determine UNIT
-    if isinstance(datasetName, list):
-        dsname4atr = datasetName[0].split('-')[0]
-    elif isinstance(datasetName, str):
-        dsname4atr = datasetName.split('-')[0]
-    atr = readfile.read_attribute(fname, datasetName=dsname4atr)
-
-    # box
-    length, width = int(atr['LENGTH']), int(atr['WIDTH'])
-    if not box:
-        box = (0, 0, width, length)
-
-    slice_list = readfile.get_slice_list(fname)
-    ds_list = []
-    for i in [i.split('-')[0] for i in slice_list]:
-        if i not in ds_list:
-            ds_list.append(i)
-    ds_2d_list = [i for i in slice_list if '-' not in i]
-    ds_3d_list = [i for i in ds_list if i not in ds_2d_list]
-
-    # Input Argument: convert input datasetName into list of slice
-    if not datasetName:
-        datasetName = [ds_list[0]]
-    elif isinstance(datasetName, str):
-        datasetName = [datasetName]
-
-    # if datasetName is all date info, add dsFamily as prefix
-    # a) if all digit, e.g. YYYYMMDD
-    # b) if in isoformat(), YYYY-MM-DDTHH:MM, etc.
-    if all(x.isdigit() or x[:4].isdigit() for x in datasetName):
-        datasetName = ['{}-{}'.format(ds_3d_list[0], x) for x in datasetName]
-
-    # Input Argument: decompose slice list into dsFamily and inputDateList
-    dsFamily = datasetName[0].split('-')[0]
-    inputDateList = [x.replace(dsFamily, '') for x in datasetName]
-    inputDateList = [x[1:] for x in inputDateList if x.startswith('-')]
-    with h5py.File(fname, 'r') as f:
-        indx = np.where(f['date'][:] == atr['REF_DATE'].encode('UTF-8'))[0]
-        # get dataset object
-        dsNames = [i for i in [datasetName[0], dsFamily] if i in f.keys()]
-        # support for old mintpy-v0.x files
-        dsNamesOld = [i for i in slice_list if '/{}'.format(datasetName[0]) in i]
-        if len(dsNames) > 0:
-            ds = f[dsNames[0]]
-        elif len(dsNamesOld) > 0:
-            ds = f[dsNamesOld[0]]
-        else:
-            raise ValueError('input dataset {} not found in file {}'.format(datasetName, fname))
-
-        # output size for >=2D dataset if x/ystep > 1
-        xsize = int((box[2] - box[0]) / xstep)
-        ysize = int((box[3] - box[1]) / ystep)
-
-        if ds.ndim == 4:
-
-            num1, num2 = ds.shape[0], ds.shape[1]
-            shape = (num1, ysize, xsize)
-            if print_msg:
-                ram_size = num1 * ysize * xsize * ds.dtype.itemsize / 1024 ** 3
-                print(f'initiate a 3D matrix in size of {shape} in {ds.dtype} in the memory ({ram_size:.1f} GB) ...')
-            data = np.zeros(shape, ds.dtype) * np.nan
-
-            # loop over the 1st dimension [for more verbose print out msg]
-            for i in range(num1):
-                if print_msg:
-                    sys.stdout.write('\r' + f'reading 3D cubes {i + 1}/{num1}...')
-                    sys.stdout.flush()
-
-                d3 = ds[i, i,
-                     box[1]:box[3],
-                     box[0]:box[2]]
-
-                # sampling / nearest interpolation in y/xstep
-                if xstep * ystep > 1:
-                    d3 = d3[int(ystep / 2)::ystep, int(xstep / 2)::xstep]
-
-                data[i, :, :] = d3[:ysize, :xsize]
-
-            if print_msg:
-                print('')
-
-            data = np.sqrt(data)
-
-        elif ds.ndim == 3:
-            # define flag matrix for index in time domain
-            slice_flag = np.zeros((ds.shape[0]), dtype=np.bool_)
-            if not inputDateList or inputDateList == ['']:
-                slice_flag[:] = True
-            else:
-                date_list = [i.split('-', 1)[1] for i in
-                             [j for j in slice_list if j.startswith(dsFamily)]]
-                for d in inputDateList:
-                    slice_flag[date_list.index(d)] = True
-
-            # read data
-            if xstep * ystep == 1:
-                data = ds[slice_flag,
-                       box[1]:box[3],
-                       box[0]:box[2]]
-            else:
-                # sampling / nearest interplation in y/xstep
-                # use for loop to save memory
-                num_slice = np.sum(slice_flag)
-                data = np.zeros((num_slice, ysize, xsize), ds.dtype)
-
-                inds = np.where(slice_flag)[0]
-                for i in range(num_slice):
-                    # print out msg
-                    if print_msg:
-                        sys.stdout.write('\r' + f'reading 2D slices {i+1}/{num_slice}...')
-                        sys.stdout.flush()
-
-                    # read and index
-                    d2 = ds[inds[i],
-                            box[1]:box[3],
-                            box[0]:box[2]]
-                    d2 = d2[int(ystep/2)::ystep,
-                            int(xstep/2)::xstep]
-                    data[i, :, :] = d2[:ysize, :xsize]
-
-                if print_msg:
-                    print('')
-
-        if any(i == 1 for i in data.shape):
-            data = np.squeeze(data)
-
-    return data, atr
-
-def correct_dem_error_patch(G_defo, ts_file, ts_std_file, geom_file=None, box=None,
+def correct_dem_error_patch(G_defo, ts_file, geom_file=None, box=None,
                             date_flag=None, phase_velocity=False):
     """
     Correct one path of a time-series for DEM error.
@@ -659,26 +419,12 @@ def correct_dem_error_patch(G_defo, ts_file, ts_std_file, geom_file=None, box=No
         num_col = ts_obj.width
     num_pixel = num_row * num_col
 
-    #mask_c = np.ones((ts_obj.length, ts_obj.width), dtype=np.int)
-    #mask_c[300:400, 1378:1558] = 0
-    #mask_c = mask_c[box[1]:box[3], box[0]:box[2]].flatten()
-
     # get date info
     tbase = np.array(ts_obj.tbase, np.float32) / 365.25
-    tbase -= tbase[ts_obj.refIndex]
     num_date = ts_obj.numDate
 
     # 1.1 read time-series
     ts_data = readfile.read(ts_file, box=box)[0].reshape(num_date, -1)
-    ts_data -= np.tile(ts_data[ts_obj.refIndex, :].reshape(1, -1), (num_date, 1))
-
-    # Sara: read ts std:
-    if ts_std_file is None:
-        ts_data_std = None #np.ones(ts_data.shape, dtype=np.float64)*0.04
-    else:
-        ts_data_std = (read_ts_std(ts_std_file, box=box)[0].reshape(num_date, -1)).astype(np.float64)
-        #ts_data_std = readfile.read(ts_std_file, box=box)[0].reshape(num_date, -1)
-
 
     # 1.2 read geometry
     sin_inc_angle, range_dist, pbase = read_geometry(ts_file, geom_file, box=box)
@@ -686,7 +432,6 @@ def correct_dem_error_patch(G_defo, ts_file, ts_std_file, geom_file=None, box=No
     # 1.3 mask of pixels to invert
     print('skip pixels with ZERO in ALL acquisitions')
     mask = np.nanmean(ts_data, axis=0) != 0.
-    #mask[mask_c==1] = False
 
     print('skip pixels with NaN  in ANY acquisitions')
     mask *= np.sum(np.isnan(ts_data), axis=0) == 0
@@ -705,26 +450,24 @@ def correct_dem_error_patch(G_defo, ts_file, ts_std_file, geom_file=None, box=No
             mask *= ~np.isnan(geom_data)
 
     num_pixel2inv = int(np.sum(mask))
-    print(num_pixel2inv)
     idx_pixel2inv = np.where(mask)[0]
-    print(('number of pixels to invert: {} out of {}'
-           ' ({:.1f}%)').format(num_pixel2inv,
-                                num_pixel,
-                                num_pixel2inv/num_pixel*100))
+    perc = num_pixel2inv / num_pixel * 100
+    print(f'number of pixels to invert: {num_pixel2inv} out of {num_pixel} ({perc:.1f}%)')
+
 
     ## 2. estimation
 
     # 2.1 initiate the output matrices
     delta_z = np.zeros(num_pixel, dtype=np.float32)
     ts_cor = np.zeros((num_date, num_pixel), dtype=np.float32)
-    ts_res = np.zeros((num_date, num_pixel), dtype=np.float32)
+    # ts_res = np.zeros((num_date, num_pixel), dtype=np.float32)
     dem_err_std = np.zeros(num_pixel, dtype=np.float32)
 
     # return directly if there is nothing to invert
     if num_pixel2inv < 1:
         delta_z = delta_z.reshape((num_row, num_col))
         ts_cor = ts_cor.reshape((num_date, num_row, num_col))
-        ts_res = ts_res.reshape((num_date, num_row, num_col))
+        # ts_res = ts_res.reshape((num_date, num_row, num_col))
         dem_err_std = dem_err_std.reshape((num_row, num_col))
         return delta_z, ts_cor, ts_res, dem_err_std, box
 
@@ -732,27 +475,23 @@ def correct_dem_error_patch(G_defo, ts_file, ts_std_file, geom_file=None, box=No
     if range_dist.size == 1:
         print('estimating DEM error ...')
         # compose design matrix
-
         G_geom = pbase / (range_dist * sin_inc_angle)
-        G = np.hstack((G_geom, G_defo)).astype(np.float64)
-
-        ts_data_std_inp = ts_data_std[:, mask] if not ts_data_std is None else None
-
+        G = np.hstack((G_geom, G_defo))
 
         # run
-        (delta_z_i,
-         ts_cor_i,
-         ts_res_i,
-         dem_err_std_i) = estimate_dem_error(ts_data[:, mask], G,
-                                        tbase=tbase,
-                                        date_flag=date_flag,
-                                        stack_std0=ts_data_std_inp,
-                                        phase_velocity=phase_velocity)
+        # delta_z_i, ts_cor_i, ts_res_i, dem_err_std_i = estimate_dem_error(
+        delta_z_i, ts_cor_i, dem_err_std_i=estimate_dem_error(
+            ts0=ts_data[:, mask],
+            G0=G,
+            tbase=tbase,
+            date_flag=date_flag,
+            phase_velocity=phase_velocity,
+        )
 
         # assemble
         delta_z[mask] = delta_z_i
         ts_cor[:, mask] = ts_cor_i
-        ts_res[:, mask] = ts_res_i
+        # ts_res[:, mask] = ts_res_i
         dem_err_std[mask] = dem_err_std_i
 
     else:
@@ -768,37 +507,37 @@ def correct_dem_error_patch(G_defo, ts_file, ts_std_file, geom_file=None, box=No
                 pbase_i = pbase[:, idx].reshape(-1, 1)
 
             G_geom = pbase_i / (range_dist[idx] * sin_inc_angle[idx])
-            G = np.hstack((G_geom, G_defo)).astype(np.float64)
-
-            ts_data_std_inp = ts_data_std[:, idx] if not ts_data_std is None else None
+            G = np.hstack((G_geom, G_defo))
 
             # run
-            (delta_z_i,
-             ts_cor_i,
-             ts_res_i,
-             dem_err_std_i) = estimate_dem_error(ts_data[:, idx], G,
-                                            tbase=tbase,
-                                            date_flag=date_flag,
-                                            stack_std0=ts_data_std_inp,
-                                            phase_velocity=phase_velocity)
+            # delta_z_i, ts_cor_i, ts_res_i, dem_err_std_i = estimate_dem_error(
+            delta_z_i, ts_cor_i, dem_err_std_i = estimate_dem_error(
+                ts0=ts_data[:, idx],
+                G0=G,
+                tbase=tbase,
+                date_flag=date_flag,
+                phase_velocity=phase_velocity,
+            )
 
             # assemble
             delta_z[idx] = delta_z_i
             ts_cor[:, idx] = ts_cor_i.flatten()
-            ts_res[:, idx] = ts_res_i.flatten()
+            #ts_res[:, idx] = ts_res_i.flatten()
             dem_err_std[idx] = dem_err_std_i
 
-            prog_bar.update(i+1, every=2000, suffix='{}/{}'.format(i+1, num_pixel2inv))
+
+            prog_bar.update(i+1, every=2000, suffix=f'{i+1}/{num_pixel2inv}')
         prog_bar.close()
     del ts_data, pbase
 
     ## 3. prepare output
     delta_z = delta_z.reshape((num_row, num_col))
     ts_cor = ts_cor.reshape((num_date, num_row, num_col))
-    ts_res = ts_res.reshape((num_date, num_row, num_col))
+    # ts_res = ts_res.reshape((num_date, num_row, num_col))
     dem_err_std = dem_err_std.reshape((num_row, num_col))
 
-    return delta_z, ts_cor, ts_res, dem_err_std, box
+    # return delta_z, ts_cor, ts_res, dem_err_std, box
+    return delta_z, ts_cor, dem_err_std, box
 
 
 def correct_dem_error(inps):
@@ -822,9 +561,6 @@ def correct_dem_error(inps):
 
     # exclude dates
     date_flag = read_exclude_date(inps.excludeDate, ts_obj.dateList)[0]
-    if not inps.num_img is None:
-        date_flag[inps.num_img::] = False
-
     if inps.polyOrder > np.sum(date_flag):
         raise ValueError("input poly order {} > number of acquisition {}! Reduce it!".format(
             inps.polyOrder, np.sum(date_flag)))
@@ -832,29 +568,23 @@ def correct_dem_error(inps):
     # 1.2 design matrix part 1 - time func for surface deformation
     G_defo = get_design_matrix4defo(inps)
 
+
     ## 2. prepare output
 
     # 2.1 metadata
     meta = dict(ts_obj.metadata)
-    print('add/update the following configuration metadata to file:\n{}'.format(configKeys))
-    for key in configKeys:
+    print(f'add/update the following configuration metadata to file:\n{config_keys}')
+    for key in config_keys:
         meta[key_prefix+key] = str(vars(inps)[key])
 
     # 2.2 instantiate est. DEM error
-    if inps.num_img is None:
-        dem_err_file = 'demErr.h5'
-    else:
-        dem_err_file = 'demErr_{}.h5'.format(inps.num_img)
+    dem_err_file = 'demErr.h5'
     meta['FILE_TYPE'] = 'dem'
     meta['UNIT'] = 'm'
     ds_name_dict = {'dem' : [np.float32, (length, width), None]}
     writefile.layout_hdf5(dem_err_file, ds_name_dict, metadata=meta)
 
-    # dem error std
-    if inps.num_img is None:
-        dem_err_std_file = 'demErr_std.h5'
-    else:
-        dem_err_std_file = 'demErr_std_{}.h5'.format(inps.num_img)
+    dem_err_std_file = 'demErr_std.h5'
     meta['FILE_TYPE'] = 'dem'
     meta['UNIT'] = 'm'
     ds_name_dict = {'dem': [np.float32, (length, width), None]}
@@ -866,8 +596,8 @@ def correct_dem_error(inps):
     writefile.layout_hdf5(ts_cor_file, metadata=meta, ref_file=inps.timeseries_file)
 
     # 2.4 instantiate residual phase time-series
-    ts_res_file = os.path.join(os.path.dirname(inps.outfile), 'timeseriesResidual.h5')
-    writefile.layout_hdf5(ts_res_file, metadata=meta, ref_file=inps.timeseries_file)
+    #ts_res_file = os.path.join(os.path.dirname(inps.outfile), 'timeseriesResidual.h5')
+    #writefile.layout_hdf5(ts_res_file, metadata=meta, ref_file=inps.timeseries_file)
 
 
     ## 3. run the estimation and write to disk
@@ -883,15 +613,16 @@ def correct_dem_error(inps):
 
     # split in row/line direction based on the input memory limit
     num_box = int(np.ceil((num_epoch * length * width * 4) * 2.5 / (inps.maxMemory * 1024**3)))
-    box_list = cluster.split_box2sub_boxes(box=(0, 0, width, length),
-                                           num_split=num_box,
-                                           dimension='y')
+    box_list = cluster.split_box2sub_boxes(
+        box=(0, 0, width, length),
+        num_split=num_box,
+        dimension='y',
+    )
 
     # 3.2 prepare the input arguments for *_patch()
     data_kwargs = {
         'G_defo'         : G_defo,
         'ts_file'        : inps.timeseries_file,
-        'ts_std_file'    : inps.timeseries_std_file,
         'geom_file'      : inps.geom_file,
         'date_flag'      : date_flag,
         'phase_velocity' : inps.phaseVelocity,
@@ -902,9 +633,9 @@ def correct_dem_error(inps):
         box_wid = box[2] - box[0]
         box_len = box[3] - box[1]
         if num_box > 1:
-            print('\n------- processing patch {} out of {} --------------'.format(i+1, num_box))
-            print('box width:  {}'.format(box_wid))
-            print('box length: {}'.format(box_len))
+            print(f'\n------- processing patch {i+1} out of {num_box} --------------')
+            print(f'box width:  {box_wid}')
+            print(f'box length: {box_len}')
 
         # update box argument in the input data
         data_kwargs['box'] = box
@@ -912,7 +643,8 @@ def correct_dem_error(inps):
         # invert
         if not inps.cluster:
             # non-parallel
-            delta_z, ts_cor, ts_res, dem_err_std = correct_dem_error_patch(**data_kwargs)[:-1]
+            # delta_z, ts_cor, ts_res, dem_err_std = correct_dem_error_patch(**data_kwargs)[:-1]
+            delta_z, ts_cor, dem_err_std = correct_dem_error_patch(**data_kwargs)[:-1]
 
         else:
             # parallel
@@ -920,18 +652,22 @@ def correct_dem_error(inps):
 
             # initiate the output data
             delta_z = np.zeros((box_len, box_wid), dtype=np.float32)
-            dem_err_std = np.zeros((box_len, box_wid), dtype=np.float32)
             ts_cor = np.zeros((num_date, box_len, box_wid), dtype=np.float32)
-            ts_res = np.zeros((num_date, box_len, box_wid), dtype=np.float32)
+            # ts_res = np.zeros((num_date, box_len, box_wid), dtype=np.float32)
+            dem_err_std = np.zeros((box_len, box_wid), dtype=np.float32)
 
             # initiate dask cluster and client
             cluster_obj = cluster.DaskCluster(inps.cluster, inps.numWorker, config_name=inps.config)
             cluster_obj.open()
 
             # run dask
-            delta_z, ts_cor, ts_res, dem_err_std = cluster_obj.run(func=correct_dem_error_patch,
-                                                      func_data=data_kwargs,
-                                                      results=[delta_z, ts_cor, ts_res, dem_err_std])
+            # delta_z, ts_cor, ts_res, dem_err_std = cluster_obj.run(func=correct_dem_error_patch,
+            #                                                       func_data=data_kwargs,
+            #                                                       results=[delta_z, ts_cor, ts_res, dem_err_std])
+
+            delta_z, ts_cor, dem_err_std = cluster_obj.run(func=correct_dem_error_patch,
+                                                           func_data=data_kwargs,
+                                                           results=[delta_z, ts_cor, dem_err_std])
 
             # close dask cluster and client
             cluster_obj.close()
@@ -963,33 +699,33 @@ def correct_dem_error(inps):
                                    block=block)
 
         # residual time-series - 3D
-        block = [0, num_date, box[1], box[3], box[0], box[2]]
-        writefile.write_hdf5_block(ts_res_file,
-                                   data=ts_res,
-                                   datasetName='timeseries',
-                                   block=block)
+        #block = [0, num_date, box[1], box[3], box[0], box[2]]
+        #writefile.write_hdf5_block(ts_res_file,
+        #                           data=ts_res,
+        #                           datasetName='timeseries',
+        #                           block=block)
 
     # roll back to the origial number of threads
     cluster.roll_back_num_threads(num_threads_dict)
 
     # time info
     m, s = divmod(time.time()-start_time, 60)
-    print('time used: {:02.0f} mins {:02.1f} secs.'.format(m, s))
+    print(f'time used: {m:02.0f} mins {s:02.1f} secs.')
 
-    return dem_err_file, ts_cor_file, ts_res_file, dem_err_std_file
-
+    #return dem_err_file, ts_cor_file, ts_res_file
+    return dem_err_file, ts_cor_file
 
 ############################################################################
 def main(iargs=None):
+    # parse
     inps = cmd_line_parse(iargs)
-    # --update option
+
+    # run or skip
     if inps.update_mode and run_or_skip(inps) == 'skip':
-        return inps.outfile
+        return
 
     # run
     correct_dem_error(inps)
-
-    return inps.outfile
 
 
 ################################################################################
