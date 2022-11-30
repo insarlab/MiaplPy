@@ -8,6 +8,10 @@
 import os, sys
 import warnings
 import logging
+import glob
+import argparse
+import numpy as np
+
 warnings.filterwarnings("ignore")
 
 mpl_logger = logging.getLogger('matplotlib')
@@ -22,14 +26,8 @@ def enablePrint():
     sys.stdout = sys.__stdout__
 
 blockPrint()
-
-from isceobj.Planet.Planet import Planet
-import glob
-import shelve
-import argparse
-import numpy as np
-from miaplpy.objects.utils import read_attribute, read
 from mintpy.utils import isce_utils, ptime, readfile, writefile, utils as ut
+from miaplpy.objects.utils import read_attribute, read
 enablePrint()
 
 
@@ -87,126 +85,6 @@ def load_product(xmlname):
     return obj
 
 
-'''
-def extract_tops_metadata(xml_file):
-    """Read metadata from xml file for Sentinel-1/TOPS
-    Parameters: xml_file : str, path of the .xml file, i.e. reference/IW1.xml
-    Returns:    meta     : dict, metadata
-    """
-    import isce
-    from isceobj.Planet.Planet import Planet
-
-    obj = load_product(xml_file)
-    burst = obj.bursts[0]
-    burstEnd = obj.bursts[-1]
-
-    metadata = {}
-    metadata['prf'] = burst.prf
-    metadata['startUTC'] = burst.burstStartUTC
-    metadata['stopUTC'] = burstEnd.burstStopUTC
-    metadata['radarWavelength'] = burst.radarWavelength
-    metadata['rangePixelSize'] = burst.rangePixelSize
-    metadata['startingRange'] = burst.startingRange
-    metadata['passDirection'] = burst.passDirection
-    metadata['polarization'] = burst.polarization
-    metadata['trackNumber'] = burst.trackNumber
-    metadata['orbitNumber'] = burst.orbitNumber
-
-    time_seconds = (burst.burstStartUTC.hour * 3600.0 +
-                    burst.burstStartUTC.minute * 60.0 +
-                    burst.burstStartUTC.second)
-    metadata['CENTER_LINE_UTC'] = time_seconds
-
-    orbit = burst.orbit
-    peg = orbit.interpolateOrbit(burst.sensingMid, method='hermite')
-
-    Vs = np.linalg.norm(peg.getVelocity())
-    metadata['satelliteSpeed'] = Vs
-    metadata['azimuthPixelSize'] = Vs*burst.azimuthTimeInterval
-
-    refElp = Planet(pname='Earth').ellipsoid
-    llh = refElp.xyz_to_llh(peg.getPosition())
-    refElp.setSCH(llh[0], llh[1], orbit.getENUHeading(burst.sensingMid))
-    metadata['earthRadius'] = refElp.pegRadCur
-    metadata['altitude'] = llh[2]
-
-    # for Sentinel-1
-    metadata['beam_mode'] = 'IW'
-    metadata['swathNumber'] = burst.swathNumber
-
-    # Sentinel-1 TOPS spatial resolution
-    iw_str = 'IW2'
-    if os.path.basename(xml_file).startswith('IW'):
-        iw_str = os.path.splitext(os.path.basename(xml_file))[0]
-    metadata['azimuthResolution'] = isce_utils.S1_TOPS_RESOLUTION[iw_str]['azimuthResolution']
-    metadata['rangeResolution'] = isce_utils.S1_TOPS_RESOLUTION[iw_str]['rangeResolution']
-
-    # 1. multipel subswaths
-    xml_files = glob.glob(os.path.join(os.path.dirname(xml_file), 'IW*.xml'))
-    if len(xml_files) > 1:
-        swath_num = [load_product(fname).bursts[0].swathNumber for fname in xml_files]
-        metadata['swathNumber'] = ''.join(str(i) for i in sorted(swath_num))
-
-    # 2. calculate ASF frame number for Sentinel-1
-    metadata['firstFrameNumber'] = int(0.2 * (burst.burstStartUTC - obj.ascendingNodeTime).total_seconds())
-    metadata['lastFrameNumber'] = int(0.2 * (burstEnd.burstStopUTC - obj.ascendingNodeTime).total_seconds())
-    return metadata, burst
-
-
-def extract_stripmap_metadata(meta_file):
-    """Read metadata from shelve file for StripMap stack from ISCE
-    Parameters: meta_file : str, path of the shelve file, i.e. referenceShelve/data.dat
-    Returns:    meta      : dict, metadata
-    """
-
-    if os.path.basename(meta_file) == "data.dat":    #shelve file from stripmapStack
-        fbase = os.path.splitext(meta_file)[0]
-        with shelve.open(fbase, flag='r') as mdb:
-            frame = mdb['frame']
-
-    elif meta_file.endswith(".xml"):   #XML file from stripmapApp
-        frame = load_product(meta_file)
-
-    else:
-        raise ValueError('un-recognized isce/stripmap metadata file: {}'.format(meta_file))
-
-    metadata = {}
-    metadata['prf'] = frame.PRF
-    metadata['startUTC'] = frame.sensingStart
-    metadata['stopUTC'] = frame.sensingStop
-    metadata['radarWavelength'] = frame.radarWavelegth
-    metadata['rangePixelSize'] = frame.instrument.rangePixelSize
-    metadata['startingRange'] = frame.startingRange
-    metadata['polarization'] = str(frame.polarization).replace('/', '')
-    if metadata['polarization'].startswith("b'"):
-        metadata['polarization'] = metadata['polarization'][2:4]
-    metadata['trackNumber'] = frame.trackNumber
-    metadata['orbitNumber'] = frame.orbitNumber
-
-    time_seconds = (frame.sensingStart.hour * 3600.0 +
-                    frame.sensingStart.minute * 60.0 +
-                    frame.sensingStart.second)
-    metadata['CENTER_LINE_UTC'] = time_seconds
-
-    orbit = frame.orbit
-    peg = orbit.interpolateOrbit(frame.sensingMid, method='hermite')
-
-    Vs = np.linalg.norm(peg.getVelocity())
-    metadata['satelliteSpeed'] = Vs
-    metadata['azimuthPixelSize'] = Vs/frame.PRF
-
-    refElp = Planet(pname='Earth').ellipsoid
-    llh = refElp.xyz_to_llh(peg.getPosition())
-    refElp.setSCH(llh[0], llh[1], orbit.getENUHeading(frame.sensingMid))
-    metadata['earthRadius'] = refElp.pegRadCur
-    metadata['altitude'] = llh[2]
-
-    # for StripMap
-    metadata['beam_mode'] = 'SM'
-    return metadata, frame
-
-'''
-
 def extract_multilook_number(geom_dir, metadata=dict()):
 
     for fbase in ['hgt','lat','lon','los']:
@@ -220,13 +98,6 @@ def extract_multilook_number(geom_dir, metadata=dict()):
                 metadata['ALOOKS'] = int(int(fullXmlDict['LENGTH']) / int(xmlDict['LENGTH']))
                 metadata['RLOOKS'] = int(int(fullXmlDict['WIDTH']) / int(xmlDict['WIDTH']))
                 break
-    '''
-    # default
-    for key in ['ALOOKS', 'RLOOKS']:
-        if key not in metadata:
-            metadata[key] = 1
-    return metadata
-'''
 
 def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=True):
     """Extract metadata from ISCE stack products
@@ -267,16 +138,11 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
     if geom_dir:
         if processor != 'alosStack':
             metadata = isce_utils.extract_geometry_metadata(geom_dir, metadata, fext_list=['.rdr.full','.geo.full'])
-    
-    # update pixel_size for full resolution data
-    #metadata['rangePixelSize'] /= metadata['RLOOKS']
-    #metadata['azimuthPixelSize'] /= metadata['ALOOKS']
-    metadata['RLOOKS'] = 1
-    metadata['ALOOKS'] = 1
+
     # NCORRLOOKS for coherence calibration
     rgfact = float(metadata['rangeResolution']) / float(metadata['rangePixelSize'])
     azfact = float(metadata['azimuthResolution']) / float(metadata['azimuthPixelSize'])
-    metadata['NCORRLOOKS'] = metadata['RLOOKS'] * metadata['ALOOKS'] / (rgfact * azfact)
+    metadata['NCORRLOOKS'] = 1 / (rgfact * azfact)
     ##
 
     # 3. common metadata
@@ -290,6 +156,9 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
 
     # write to .rsc file
     metadata = readfile.standardize_metadata(metadata)
+    metadata['RLOOKS'] = 1
+    metadata['ALOOKS'] = 1
+
     if rsc_file:
         print('writing ', rsc_file)
         writefile.write_roipac_rsc(metadata, rsc_file)

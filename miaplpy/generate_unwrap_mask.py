@@ -79,7 +79,7 @@ def main(iargs=None):
         with h5py.File(h5_mask, 'r') as f:
             mask = f['mask'][:, :]
     else:
-        mask = np.ones((int(atr_in['LENGTH']), int(atr_in['WIDTH'])), dtype=np.int)
+        mask = np.ones((int(atr_in['LENGTH']), int(atr_in['WIDTH'])), dtype='int16')
 
     if not inps.output_mask is None:
         unwrap_mask = inps.output_mask

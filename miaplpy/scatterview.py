@@ -30,8 +30,9 @@ from mintpy.objects import (
 )
 from mintpy.objects.gps import GPS
 from mintpy.utils import ptime, readfile, utils as ut, plot as pp
-from mintpy.multilook import multilook_data
-from mintpy import subset, version
+from mintpy.cli.multilook import multilook_data
+from mintpy.cli import subset
+from mintpy import version
 
 ##################################################################################################
 EXAMPLE = """example:
