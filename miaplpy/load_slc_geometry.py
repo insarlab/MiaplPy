@@ -10,11 +10,9 @@ import datetime
 from mintpy.objects import (GEOMETRY_DSET_NAMES,
                             geometry,
                             sensor)
-from miaplpy.objects.slcStack import slcStack
-from miaplpy.objects.geometryStack import geometryDict
-from mintpy.utils import readfile, ptime, utils as ut
+from mintpy.utils import readfile, ptime
 import mintpy.load_data as mld
-
+from miaplpy.objects.geometryStack import geometryDict
 import miaplpy.objects.utils as mut
 from miaplpy.objects.arg_parser import MiaplPyParser
 
@@ -44,6 +42,8 @@ datasetName2templateKey = {'slc': 'miaplpy.load.slcFile',
 def main(iargs=None):
     Parser = MiaplPyParser(iargs, script='load_slc')
     inps = Parser.parse()
+
+    print(os.getcwd())
 
     dateStr = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
 
