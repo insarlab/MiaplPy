@@ -85,7 +85,7 @@ def main(iargs=None):
             latitude -= sign * dy
 
             sign = np.sign(longitude)
-            longitude += sign * dx
+            longitude -= sign * dx
 
             atr[key] = 'no'
             block = [0, latitude.shape[0], 0, latitude.shape[1]]
@@ -107,7 +107,7 @@ def main(iargs=None):
             latitude += sign * dy
 
             sign = np.sign(longitude)
-            longitude -= sign * dx
+            longitude += sign * dx
 
             atr[key] = 'yes'
             block = [0, latitude.shape[0], 0, latitude.shape[1]]
