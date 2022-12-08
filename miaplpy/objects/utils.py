@@ -1324,7 +1324,7 @@ def prepare_metadata(inpsDict):
             meta_file = meta_files[0]
             baseline_dir = inpsDict['miaplpy.load.baselineDir']
             geom_dir = os.path.dirname(inpsDict['miaplpy.load.demFile'])
-            cmd = '{s} -s {i} -f {f} -m {m} -b {b} -g {g}'.format(s=script_name,
+            cmd = '{s} -s {i} -f {f} -m {m} -b {b} -g {g} --force'.format(s=script_name,
                                                                   i=slc_dir,
                                                                   f=slc_file,
                                                                   m=meta_file,
