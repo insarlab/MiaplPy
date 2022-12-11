@@ -67,10 +67,10 @@ python setup.py
 II. Install [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/) 
 ```
 cd $MIAPLPY_HOME;
-wget --no-check-certificate  https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/snaphu-v2.0.4.tar.gz
-tar -xvf snaphu-v2.0.4.tar.gz
-mv snaphu-v2.0.4 snaphu;
-rm snaphu-v2.0.4.tar.gz;
+wget --no-check-certificate  https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/snaphu-v2.0.5.tar.gz
+tar -xvf snaphu-v2.0.5.tar.gz
+mv snaphu-v2.0.5 snaphu;
+rm snaphu-v2.0.5.tar.gz;
 sed -i 's/\/usr\/local/$(MIAPLPY_HOME)\/snaphu/g' snaphu/src/Makefile
 cd snaphu/src; make
 ```
