@@ -76,6 +76,8 @@ Please follow the [guidelines](./CONTRIBUTING.md) for contributing to the code
 
 ### 4. Citation ###
 
+Mirzaee, S., Amelung, F., Fattahi, H., 2022. Non-linear phase linking using joined distributed and persistent scatterers. Comput Geosci 105291. https://doi.org/10.1016/j.cageo.2022.105291.
+
 S. Mirzaee, F. Amelung, and H. Fattahi, Non-linear phase inversion package for time series
 analysis, in AGU Fall Meeting Abstracts, Dec. 2019, vol. 2019, pp. G13C-0572.
 
