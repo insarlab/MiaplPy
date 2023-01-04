@@ -5,9 +5,8 @@
 import os
 import sys
 import datetime
-from miaplpy.objects.arg_parser import MiaplPyParser
 from mintpy.utils import readfile, utils as ut
-#from mintpy import ifgram_inversion
+from miaplpy.objects.arg_parser import MiaplPyParser
 from miaplpy.dev import ifgram_inversion_L1L2
 import generate_temporal_coherence
 

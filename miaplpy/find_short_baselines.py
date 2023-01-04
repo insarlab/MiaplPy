@@ -4,8 +4,6 @@
 import os
 import numpy as np
 import argparse
-#from scipy.sparse import csr_matrix
-#from scipy.sparse.csgraph import minimum_spanning_tree
 from datetime import datetime
 from scipy.spatial import Delaunay
 
@@ -199,7 +197,7 @@ def find_mini_stacks(date_list, baseline_dir, month=6):
     f_ind = indices_first
     l_ind = np.zeros(indices_first.shape, dtype=np.int)
     l_ind[0:-1] = np.array(f_ind[1::]).astype(np.int)
-    l_ind[-1] = len(dates)-1
+    l_ind[-1] = len(dates)
     ref_inds = []
     for i in range(len(f_ind)):
         months = np.array([x.month for x in dates[f_ind[i]:l_ind[i]]])
@@ -213,7 +211,8 @@ def find_mini_stacks(date_list, baseline_dir, month=6):
         ref_inds.append(ref_ind)
 
         for k in range(f_ind[i], l_ind[i]):
-            pairs.append((date_list[ref_ind], date_list[k]))
+            if not ref_ind == k:
+                pairs.append((date_list[ref_ind], date_list[k]))
         ministack_size = l_ind[i] - f_ind[i]
         if i > 0:
             pairs.append(find_short_pbaseline_pair(bperp, date_list, ministack_size, l_ind[i]))

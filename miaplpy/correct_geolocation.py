@@ -18,6 +18,16 @@ def cmd_line_parse(iargs=None):
     return inps
 
 
+def measure_d(lat1, lat2, lon1, lon2):
+    R = 6378137  # in meter
+    dLat = lat2 * np.pi / 180 - lat1 * np.pi / 180
+    dLon = lon2 * np.pi / 180 - lon1 * np.pi / 180
+    a = (np.sin(dLat/2)) ** 2 + (np.cos(lat1 * np.pi / 180)) ** 2 * (np.sin(dLon/2)) ** 2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1-a))
+    d = R * c
+    return d
+
+
 def main(iargs=None):
     inps = cmd_line_parse(iargs)
 
@@ -60,19 +70,22 @@ def main(iargs=None):
         one_degree_longitude = 111412.84 * np.cos(rad_latitude) - \
                                93.5 * np.cos(3 * rad_latitude) + 0.118 * np.cos(5 * rad_latitude)
 
-        dx = np.divide(dem_error * (1 / np.tan(inc_angle)) * np.cos(az_angle), one_degree_longitude)  # converted to degree
-        dy = np.divide(dem_error * (1 / np.tan(inc_angle)) * np.sin(az_angle), one_degree_latitude)  # converted to degree
+        print(np.mean(one_degree_latitude), np.mean(one_degree_longitude))
+
+        #one_degree_latitude = measure_d(latitude, latitude+1, 0, 0)
+        #one_degree_longitude = measure_d(latitude, latitude, 10, 11)
+
+        #print(np.mean(one_degree_latitude), np.mean(one_degree_longitude))
+        
+        dx = np.divide((dem_error) * (1 / np.tan(inc_angle)) * np.cos(az_angle), one_degree_longitude)  # converted to degree
+        dy = np.divide((dem_error) * (1 / np.tan(inc_angle)) * np.sin(az_angle), one_degree_latitude)  # converted to degree
 
         if inps.reverse:
             sign = np.sign(latitude)
             latitude -= sign * dy
 
             sign = np.sign(longitude)
-
-            if atr['ORBIT_DIRECTION'] == 'Ascending':
-                longitude += sign * dx
-            else:
-                longitude -= sign * dx
+            longitude -= sign * dx
 
             atr[key] = 'no'
             block = [0, latitude.shape[0], 0, latitude.shape[1]]
@@ -94,11 +107,7 @@ def main(iargs=None):
             latitude += sign * dy
 
             sign = np.sign(longitude)
-
-            if atr['ORBIT_DIRECTION'] == 'Ascending':
-                longitude -= sign * dx
-            else:
-                longitude += sign * dx
+            longitude += sign * dx
 
             atr[key] = 'yes'
             block = [0, latitude.shape[0], 0, latitude.shape[1]]

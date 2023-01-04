@@ -42,16 +42,27 @@ Use `miaplpyApp.py -h` for a help on the steps you need to run
 Inversion step may take long time depending on the number of pixels in the subset area you are processing and number of images. 
 
 
-**Example:** Here is an example of SAR stack pre-processed using ISCE:
+**Example:** Here are examples of SAR stack pre-processed using ISCE:
 
 Area: Pichincha volcano, Ecuador\
 Dataset: Sentinel-1 Descending Track 142, 46 acquisitions, 2016.04.19 - 2017.12.28\
-Size: ~318 Mb\
+Size: ~318 MB\
 ```
 wget https://zenodo.org/record/6539952/files/PichinchaSenDT142.zip
 unzip PichinchaSenDT142.zip
 cd PichinchaSenDT142
 miaplpyApp.py PichinchaSenDT142.txt --dir ./miaplpy
+```
+
+
+Area: Miami, USA\
+Dataset: Sentinel-1 Ascending Track 48, 147 acquisitions, 2015.09.21 - 2021.11.12\
+Size: ~1.3 GB\
+```
+wget https://zenodo.org/record/7470050/files/Miami_Sentinel1_data.tar.xz
+tar -xvJf Miami_Sentinel1_data.tar.xz
+cd Miami_Sentinel1_data
+miaplpyApp.py Miami_Sentinel1_data.template --start phase_linking --dir ./miaplpy
 ```
 
 #### Example tutorial in jupyter notebook [nbviewer](https://nbviewer.org/github/insarlab/MiaplPy_notebooks/blob/main/miaplpyApp.ipynb)
