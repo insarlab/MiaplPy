@@ -57,7 +57,7 @@ def main(iargs=None):
 
     if status == 'run':
 
-        az_angle = np.deg2rad(np.float(atr['HEADING']))
+        az_angle = np.deg2rad(float(atr['HEADING']))
         inc_angle = np.deg2rad(readfile.read(inps.geometry_file, datasetName='incidenceAngle')[0])
 
         dem_error = readfile.read(inps.dem_error_file, datasetName='dem')[0]
