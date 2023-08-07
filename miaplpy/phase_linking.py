@@ -140,7 +140,9 @@ def concatenate_patches(inversionObj):
         out_folder = out_dir + '/PATCHES/PATCH_{:04.0f}'.format(index)
         while not os.path.exists(out_folder + '/flag.npy'):
             completed = False
-            print('Error: PATCH_{:04.0f} is not inverted, run previous step (phase_linking) to complete'.format(index))
+            # print('Error: PATCH_{:04.0f} is not inverted, run previous step (phase_linking) to complete'.format(index))
+            raise RuntimeError('Error: PATCH_{:04.0f} is not inverted, run previous step (phase_linking) to complete'.format(index))
+
     if completed:
         inversionObj.unpatch()
         print('Successfully concatenated')
