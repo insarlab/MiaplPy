@@ -180,8 +180,10 @@ class coord_rev(coordinate):
                                        datasetName='rangeCoord',
                                        print_msg=print_msg)[0]
         else:
+            print('Loading  .... ', self.lookup_file[0])
             self.lut_y = read_image(self.lookup_file[0])
             # readfile.read(self.lookup_file[0], datasetName='latitude', print_msg=print_msg)[0]
+            print('Loading .... ', self.lookup_file[1])
             self.lut_x = read_image(self.lookup_file[1])
             # readfile.read(self.lookup_file[1], datasetName='longitude', print_msg=print_msg)[0]
         return self.lut_y, self.lut_x
