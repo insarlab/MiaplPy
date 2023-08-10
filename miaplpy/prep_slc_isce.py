@@ -394,7 +394,7 @@ def main(iargs=None):
                           baseline_dict=baseline_dict,
                           processor=inps.processor,
                           update_mode=inps.update_mode)
-    print('Done.')
+    print('prep_slc_isce.py: Done.')
     return
 
 
