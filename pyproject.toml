@@ -1,0 +1,19 @@
+[build-system]
+requires        = ['setuptools>=61.0', "cython", "numpy"]                  # 'cython'
+build-backend   = 'setuptools.build_meta'   
+
+[project]
+name = "miaplpy"
+version = "0.1.0"
+description = "A package for inversion utilities"
+
+# ...
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+#py-modules = ["_custom_build"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+[tool.setuptools.dynamic]
+version = {attr = "mymodule.__version__"}

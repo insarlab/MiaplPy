@@ -1,17 +1,16 @@
-#cython: wraparound=False, nonecheck=False, boundscheck=False, cdivision=True, language_level=3
-
 cimport cython
 import numpy as np
 cimport numpy as cnp
-cimport utils as iut
-import utils as iut
 import os
 from libc.stdio cimport printf
 from miaplpy.objects.slcStack import slcStack
 import h5py
 import time
+import isce2
 from isceobj.Util.ImageUtil import ImageLib as IML
 
+cimport utils
+from .utils import process_patch_c
 
 
 cdef void write_wrapped(list date_list, bytes out_dir, int width, int length, bytes RSLCfile, bytes date):
@@ -82,7 +81,7 @@ cdef class CPhaseLink:
         # threshold for shp test based on number of images to test
         alpha = 0.01
         if self.shp_test == b'ks':
-            self.distance_thresh = iut.ks_lut_cy(self.n_image, self.n_image, alpha)
+            self.distance_thresh = utils.ks_lut_cy(self.n_image, self.n_image, alpha)
         else:
             self.distance_thresh = alpha
 
@@ -271,7 +270,7 @@ cdef class CPhaseLink:
 
             data_kwargs['box'] = box
             os.makedirs(self.out_dir.decode('UTF-8') + '/PATCHES', exist_ok=True)
-            iut.process_patch_c(**data_kwargs)
+            process_patch_c(**data_kwargs)
 
         m, s = divmod(time.time() - start_time, 60)
         print('time used: {:02.0f} mins {:02.1f} secs.\n'.format(m, s))
