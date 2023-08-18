@@ -8,13 +8,13 @@ import numpy
 
 ext_modules = [
     Extension(
-        name="miaplpy.utils",
+        name="miaplpy.lib.utils",
         sources=["src/miaplpy/lib/utils.pyx"],
         # include_dirs        = ['src/miaplpy/lib'],
         include_dirs=[numpy.get_include()],
     ),
     Extension(
-        name="miaplpy.invert",
+        name="miaplpy.lib.invert",
         sources=["src/miaplpy/lib/invert.pyx"],
         include_dirs=[numpy.get_include()],
     ),
@@ -24,7 +24,7 @@ setup_args = dict(
     packages=find_packages(where="src"),  # list
     # package_dir={"": "src"},  # mapping
     # ext_modules     = [ext],                            # list
-    ext_modules=cythonize(ext_modules),
+    ext_modules=cythonize(ext_modules, language_level=3),
     # scripts=["examples/fbs_test.py"],  # list
 )
 

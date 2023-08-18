@@ -1,3 +1,5 @@
+#cython: wraparound=False, nonecheck=False, boundscheck=False, cdivision=True, language_level=3
+
 cimport cython
 import numpy as np
 cimport numpy as cnp
@@ -9,8 +11,7 @@ import time
 import isce2
 from isceobj.Util.ImageUtil import ImageLib as IML
 
-cimport utils
-from .utils import process_patch_c
+from . cimport utils
 
 
 cdef void write_wrapped(list date_list, bytes out_dir, int width, int length, bytes RSLCfile, bytes date):
@@ -270,7 +271,7 @@ cdef class CPhaseLink:
 
             data_kwargs['box'] = box
             os.makedirs(self.out_dir.decode('UTF-8') + '/PATCHES', exist_ok=True)
-            process_patch_c(**data_kwargs)
+            utils.process_patch_c(**data_kwargs)
 
         m, s = divmod(time.time() - start_time, 60)
         print('time used: {:02.0f} mins {:02.1f} secs.\n'.format(m, s))

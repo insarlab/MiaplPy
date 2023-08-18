@@ -4,16 +4,29 @@ build-backend   = 'setuptools.build_meta'
 
 [project]
 name = "miaplpy"
-version = "0.1.0"
 description = "A package for inversion utilities"
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+license = { file = "LICENSE" }
 
-# ...
+# The version will be written into a version.py upon install, auto-generated
+# see section: setuptools_scm
+# https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html#dynamic-metadata
+# dependencies will be read from text files
+dynamic = ["version", "dependencies"]
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-#py-modules = ["_custom_build"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
 [tool.setuptools.dynamic]
-version = {attr = "mymodule.__version__"}
+version = {attr = "miaplpy.__version__"}
+
+
+[project.urls]
+Homepage = "https://github.com/insarlab/MiaplPy/"
+"Bug Tracker" = "https://github.com/insarlab/MiaplPy/issues"
