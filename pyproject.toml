@@ -13,10 +13,6 @@ classifiers = [
 ]
 license = { file = "LICENSE" }
 
-# The version will be written into a version.py upon install, auto-generated
-# see section: setuptools_scm
-# https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html#dynamic-metadata
-# dependencies will be read from text files
 dynamic = ["version", "dependencies"]
 
 
@@ -24,6 +20,7 @@ dynamic = ["version", "dependencies"]
 where = ["src"]
 
 [tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
 version = {attr = "miaplpy.__version__"}
 
 
