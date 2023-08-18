@@ -13,14 +13,14 @@ classifiers = [
 ]
 license = { file = "LICENSE" }
 
-dynamic = ["version", "dependencies"]
+dynamic = ["version"] # , "dependencies"]
 
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
+# dependencies = { file = ["requirements.txt"] }
 version = {attr = "miaplpy.__version__"}
 
 
