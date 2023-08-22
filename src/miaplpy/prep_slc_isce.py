@@ -151,7 +151,6 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
             metadata['LAT_REF2'] = metadata_multi_looked['LAT_REF2']
             metadata['LAT_REF3'] = metadata_multi_looked['LAT_REF3']
             metadata['LAT_REF4'] = metadata_multi_looked['LAT_REF4']
-            print(metadata_multi_looked)
 
     # NCORRLOOKS for coherence calibration
     rgfact = float(metadata['rangeResolution']) / float(metadata['rangePixelSize'])
