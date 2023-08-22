@@ -1,78 +1,39 @@
 ## Install MiaplPy
 
-#### 1. Set the following environment variables in your source file. It could be ~/.bash_profile file for bash user or ~/.cshrc file for csh/tcsh user.
-
-```
-if [ -z ${PYTHONPATH+x} ]; then export PYTHONPATH=""; fi
-
-##--------- MintPy ------------------##
-export MINTPY_HOME=~/tools/MintPy
-export PYTHONPATH=${PYTHONPATH}:${MINTPY_HOME}
-export PATH=${PATH}:${MINTPY_HOME}/mintpy/cli
-
-#---------- MiaplPy ------------------##
-export MIAPLPY_HOME=~/tools/MiaplPy
-export PYTHONPATH=${PYTHONPATH}:${MIAPLPY_HOME}
-export PATH=${PATH}:${MIAPLPY_HOME}/miaplpy
-export PATH=${PATH}:${MIAPLPY_HOME}/snaphu/bin
-
-```
-#### 2. Download
-
+#### 1. Download source code
 ```
 cd ~/tools
 git clone https://github.com/insarlab/MiaplPy.git
-git clone https://github.com/insarlab/MintPy.git
+cd ~/tools/MiaplPy
 ```
 
-#### 3. install dependencies
-
-Install miniconda if you have not already done so. You may need to close and restart the shell for changes to take effect.
+#### 2. Install dependencies
 ```
-# download and install miniconda
-# use wget or curl to download in command line or click from the web brower
-# MacOS users: curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o Miniconda3-latest-MacOSX-x86_64.sh
-# Linux users: curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o Miniconda3-latest-Linux-x86_64.sh
-
-# Mac users:
-miniconda_version=Miniconda3-latest-MacOSX-x86_64.sh
-# Linux users:
-miniconda_version=Miniconda3-latest-Linux-x86_64.sh
-
-wget http://repo.continuum.io/miniconda/$miniconda_version --no-check-certificate -O $miniconda_version
-chmod +x $miniconda_version
-./$miniconda_version -b -p ~/tools/miniconda3
-~/tools/miniconda3/bin/conda init bash
+mamba env create --file conda-env.yml
 ```
-
-Run the following in your terminal to install the dependencies to a new environment miaplpy (recommended):
+or if you have an existing environment:
 
 ```
-conda env create -f $MIAPLPY_HOME/docs/conda_env.yml
-conda activate miaplpy
-```
-Or run the following in your terminal to install the dependencies to your custom environment, the default is base:
-
-```
-conda install --yes -c conda-forge --file ~/tools/MiaplPy/docs/requirements.txt
+mamba env update --name my-existing-env --file conda-env.yml
 ```
 
-#### 4. Setup MiaplPy
+#### 3. Install MiaplPy via pip
+```
+conda activate dolphin-env
+python -m pip install .
+```
 
-I. Compile
+#### 4. Install [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/) 
 ```
-cd $MIAPLPY_HOME/miaplpy/lib;
-python setup.py
-```
-II. Install [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/) 
-```
-cd $MIAPLPY_HOME;
+export TOOLS_DIR=~/tools
+cd ~/tools;
 wget --no-check-certificate  https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/snaphu-v2.0.5.tar.gz
 tar -xvf snaphu-v2.0.5.tar.gz
 mv snaphu-v2.0.5 snaphu;
 rm snaphu-v2.0.5.tar.gz;
-sed -i 's/\/usr\/local/$(MIAPLPY_HOME)\/snaphu/g' snaphu/src/Makefile
+sed -i 's/\/usr\/local/$(TOOLS_DIR)\/snaphu/g' snaphu/src/Makefile
 cd snaphu/src; make
+export PATH=${TOOLS_DIR}/snaphu/bin:${PATH}
 ```
 
 ### Notes

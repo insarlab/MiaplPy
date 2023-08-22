@@ -19,7 +19,7 @@ def enablePrint():
     sys.stdout = sys.__stdout__
 
 blockPrint()
-#import isce
+import isce
 import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
 from contrib.UnwrapComp.unwrapComponents import UnwrapComponents
@@ -191,6 +191,8 @@ class Snaphu:
         print(error)
         if 'ERROR' in error.decode('UTF-8') or 'Error' in error.decode('UTF-8'): # or len(error.decode('UTF-8'))>0:
             raise RuntimeError(error)
+
+
         
         if os.path.exists(self.out_unwrapped):
 
