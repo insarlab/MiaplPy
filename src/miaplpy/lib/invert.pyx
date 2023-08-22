@@ -8,37 +8,25 @@ from libc.stdio cimport printf
 from miaplpy.objects.slcStack import slcStack
 import h5py
 import time
-import isce2
-from isceobj.Util.ImageUtil import ImageLib as IML
-
+from datetime import datetime
+from osgeo import gdal, gdal_array
+from pyproj import CRS
+from miaplpy.objects.crop_geo import create_grid_mapping, create_tyx_dsets
 from . cimport utils
-from .utils import process_patch_c
+from.utils import process_patch_c
 
-
-cdef void write_wrapped(list date_list, bytes out_dir, int width, int length, bytes RSLCfile, bytes date):
-
-    cdef int d = date_list.index(date.decode('UTF-8'))
-    cdef bytes out_name, wrap_date
-    cdef object fhandle
-    cdef float complex[:, :, ::1] out_rslc
-
-    printf('write wrapped_phase {}'.format(date.decode('UTF-8')))
-    wrap_date = os.path.join(out_dir, b'wrapped_phase', date)
-    os.makedirs(wrap_date.decode('UTF-8'), exist_ok=True)
-    out_name = os.path.join(wrap_date, date + b'.slc')
-
-    if not os.path.exists(out_name.decode('UTF-8')):
-        fhandle = h5py.File(RSLCfile.decode('UTF-8'), 'r')
-        out_rslc = np.memmap(out_name, dtype='complex64', mode='w+', shape=(length, width))
-        out_rslc[:, :] = fhandle['slc'][d, :, :]
-        fhandle.close()
-        IML.renderISCEXML(out_name.decode('UTF-8'), bands=1, nyy=length, nxx=width, datatype='complex64',
-                          scheme='BSQ')
-    else:
-        IML.renderISCEXML(out_name.decode('UTF-8'), bands=1, nyy=length, nxx=width, datatype='complex64',
-                          scheme='BSQ')
-    return
-
+DEFAULT_TILE_SIZE = [128, 128]
+DEFAULT_TIFF_OPTIONS = (
+    "COMPRESS=DEFLATE",
+    "ZLEVEL=4",
+    "TILED=YES",
+    f"BLOCKXSIZE={DEFAULT_TILE_SIZE[1]}",
+    f"BLOCKYSIZE={DEFAULT_TILE_SIZE[0]}",
+)
+DEFAULT_ENVI_OPTIONS = (
+    "INTERLEAVE=BIL",
+    "SUFFIX=ADD"
+)
 
 cdef void write_hdf5_block_3D(object fhandle, float[:, :, ::1] data, bytes datasetName, list block):
 
@@ -46,6 +34,11 @@ cdef void write_hdf5_block_3D(object fhandle, float[:, :, ::1] data, bytes datas
     return
 
 cdef void write_hdf5_block_2D_int(object fhandle, int[:, ::1] data, bytes datasetName, list block):
+
+    fhandle[datasetName.decode('UTF-8')][block[0]:block[1], block[2]:block[3]] = data
+    return
+
+cdef void write_hdf5_block_2D_float(object fhandle, float[:, ::1] data, bytes datasetName, list block):
 
     fhandle[datasetName.decode('UTF-8')][block[0]:block[1], block[2]:block[3]] = data
     return
@@ -66,11 +59,12 @@ cdef class CPhaseLink:
         self.patch_size = np.int32(inps.patch_size)
         self.ps_shp = np.int32(inps.ps_shp)
         self.out_dir = self.work_dir + b'/inverted'
+        #self.num_archived = np.int32(inps.num_archived)
         os.makedirs(self.out_dir.decode('UTF-8'), exist_ok='True')
-
         self.slcStackObj = slcStack(inps.slc_stack)
         self.metadata = self.slcStackObj.get_metadata()
-        self.all_date_list = self.slcStackObj.get_date_list()
+        #self.all_date_list = self.slcStackObj.get_date_list()
+        self.all_date_list = self.get_dates(inps.slc_stack)
         with h5py.File(inps.slc_stack, 'r') as f:
             self.prep_baselines = f['bperp'][:]
         self.n_image, self.length, self.width = self.slcStackObj.get_size()
@@ -100,14 +94,49 @@ cdef class CPhaseLink:
 
         self.window_for_shp()
 
+        #self.RSLCfile = self.out_dir + b'/phase_series.h5'
         self.RSLCfile = self.out_dir + b'/phase_series.h5'
-
 
         if b'sequential' == self.phase_linking_method[0:10]:
             self.sequential = True
         else:
             self.sequential = False
         return
+
+    def get_projection(self, slc_stack):
+        cdef object ds, gt
+        cdef str projection
+        cdef dict attrs
+        cdef list geotransform #, extent
+        with h5py.File(slc_stack, 'r') as ds:
+            attrs = dict(ds.attrs)
+            if 'spatial_ref' in attrs.keys():
+                projection = attrs['spatial_ref'][3:-1]
+                geotransform = [attrs['X_FIRST'], attrs['X_STEP'], 0, attrs['Y_FIRST'], 0, attrs['Y_STEP']]
+                geotransform = [float(x) for x in geotransform]
+            else:
+                geotransform = [0, 1, 0, 0, 0, -1]
+                projection = CRS.from_epsg(4326).to_wkt()
+
+        return projection, geotransform
+
+    def get_dates(self, slc_stack):
+        cdef object ds, ff, ft
+        cdef list dates
+        cdef double[::1] tt
+        cdef double st
+        with h5py.File(slc_stack) as ds:
+            if 'date' in ds.keys():
+                dates = list(ds['date'][()])
+                return dates
+            else:
+                tt = ds['time'][()]
+                ff = datetime.strptime(ds['time'].attrs['units'].split('seconds since ')[1], '%Y-%m-%d %H:%M:%S.%f')
+                ft = datetime.strptime('19691231-16', '%Y%m%d-%H')
+                st = (ff - ft).total_seconds()
+                dates = [datetime.fromtimestamp(t+st) for t in tt]
+                return [t.strftime('%Y%m%d') for t in dates]
+
 
     def patch_slice(self):
         """
@@ -158,7 +187,6 @@ cdef class CPhaseLink:
 
         return
 
-
     def initiate_output(self):
         cdef object RSLC, psf
 
@@ -188,7 +216,20 @@ cdef class CPhaseLink:
                                     maxshape=(None, self.length, self.width),
                                     chunks=True,
                                     dtype=np.float32)
+                '''
+                if b'real_time' == self.phase_linking_method[0:9]:
+                    RSLC.create_dataset('phase_seq',
+                                        shape=(self.n_image, self.length, self.width),
+                                        maxshape=(None, self.length, self.width),
+                                        chunks=True,
+                                        dtype=np.float32)
 
+                    RSLC.create_dataset('amplitude_seq',
+                                        shape=(self.n_image, self.length, self.width),
+                                        maxshape=(None, self.length, self.width),
+                                        chunks=True,
+                                        dtype=np.float32)
+                '''
                 RSLC.create_dataset('shp',
                                     shape=(self.length, self.width),
                                     maxshape=(self.length, self.width),
@@ -238,27 +279,17 @@ cdef class CPhaseLink:
 
     def get_datakwargs(self):
 
-        cdef dict data_kwargs = {
-            "range_window" : self.range_window,
-            "azimuth_window" : self.azimuth_window,
-            "width" : self.width,
-            "length" : self.length,
-            "n_image" : self.n_image,
-            "slcStackObj" : self.slcStackObj,
-            "distance_threshold" : self.distance_thresh,
-            "def_sample_rows" : np.array(self.sample_rows),
-            "def_sample_cols" : np.array(self.sample_cols),
-            "reference_row" : self.reference_row,
-            "reference_col" : self.reference_col,
-            "phase_linking_method" : self.phase_linking_method,
-            "total_num_mini_stacks" : self.total_num_mini_stacks,
-            "default_mini_stack_size" : self.mini_stack_default_size,
-            'ps_shp': self.ps_shp,
-            "shp_test": self.shp_test,
-            "out_dir": self.out_dir,
-            "time_lag": self.time_lag,
-            "mask_file": self.mask_file,
-        }
+        cdef dict data_kwargs = dict(range_window=self.range_window, azimuth_window=self.azimuth_window,
+                                     width=self.width, length=self.length, n_image=self.n_image,
+                                     slcStackObj=self.slcStackObj, distance_threshold=self.distance_thresh,
+                                     def_sample_rows=np.array(self.sample_rows),
+                                     def_sample_cols=np.array(self.sample_cols), reference_row=self.reference_row,
+                                     reference_col=self.reference_col, phase_linking_method=self.phase_linking_method,
+                                     total_num_mini_stacks=self.total_num_mini_stacks,
+                                     default_mini_stack_size=self.mini_stack_default_size, ps_shp=self.ps_shp,
+                                     shp_test=self.shp_test, out_dir=self.out_dir, time_lag=self.time_lag,
+                                     mask_file=self.mask_file)
+        #"num_archived": self.num_archived,
         return data_kwargs
 
 
@@ -278,15 +309,94 @@ cdef class CPhaseLink:
         print('time used: {:02.0f} mins {:02.1f} secs.\n'.format(m, s))
         return
 
+    def set_projection_hdf(self, object fhandle, object projection, list geotransform):
+        # cdef object grp
+
+        create_grid_mapping(group=fhandle, crs=projection, gt=list(geotransform))
+
+        #if "georeference" in fhandle:
+        #    grp = fhandle["georeference"]
+        #else:
+        #    grp = fhandle.create_group("georeference")
+
+        #if not "transform" in grp.keys():
+        #    grp.create_dataset("transform", data=geotransform, dtype=np.float32)
+        #grp.attrs["crs"] = projection
+        #grp.attrs["extent"] = crop_extent
+        #grp.attrs["pixel_size_x"] = self.pixel_width
+        #grp.attrs["pixel_size_y"] = self.pixel_height
+        return
+
+    def set_projection_gdal1_int(self, cnp.ndarray[int, ndim=2] data, int bands, bytes output, str description,
+                             str projection, list geotransform):
+        cdef object driver, dataset, band1, target_crs
+        driver = gdal.GetDriverByName('ENVI')
+        dataset = driver.Create(output, self.width, self.length, 1, gdal.GDT_Int16, DEFAULT_ENVI_OPTIONS)
+        dataset.SetGeoTransform(list(geotransform))
+        dataset.SetProjection(projection) #.to_wkt()) #target_crs.ExportToWkt())
+        band1 = dataset.GetRasterBand(1)
+        band1.SetDescription(description)
+        gdal_array.BandWriteArray(band1, data, xoff=0, yoff=0)
+        # band1.WriteArray(data, xoff=0, yoff=0)
+        band1.SetNoDataValue(np.nan)
+
+        dataset.FlushCache()
+        dataset = None
+
+        return
+
+    def set_projection_gdal1(self, cnp.ndarray[float, ndim=2] data, int bands, bytes output, str description,
+                             str projection, list geotransform):
+        cdef object driver, dataset, band1, target_crs
+        driver = gdal.GetDriverByName('ENVI')
+        dataset = driver.Create(output, self.width, self.length, 1, gdal.GDT_Float32, DEFAULT_ENVI_OPTIONS)
+        dataset.SetGeoTransform(list(geotransform))
+        dataset.SetProjection(projection) #.to_wkt()) #target_crs.ExportToWkt())
+        band1 = dataset.GetRasterBand(1)
+        band1.SetDescription(description)
+        gdal_array.BandWriteArray(band1, data, xoff=0, yoff=0)
+        # band1.WriteArray(data, xoff=0, yoff=0)
+        band1.SetNoDataValue(np.nan)
+
+        dataset.FlushCache()
+        dataset = None
+
+        return
+
+    def set_projection_gdalm(self, cnp.ndarray[float, ndim=3] data, int bands, bytes output, list description,
+                             str projection, list geotransform):
+        cdef int i
+        cdef object driver, dataset, band
+        driver = gdal.GetDriverByName('ENVI')
+        dataset = driver.Create(output, self.width, self.length, bands, gdal.GDT_Float32, DEFAULT_ENVI_OPTIONS)
+
+        for i in range(bands):
+            band = dataset.GetRasterBand(i+1)
+            band.SetDescription(description[i])
+            gdal_array.BandWriteArray(band, data[i, :, :], xoff=0, yoff=0)
+            #band.WriteArray(data[i, :, :], xoff=0, yoff=0)
+            band.SetNoDataValue(np.nan)
+            del band
+
+        dataset.SetGeoTransform(list(geotransform))
+        dataset.SetProjection(projection) #.to_wkt())
+        dataset.FlushCache()
+        dataset = None
+
+        return
+
     def unpatch(self):
         cdef list block
         cdef object fhandle, psf
         cdef int index, box_length, box_width
         cdef cnp.ndarray[int, ndim=1] box
         cdef bytes patch_dir
-        cdef float complex[:, :, ::1] rslc_ref
+        cdef str projection
+        cdef float complex[:, :, ::1] rslc_ref, rslc_ref_seq
         cdef cnp.ndarray[float, ndim=3] temp_coh, ps_prod, eig_values = np.zeros((3, self.length, self.width), dtype=np.float32)
         cdef cnp.ndarray[float, ndim=2] amp_disp = np.zeros((self.length, self.width), dtype=np.float32)
+        #cdef cnp.ndarray[int, ndim=2] reference_index_map = np.zeros((self.length, self.width), dtype=np.int32)
+        cdef list geotransform
 
         if os.path.exists(self.RSLCfile.decode('UTF-8')):
             print('Deleting old phase_series.h5 ...')
@@ -300,8 +410,13 @@ cdef class CPhaseLink:
         print('Concatenate and write wrapped phase time series to HDF5 file phase_series.h5 ')
         print('open  HDF5 file phase_series.h5 in a mode')
 
+        dask_chunks = (1, 128 * 10, 128 * 10)
+        projection, geotransform = self.get_projection(self.inps.slc_stack)
+
         with h5py.File(self.RSLCfile.decode('UTF-8'), 'a') as fhandle:
-            
+            #create_grid_mapping(group=fhandle, crs=projection, gt=list(geotransform))
+            #create_tyx_dsets(group=fhandle, gt=list(geotransform), times=self.all_date_list, shape=(self.length, self.width))
+
             for index, box in enumerate(self.box_list):
                 box_width = box[2] - box[0]
                 box_length = box[3] - box[1]
@@ -312,6 +427,9 @@ cdef class CPhaseLink:
                 shp = np.load(patch_dir.decode('UTF-8') + '/shp.npy', allow_pickle=True)
                 mask_ps = np.load(patch_dir.decode('UTF-8') + '/mask_ps.npy', allow_pickle=True)
                 ps_prod = np.load(patch_dir.decode('UTF-8') + '/ps_products.npy', allow_pickle=True)
+                #reference_index = np.load(patch_dir.decode('UTF-8') + '/reference_index.npy', allow_pickle=True)
+                #if b'real_time' == self.phase_linking_method[0:9]:
+                #    rslc_ref_seq = np.load(patch_dir.decode('UTF-8') + '/phase_ref_seq.npy', allow_pickle=True)
 
                 temp_coh[temp_coh<0] = 0
 
@@ -320,82 +438,48 @@ cdef class CPhaseLink:
 
                 # wrapped interferograms 3D
                 block = [0, self.n_image, box[1], box[3], box[0], box[2]]
-                #write_hdf5_block_3D(fhandle, rslc_ref, b'slc', block)
+                ## write_hdf5_block_3D(fhandle, rslc_ref, b'slc', block)
                 write_hdf5_block_3D(fhandle, np.angle(rslc_ref), b'phase', block)
                 write_hdf5_block_3D(fhandle, np.abs(rslc_ref), b'amplitude', block)
+                #if b'real_time' == self.phase_linking_method[0:9]:
+                #    write_hdf5_block_3D(fhandle, np.angle(rslc_ref_seq), b'phase_seq', block)
+                #    write_hdf5_block_3D(fhandle, np.abs(rslc_ref_seq), b'amplitude_seq', block)
 
                 # SHP - 2D
                 block = [box[1], box[3], box[0], box[2]]
                 write_hdf5_block_2D_int(fhandle, shp, b'shp', block)
                 amp_disp[block[0]:block[1], block[2]:block[3]] = ps_prod[0, :, :]
+                #reference_index_map[block[0]:block[1], block[2]:block[3]] = reference_index[:, :]
 
                 # temporal coherence - 3D
                 block = [0, 2, box[1], box[3], box[0], box[2]]
                 write_hdf5_block_3D(fhandle, temp_coh, b'temporalCoherence', block)
                 eig_values[0:3, block[2]:block[3], block[4]:block[5]] = ps_prod[1:4, :, :]
 
+
+            ###
+            print('close HDF5 file phase_series.h5.')
+
             print('write amplitude dispersion and top eigen values')
             amp_disp_file = self.out_dir + b'/amp_dipersion_index'
-            if not os.path.exists(amp_disp_file.decode('UTF-8')):
-                amp_disp_memmap = np.memmap(amp_disp_file.decode('UTF-8'), mode='write', dtype='float32',
-                                           shape=(self.length, self.width))
-                IML.renderISCEXML(amp_disp_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
-                                  datatype='float32', scheme='BIL')
-            else:
-                amp_disp_memmap = np.memmap(amp_disp_file.decode('UTF-8'), mode='r+', dtype='float32',
-                                           shape=(self.length, self.width))
-
-            amp_disp_memmap[:, :] = amp_disp[:, :]
-            amp_disp_memmap = None
-
+            self.set_projection_gdal1(amp_disp, 1,
+                                      amp_disp_file, 'Amplitude dispersion index', projection, geotransform)
+            #self.set_projection_gdal1(amp_disp, 1, amp_disp_file, 'Amplitude dispersion index', projection, geotransform)
             top_eig_files = self.out_dir + b'/top_eigenvalues'
-            if not os.path.exists(top_eig_files.decode('UTF-8')):
-                top_eig_memmap = np.memmap(top_eig_files.decode('UTF-8'), mode='write', dtype='float32',
-                                           shape=(3, self.length, self.width))
-                IML.renderISCEXML(top_eig_files.decode('UTF-8'), bands=3, nyy=self.length, nxx=self.width,
-                                  datatype='float32', scheme='BSQ')
-            else:
-                top_eig_memmap = np.memmap(top_eig_files.decode('UTF-8'), mode='r+', dtype='float32',
-                                           shape=(3, self.length, self.width))
-
-            print(top_eig_memmap.shape, np.array(eig_values).shape)
-            top_eig_memmap[0:3, :, :] = eig_values[:, :, :]
-            #top_eig_memmap[2, :, :] = eig_values[1, :, :]/eig_values[0, :, :]
-            rr, cc, kk = np.where(np.isnan(top_eig_memmap))
-            top_eig_memmap[:, rr, cc] = np.nan
-            top_eig_memmap = None
-
+            self.set_projection_gdalm(np.array(eig_values), 3, top_eig_files,
+                                      ['Top eigenvalue 1', 'Top eigenvalue 2', 'Top eigenvalue 3'], projection, geotransform)
             print('write averaged temporal coherence file from mini stacks')
             temp_coh_file = self.out_dir + b'/tempCoh_average'
-
-            if not os.path.exists(temp_coh_file.decode('UTF-8')):
-                temp_coh_memmap = np.memmap(temp_coh_file.decode('UTF-8'), mode='write', dtype='float32',
-                                           shape=(self.length, self.width))
-                IML.renderISCEXML(temp_coh_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
-                                  datatype='float32', scheme='BIL')
-            else:
-                temp_coh_memmap = np.memmap(temp_coh_file.decode('UTF-8'), mode='r+', dtype='float32',
-                                           shape=(self.length, self.width))
-
-            temp_coh_memmap[:, :] = fhandle['temporalCoherence'][0, :, :]
-            temp_coh_memmap = None
-
-            print('write temporal coherence file from full stack')
+            self.set_projection_gdal1(fhandle['temporalCoherence'][0, :, :], 1,
+                                      temp_coh_file, 'Temporal coherence average', projection, geotransform)
             temp_coh_file = self.out_dir + b'/tempCoh_full'
+            self.set_projection_gdal1(fhandle['temporalCoherence'][1, :, :], 1,
+                                      temp_coh_file, 'Temporal coherence full', projection, geotransform)
+            #ref_index_file = self.out_dir + b'/reference_index'
+            #self.set_projection_gdal1_int(reference_index_map, 1,
+            #                          ref_index_file, 'Reference index map', projection, geotransform)
 
-            if not os.path.exists(temp_coh_file.decode('UTF-8')):
-                temp_coh_memmap = np.memmap(temp_coh_file.decode('UTF-8'), mode='write', dtype='float32',
-                                           shape=(self.length, self.width))
-                IML.renderISCEXML(temp_coh_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
-                                  datatype='float32', scheme='BIL')
-            else:
-                temp_coh_memmap = np.memmap(temp_coh_file.decode('UTF-8'), mode='r+', dtype='float32',
-                                           shape=(self.length, self.width))
 
-            temp_coh_memmap[:, :] = fhandle['temporalCoherence'][1, :, :]
-            temp_coh_memmap = None
-
-            print('close HDF5 file phase_series.h5.')
 
         print('write PS mask file')
 
@@ -407,6 +491,3 @@ cdef class CPhaseLink:
                write_hdf5_block_2D_int(psf, mask_ps, b'mask', block)
 
         return
-
-
-
