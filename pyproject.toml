@@ -1,0 +1,29 @@
+[build-system]
+requires        = ['setuptools>=61.0', "cython", "numpy"]                  # 'cython'
+build-backend   = 'setuptools.build_meta'   
+
+[project]
+name = "miaplpy"
+description = "A package for inversion utilities"
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+license = { file = "LICENSE" }
+
+dynamic = ["version"] # , "dependencies"]
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+# dependencies = { file = ["requirements.txt"] }
+version = {attr = "miaplpy.__version__"}
+
+
+[project.urls]
+Homepage = "https://github.com/insarlab/MiaplPy/"
+"Bug Tracker" = "https://github.com/insarlab/MiaplPy/issues"
