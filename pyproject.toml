@@ -40,8 +40,10 @@ miaplpyApp = "miaplpy.miaplpyApp:main"
 where = ["src"]
 #include = ["defaults/*.cfg", "defaults/*.full"]
 
+
 [tool.setuptools.package-data]
-myModule = ["defaults/*.cfg", "defaults/*.full"]
+"miaplpy.defaults" = ["*.cfg", "*.full"]
+
 
 [tool.setuptools.dynamic]
 #dependencies = { file = ["requirements.txt"] }
