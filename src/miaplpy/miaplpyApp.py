@@ -142,12 +142,6 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         elif self.template['miaplpy.interferograms.networkType'] == 'sequential':
             name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.connNum'])
 
-        name_ifg_network = self.template['miaplpy.interferograms.networkType']
-        if self.template['miaplpy.interferograms.networkType'] == 'delaunay':
-            name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.delaunayBaselineRatio'])
-        elif self.template['miaplpy.interferograms.networkType'] == 'sequential':
-            name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.connNum'])
-
         self.out_dir_network = '{}/{}'.format(self.workDir,
                                               'network_' + name_ifg_network)
         os.makedirs(self.out_dir_network, exist_ok=True)
