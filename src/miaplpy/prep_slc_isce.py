@@ -140,6 +140,7 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
         if processor != 'alosStack':
             metadata = isce_utils.extract_geometry_metadata(geom_dir, metadata, fext_list=['.rdr.full','.geo.full'])
 
+            '''
             # get metadata for multilooked data as full resolution lacks the LOB_REF1, etc information
             metadata_multi_looked = copy.deepcopy(metadata)
             metadata_multi_looked = isce_utils.extract_geometry_metadata(geom_dir, metadata_multi_looked)
@@ -151,6 +152,7 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
             metadata['LAT_REF2'] = metadata_multi_looked['LAT_REF2']
             metadata['LAT_REF3'] = metadata_multi_looked['LAT_REF3']
             metadata['LAT_REF4'] = metadata_multi_looked['LAT_REF4']
+            '''
 
     # NCORRLOOKS for coherence calibration
     rgfact = float(metadata['rangeResolution']) / float(metadata['rangePixelSize'])
