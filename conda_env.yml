@@ -3,7 +3,7 @@
 # remove environment : conda env remove -n miaplpy
 # enter  environment : conda activate miaplpy
 # exit   environment : conda deactivate
-name: miaplpy
+name: miaplpy-env
 channels:
   - conda-forge
   - defaults
