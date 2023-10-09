@@ -19,7 +19,7 @@ mamba env update --name my-existing-env --file conda-env.yml
 
 #### 3. Install MiaplPy via pip
 ```
-conda activate dolphin-env
+conda activate miaplpy-env
 python -m pip install .
 ```
 
