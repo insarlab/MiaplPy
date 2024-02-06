@@ -272,7 +272,7 @@ cdef class CPhaseLink:
                                     shape=(self.length, self.width),
                                     maxshape=(self.length, self.width),
                                     chunks=True,
-                                    dtype=np.int32)
+                                    dtype=np.bool_)
                 psf['mask'][:, :] = 0
 
         return
