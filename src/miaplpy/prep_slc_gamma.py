@@ -9,6 +9,7 @@ import os
 import sys
 import warnings
 import logging
+import argparse
 from mintpy.prep_gamma import (get_lalo_ref, extract_metadata4geometry_radar, extract_metadata4geometry_geo)
 from mintpy.utils import readfile as mt_readfile
 
@@ -40,7 +41,35 @@ EXAMPLE = """example:
   """
 
 
-def extract_metadata4slc(fname):
+def create_parser():
+    """Command line parser."""
+    parser = argparse.ArgumentParser(description='Prepare ISCE metadata files.',
+                                     formatter_class=argparse.RawTextHelpFormatter,
+                                     epilog=EXAMPLE)
+    parser.add_argument('-s', '--slc-files', nargs='+', dest='slc_files', type=str, default=None,
+                        help='List of resampled slc files that will be used in miaplpy\n'
+                             'e.g.: ../rslc/2018*/20*slc')
+    parser.add_argument('-r', '--radar-geom', nargs='+', dest='radar_geom_files', type=str, default=None,
+                        help=' Geometry files in radar coosdinates. e.g.: ../geometry/sim_20170223.rdc.dem')
+    parser.add_argument('-g', '--geo-geom', nargs='+', dest='geo_geom_files', type=str, default=None,
+                        help=' Geometry files in geo coosdinates. e.g.: ../geometry/sim_20170223.utm_to_rdc ')
+    # TODO: implement overwrite mode
+    # parser.add_argument('--force', dest='update_mode', action='store_false',
+    #                     help='Force to overwrite all .rsc metadata files. Not implemented yet!')
+    return parser
+
+
+def cmd_line_parse(iargs=None):
+    parser = create_parser()
+    inps = parser.parse_args()
+    inps = vars(inps)
+    if all(not i for i in [inps['slc_files'], inps['radar_geom_files'], inps['geo_geom_files']]):
+        parser.print_usage()
+        raise SystemExit('error: at least one of the following arguments are required: -s, -g, -m')
+    return inps
+
+
+def extract_metadata4slc(fname, update_mode=False):
     print('preparing RSC file for ', fname)
     slc_metadata = read_attribute(fname, metafile_ext='.par')
     # update date yyyy -> yyyymmgg
@@ -61,24 +90,31 @@ def extract_metadata4slc(fname):
 
 
 def main(iargs=None):
-    fnames = list(iargs)
+    inps = cmd_line_parse(iargs)
 
-    # loop for each file
-    for fname in fnames:
-        print(fname)
-        file_ext = fname.split('.')[-1]
-        # slc
-        if file_ext in ['slc', 'rslc']:
-            extract_metadata4slc(fname)
+    if inps['geo_geom_files']:
+        fnames = inps['geo_geom_files']
+        for fname in fnames:
+            if fname.endswith(('utm_to_rdc', 'inc')):  # TODO: add other extentions
+                extract_metadata4geometry_geo(fname)
+            else:
+                raise Exception(f'File {fname} not supported. Use utm_to_rdc or inc.')
 
-            # geometry - geo
-        elif file_ext in ['utm_to_rdc'] or fname.endswith('utm.dem'):
-            extract_metadata4geometry_geo(fname)
+    if inps['radar_geom_files']:
+        fnames = inps['radar_geom_files']
+        for fname in fnames:
+            if fname.endswith(('rdc.dem')):
+                extract_metadata4geometry_radar(fname)
+            else:
+                raise Exception(f'File {fname} not supported. Use rdc.dem.')
 
-            # geometry - radar
-        elif fname.endswith(('rdc.dem', 'hgt_sim')):
-            extract_metadata4geometry_radar(fname)
-
+    if inps['slc_files']:
+        fnames = inps['slc_files']
+        for fname in fnames:
+            if fname.endswith(('.slc', '.rslc')):
+                extract_metadata4slc(fname)
+            else:
+                raise Exception(f'File {fname} not supported. Use .slc os .rslc.')
     return
 
 
