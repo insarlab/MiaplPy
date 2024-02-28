@@ -1137,9 +1137,13 @@ def read_subset_box(inpsDict):
     # Grab required info to read input geo_box into pix_box
 
     try:
-        lookupFile = [glob.glob(str(inpsDict['miaplpy.load.lookupYFile'] + '.xml'))[0],
-                      glob.glob(str(inpsDict['miaplpy.load.lookupXFile'] + '.xml'))[0]]
-        lookupFile = [x.split('.xml')[0] for x in lookupFile]
+        if inpsDict['processor'] == 'gamma':
+            lookupFile = [glob.glob(str(inpsDict['miaplpy.load.lookupYFile']))[0],
+                            glob.glob(str(inpsDict['miaplpy.load.lookupXFile']))[0]]
+        else:
+            lookupFile = [glob.glob(str(inpsDict['miaplpy.load.lookupYFile'] + '.xml'))[0],
+                          glob.glob(str(inpsDict['miaplpy.load.lookupXFile'] + '.xml'))[0]]
+            lookupFile = [x.split('.xml')[0] for x in lookupFile]
     except:
         lookupFile = None
 
@@ -1458,6 +1462,7 @@ def read_inps_dict2slc_stack_dict_object(inpsDict):
     print('-' * 50)
     print('searching slcs info')
     print('input data files:')
+    processor = inpsDict['processor']
 
     from miaplpy.objects.slcStack import (slcDatasetNames,
                                          slcStackDict,
