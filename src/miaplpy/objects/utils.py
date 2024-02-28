@@ -667,7 +667,7 @@ def read_hdf5_file(fname, datasetName=None, box=None):
 
 
 #########################################################################
-def read_binary_file(fname, datasetName=None, box=None, attributes_only=False):
+def read_binary_file(fname, datasetName=None, box=None, attributes_only=False, processor="isce"):
 
     """Read data from binary file, such as .unw, .cor, etc.
     Parameters: fname : str, path/name of binary file
