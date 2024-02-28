@@ -37,7 +37,7 @@ enablePrint()
 
 EXAMPLE = """example:
   prep_slc_gamma.py ../rslc/20*/*slc   #for slc
-  prep_slc_gamma.py ../rslc/20*/*slc ../geometry/*.dem ../geometry/*.UTM_TO_RDC   #for slc and geometry files
+  prep_slc_gamma.py -s ../rslc/20*/*slc -r ../geometry/*.dem -g ../geometry/*.utm_to_rdc   #for slc and geometry files
   """
 
 
