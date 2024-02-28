@@ -10,7 +10,7 @@ import sys
 import warnings
 import logging
 from mintpy.prep_gamma import (get_lalo_ref, extract_metadata4geometry_radar, extract_metadata4geometry_geo)
-from mintpy.utils.readfile import (attribute_gamma2roipac, standardize_metadata)
+from mintpy.utils import readfile as mt_readfile
 
 warnings.filterwarnings("ignore")
 
@@ -112,8 +112,8 @@ def read_gamma_slc_par(fname, delimiter=':', skiprows=3):
                 value = ''.join(str.replace(c[1], '\n', '').split("#")[0].split()[0:3])
                 parDict[key] = value
 
-    parDict = attribute_gamma2roipac(parDict)
-    parDict = standardize_metadata(parDict)
+    parDict = mt_readfile._attribute_gamma2roipac(parDict)
+    parDict = mt_readfile.standardize_metadata(parDict)
 
     return parDict
 
