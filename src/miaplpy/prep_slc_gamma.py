@@ -72,7 +72,7 @@ def main(iargs=None):
             extract_metadata4slc(fname)
 
             # geometry - geo
-        elif file_ext in ['UTM_TO_RDC'] or fname.endswith('utm.dem'):
+        elif file_ext in ['utm_to_rdc'] or fname.endswith('utm.dem'):
             extract_metadata4geometry_geo(fname)
 
             # geometry - radar
