@@ -167,10 +167,10 @@ class slcStackDict:
                         box = (0, 0, self.width, self.length)
                     if metadata['PROCESSOR'] == 'gamma':
                         ds[i, :, :] = readfile.read_binary(fname,
-                                                           shape=(self.length,self.width),
+                                                           shape=(self.length, self.width),
                                                            data_type=metadata['DATA_TYPE'],
                                                            byte_order=metadata['BYTE_ORDER'],
-                                                           cpx_band='c')
+                                                           cpx_band='cpx')
                     else:  # isce
                         dsSlc = gdal.Open(fname + '.vrt', gdal.GA_ReadOnly)
                         ds[i, :, :] = dsSlc.GetRasterBand(1).ReadAsArray(int(box[0]), int(box[1]), self.width, self.length)
