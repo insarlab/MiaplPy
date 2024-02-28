@@ -1347,11 +1347,12 @@ def prepare_metadata(inpsDict):
     print('-' * 50)
     print('prepare metadata files for {} products'.format(processor))
     if processor in ['gamma', 'roipac', 'snap']:
-        for key in [i for i in inpsDict.keys() if (i.startswith('miaplpy.load.') and i.endswith('File'))]:
-            if len(glob.glob(str(inpsDict[key]))) > 0:
-                cmd = '{} {}'.format(script_name, inpsDict[key])
-                print(cmd)
-                os.system(cmd)
+        slc_files = inpsDict['miaplpy.load.slcFile']
+        dem_file = inpsDict['miaplpy.load.demFile']
+        lookup_file = inpsDict['miaplpy.load.lookupXFile']
+        cmd = f'{script_name} -s {slc_files} -r {dem_file} -g {lookup_file}'
+        print(cmd)
+        os.system(cmd)
 
     elif processor == 'isce':
 
