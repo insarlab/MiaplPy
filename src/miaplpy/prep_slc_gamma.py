@@ -84,8 +84,8 @@ def extract_metadata4slc(fname, update_mode=False):
     rsc_file = fname + '.rsc'
     update_mode = True
     writefile.write_roipac_rsc(slc_metadata, rsc_file,
-                                   update_mode=update_mode,
-                                   print_msg=False)
+                               update_mode=update_mode,
+                               print_msg=False)
     return
 
 
