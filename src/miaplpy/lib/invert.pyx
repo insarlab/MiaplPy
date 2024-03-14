@@ -4,7 +4,7 @@ cimport cython
 import numpy as np
 cimport numpy as cnp
 import os
-from libc.stdio cimport printf
+# from libc.stdio cimport printf
 from miaplpy.objects.slcStack import slcStack
 import h5py
 import time
@@ -259,7 +259,7 @@ cdef class CPhaseLink:
         with h5py.File(mask_ps_file.decode('UTF-8'), 'a') as psf:
             if not 'mask' in psf.keys():
                 self.metadata['FILE_TYPE'] = 'mask' #'phase'
-                self.metadata['DATA_TYPE'] = 'int32'
+                self.metadata['DATA_TYPE'] = 'bool'
                 self.metadata['data_type'] = 'BYTE'
                 self.metadata['description'] = 'PS mask'
                 self.metadata['file_name'] = mask_ps_file.decode('UTF-8')
@@ -488,6 +488,6 @@ cdef class CPhaseLink:
                patch_dir = self.out_dir + ('/PATCHES/PATCH_{:04.0f}'.format(index)).encode('UTF-8')
                mask_ps = np.load(patch_dir.decode('UTF-8') + '/mask_ps.npy', allow_pickle=True)
                block = [box[1], box[3], box[0], box[2]]
-               write_hdf5_block_2D_int(psf, mask_ps, b'mask', block)
+               psf['mask'][block[0]:block[1], block[2]:block[3]] = mask_ps
 
         return
