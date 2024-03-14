@@ -263,7 +263,7 @@ def repeat_simulation(numr, n_img, n_shp, phas, coh_sim_S, coh_sim_L, outname): 
 
         ####
 
-        num_seq = np.int(n_img // 10)
+        num_seq = int(n_img // 10)
         ph_vec, sqeezed, temp_quality = sequential_phase_linking_py(CCGsam_Sterm, b'EVD', 10, num_seq)
         ph_vec = datum_connect_py(sqeezed, ph_vec, 10)
         EVD_seq_est_resS[:, t:t + 1] = np.angle(np.array(ph_vec).reshape(-1, 1) * np.exp(-1j * phas))
