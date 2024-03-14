@@ -106,7 +106,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if not customTemplateFile is None:
             custom_mintpy_temp = os.path.dirname(customTemplateFile) + '/custom_smallbaselineApp.cfg'
         else:
-            custom_mintpy_temp = os.path.dirname(inps.templateFile) + '/custom_smallbaselineApp.cfg'
+            custom_mintpy_temp = os.getcwd() + '/custom_smallbaselineApp.cfg'
 
         if os.path.exists(custom_mintpy_temp):
             super().__init__(custom_mintpy_temp, workDir)
@@ -135,12 +135,6 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         #self.run_dir = os.path.join(self.workDir, pathObj.rundir)
         #os.makedirs(self.run_dir, exist_ok=True)
-
-        name_ifg_network = self.template['miaplpy.interferograms.networkType']
-        if self.template['miaplpy.interferograms.networkType'] == 'delaunay':
-            name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.delaunayBaselineRatio'])
-        elif self.template['miaplpy.interferograms.networkType'] == 'sequential':
-            name_ifg_network += '_{}'.format(self.template['miaplpy.interferograms.connNum'])
 
         name_ifg_network = self.template['miaplpy.interferograms.networkType']
         if self.template['miaplpy.interferograms.networkType'] == 'delaunay':
@@ -189,10 +183,10 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             self.ifgram_dir, self.pairs = self.get_interferogram_pairs()
             os.makedirs(self.ifgram_dir, exist_ok=True)
 
-        if 'sensor_type' in self.metadata:
-            self.sensor_type = self.metadata['sensor_type']
-        else:
-            self.sensor_type = 'tops'
+            if 'sensor_type' in self.metadata:
+                self.sensor_type = self.metadata['sensor_type']
+            else:
+                self.sensor_type = 'tops'
 
         os.chdir(self.workDir)
         shutil.rmtree(self.workDir + '/pic')

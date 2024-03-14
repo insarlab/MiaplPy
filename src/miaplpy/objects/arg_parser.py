@@ -184,7 +184,7 @@ class MiaplPyParser:
                 path1 = os.path.dirname(inps.customTemplateFile)
                 inps.workDir = path1 + '/miaplpy'
             else:
-                inps.workDir = os.path.dirname(inps.templateFile)
+                inps.workDir = os.getcwd()  #os.path.dirname(inps.templateFile)
 
         inps.workDir = os.path.abspath(inps.workDir)
 

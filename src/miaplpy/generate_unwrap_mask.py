@@ -44,7 +44,7 @@ def main(iargs=None):
         else:
             print('There is no shadow mask in geometryRadar.h5, all values set to 1')
             args_shm = '{} -m -1 -o {}'.format(corr_file, shadow_mask)
-            mintpy.generate_mask.main(args_shm.split())
+            mintpy.cli.generate_mask.main(args_shm.split())
 
     if not inps.custom_mask in ['None', None]:
         h5_mask = inps.custom_mask

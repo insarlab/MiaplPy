@@ -180,8 +180,10 @@ class coord_rev(coordinate):
                                        datasetName='rangeCoord',
                                        print_msg=print_msg)[0]
         else:
+            print('Loading  .... ', self.lookup_file[0])
             self.lut_y = read_image(self.lookup_file[0])
             # readfile.read(self.lookup_file[0], datasetName='latitude', print_msg=print_msg)[0]
+            print('Loading .... ', self.lookup_file[1])
             self.lut_x = read_image(self.lookup_file[1])
             # readfile.read(self.lookup_file[1], datasetName='longitude', print_msg=print_msg)[0]
         return self.lut_y, self.lut_x
@@ -1324,7 +1326,7 @@ def prepare_metadata(inpsDict):
             meta_file = meta_files[0]
             baseline_dir = inpsDict['miaplpy.load.baselineDir']
             geom_dir = os.path.dirname(inpsDict['miaplpy.load.demFile'])
-            cmd = '{s} -s {i} -f {f} -m {m} -b {b} -g {g}'.format(s=script_name,
+            cmd = '{s} -s {i} -f {f} -m {m} -b {b} -g {g} --force'.format(s=script_name,
                                                                   i=slc_dir,
                                                                   f=slc_file,
                                                                   m=meta_file,

@@ -153,6 +153,7 @@ def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baselin
                                              str(baselines[dates[h]]), str(baselines[dates[g]] - baselines[dates[h]]))
                     for g, h in zip(ind1, ind2)]
 
+    plt.switch_backend('Agg')
     fig = plt.figure(figsize=(8, 4))
 
     for d in ifgdates:
