@@ -358,7 +358,7 @@ def update_connect_component_mask(unwrapped_file, temporal_coherence):
     ds_conn = gdal.Open(unwrapped_file + '.conncomp.vrt', gdal.GA_ReadOnly)
     conn_comp = ds_conn.GetRasterBand(1).ReadAsArray()
 
-    factor_2pi = np.round(phas / (2 * np.pi)).astype(np.int) + conn_comp
+    factor_2pi = np.round(phas / (2 * np.pi)).astype(int) + conn_comp
     factor_2pi = factor_2pi - np.min(factor_2pi) + 1
     mask = conn_comp > 0
 
