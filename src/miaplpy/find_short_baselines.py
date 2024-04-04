@@ -196,8 +196,8 @@ def find_mini_stacks(date_list, baseline_dir, month=6):
     years = np.array([x.year for x in dates])
     u, indices_first = np.unique(years, return_index=True)
     f_ind = indices_first
-    l_ind = np.zeros(indices_first.shape, dtype=np.int)
-    l_ind[0:-1] = np.array(f_ind[1::]).astype(np.int)
+    l_ind = np.zeros(indices_first.shape, dtype=int)
+    l_ind[0:-1] = np.array(f_ind[1::]).astype(int)
     l_ind[-1] = len(dates)
     ref_inds = []
     for i in range(len(f_ind)):
