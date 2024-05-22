@@ -95,10 +95,10 @@ def main(iargs=None):
     if inps['geo_geom_files']:
         fnames = inps['geo_geom_files']
         for fname in fnames:
-            if fname.endswith(('utm_to_rdc', 'inc')):  # TODO: add other extentions
+            if fname.endswith(('UTM_TO_RDC', 'inc')):  # TODO: add other extentions
                 extract_metadata4geometry_geo(fname)
             else:
-                raise Exception(f'File {fname} not supported. Use utm_to_rdc or inc.')
+                raise Exception(f'File {fname} not supported. Use UTM_TO_RDC or inc.')
 
     if inps['radar_geom_files']:
         fnames = inps['radar_geom_files']
@@ -148,7 +148,7 @@ def read_gamma_slc_par(fname, delimiter=':', skiprows=3):
                 value = ''.join(str.replace(c[1], '\n', '').split("#")[0].split()[0:3])
                 parDict[key] = value
 
-    parDict = mt_readfile._attribute_gamma2roipac(parDict)
+    parDict = mt_readfile.attribute_gamma2roipac(parDict)
     parDict = mt_readfile.standardize_metadata(parDict)
 
     return parDict
