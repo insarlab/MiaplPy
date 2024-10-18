@@ -148,7 +148,7 @@ def read_gamma_slc_par(fname, delimiter=':', skiprows=3):
                 value = ''.join(str.replace(c[1], '\n', '').split("#")[0].split()[0:3])
                 parDict[key] = value
 
-    parDict = mt_readfile.attribute_gamma2roipac(parDict)
+    parDict = mt_readfile._attribute_gamma2roipac(parDict)
     parDict = mt_readfile.standardize_metadata(parDict)
 
     return parDict
