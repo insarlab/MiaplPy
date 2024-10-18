@@ -384,7 +384,7 @@ def invert_L1_norm(R, Alpha, y, max_iter=100, smoothing_facor=0.0):
     else:
         ifg[:] = y[:]
     W = np.eye((ifg.shape[0]), dtype=np.float32)
-    inv_Q = linalg.pinv2(np.linalg.multi_dot([G.T, W, G])).astype(np.float32)
+    inv_Q = linalg.pinv(np.linalg.multi_dot([G.T, W, G])).astype(np.float32)
     Coef = np.linalg.multi_dot([G.T, W, ifg]).astype(np.float32)
     X = np.matmul(inv_Q, Coef).astype(np.float32)
 
@@ -402,7 +402,7 @@ def invert_L1_norm(R, Alpha, y, max_iter=100, smoothing_facor=0.0):
         res1[:] = res2[:]
         W = np.diag(1/res.flatten())
         W = W / np.max(W)
-        inv_Q = linalg.pinv2(np.linalg.multi_dot([G.T, W, G])).astype(np.float32)
+        inv_Q = linalg.pinv(np.linalg.multi_dot([G.T, W, G])).astype(np.float32)
         Coef = np.linalg.multi_dot([G.T, W, ifg]).astype(np.float32)
         X = np.matmul(inv_Q, Coef).astype(np.float32)
         res = np.abs(ifg - np.matmul(G, X)).astype(np.float32)
