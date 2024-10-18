@@ -1060,7 +1060,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef cnp.ndarray[float complex, ndim=3] rslc_ref = np.zeros((n_image, box_length, box_width), dtype=np.complex64)
     cdef cnp.ndarray[float, ndim=3] tempCoh = np.zeros((2, box_length, box_width), dtype=np.float32)
     cdef cnp.ndarray[float, ndim=3] PSprod = np.zeros((4, box_length, box_width), dtype=np.float32)
-    cdef cnp.ndarray[int, ndim=2] mask_ps = np.zeros((box_length, box_width), dtype=np.bool_)
+    cdef cnp.ndarray mask_ps = np.zeros((box_length, box_width), dtype=np.bool_)
     cdef cnp.ndarray[int, ndim=2] SHP = np.zeros((box_length, box_width), dtype=np.int32)
     cdef int row1 = box[1] - big_box[1]
     cdef int row2 = box[3] - big_box[1]
