@@ -1,0 +1,31 @@
+################
+miaplpy.load.processor = gamma
+minopy.load.updateMode     = auto  #[yes / no], auto for yes, skip re-loading if HDF5 files are complete
+minopy.load.compression    = auto  #[gzip / lzf / no], auto for no.
+minopy.load.autoPath       = auto    # [yes, no] auto for no
+
+miaplpy.load.slcFile = ../rslc/*/*.*slc
+
+##---------for ISCE only:
+miaplpy.load.baselineDir = ../baselines/
+
+##---------geometry datasets:
+miaplpy.load.demFile = ../geometry/sim_*.rdc.dem
+miaplpy.load.lookupYFile = ../geometry/sim_*.UTM_TO_RDC
+miaplpy.load.lookupXFile = ../geometry/sim_*.UTM_TO_RDC
+miaplpy.load.azAngleFile = ../geometry/sim_*.hed
+
+miaplpy.subset.yx  = 0:300,0:500
+###minopy.subset.lalo       # ***currently not supported***
+
+# MiaplPy options
+minopy.multiprocessing.numProcessor   = 40
+miaplpy.interferograms.type = single_reference
+
+## Mintpy options
+mintpy.compute.cluster     = local  # if dask is not available, set this option to no
+mintpy.compute.numWorker   = 8
+
+mintpy.reference.lalo     = 32.65, 51.70
+mintpy.troposphericDelay.method = no
+
