@@ -73,7 +73,7 @@ def extract_metadata4slc(fname, update_mode=False):
     print('preparing RSC file for ', fname)
     slc_metadata = read_attribute(fname, metafile_ext='.par')
     # update date yyyy -> yyyymmgg
-    # TODO: update read_attribute to correctly read date from par file
+    # TODO: update read_attribute to correctly read date from par file when it is in yyyymd format
     atr = read_gamma_slc_par(fname + '.par', skiprows=2)
     slc_metadata['DATE'] = atr['date']
     slc_metadata.pop('date', None)
