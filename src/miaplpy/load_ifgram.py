@@ -13,6 +13,7 @@ import shutil
 import datetime
 import importlib
 
+import h5py
 from mintpy.objects import (GEOMETRY_DSET_NAMES,
                             geometry,
                             IFGRAM_DSET_NAMES,
@@ -203,6 +204,11 @@ def read_subset_box(inpsDict):
     inpsDict['box4geo_lut'] = None
     pix_box, geo_box = read_subset_template2box(inpsDict['template_file'][0])
 
+    # TODO: Shouldn't pix_box be the same as the slcStack? Check this to make sure
+    if inpsDict['processor'].lower() == 'gamma':
+        y_range, x_range = [list(map(int, part.split(':'))) for part in inpsDict['miaplpy.subset.yx'].split(',')]
+        pix_box = (*y_range, *x_range)
+
     # Grab required info to read input geo_box into pix_box
     try:
         lookupFile = [glob.glob(str(inpsDict['miaplpy.load.lookupYFile']))[0],
@@ -274,9 +280,47 @@ def prepare_metadata(inpsDict):
     print('prepare metadata files for {} products'.format(processor))
 
     if processor in ['gamma', 'roipac', 'snap']:
-        for key in [i for i in inpsDict.keys() if (i.startswith('miaplpy.load.') and i.endswith('File'))]:
-            if len(glob.glob(str(inpsDict[key]))) > 0:
-                script_name.main([inpsDict[key]])
+
+        slc_stack_file = os.path.join('inputs', 'slcStack.h5')
+
+        ### read metadata from slcStack.h5
+        # TODO: check if all metadata from slcStack are compatible with ifg metadata
+        # TODO: read this from ifg parameter files instead of slcStack
+        h5 = h5py.File(slc_stack_file, mode='r')
+        attrs = h5.attrs
+        slc_dates = [date.decode('utf-8') for date in h5['date'][:]]
+        slc_bperps = h5['bperp'][:]
+
+        unw_files = glob.glob(inpsDict['miaplpy.load.unwFile'])
+        dates = [os.path.basename(os.path.dirname(unw_file)) for unw_file in unw_files]
+
+        for ref_sec_date, unw_file in zip(dates, unw_files):
+            ref_date = ref_sec_date.split('_')[0]
+            sec_date = ref_sec_date.split('_')[1]
+            date12 = ref_date[-6:] + '-' + sec_date[-6:]
+
+            ref_ind = slc_dates.index(ref_date)
+            sec_ind = slc_dates.index(sec_date)
+
+            bperp = slc_bperps[sec_ind]-slc_bperps[ref_ind]
+
+            with open(unw_file + '.rsc', 'w') as file:
+                for key, value in attrs.items():
+                    value = {
+                        'data_type': 'float',
+                        'processor': 'isce',  # ifgs are in isce format not gamma
+                        'file_type': '.unw'
+                    }.get(key.lower(), value)
+                    file.write(f"{key:<25} {value}\n")
+
+                additional_metadata = {
+                    'DATE12': date12,
+                    'P_BASELINE_BOTTOM_HDR': bperp,
+                    'P_BASELINE_TOP_HDR': bperp
+                }
+
+                for key, value in additional_metadata.items():
+                    file.write(f"{key:<25}  {value}\n")
 
 
     elif processor == 'isce':
