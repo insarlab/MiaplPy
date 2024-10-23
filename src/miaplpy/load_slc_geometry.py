@@ -131,6 +131,17 @@ def main(iargs=None):
                               compression='lzf')
     if iDict['processor'] == 'gamma':
         add_lonlat_gamma(inps.out_file[2])
+        dir_name = os.path.dirname(inps.out_file[2])
+        this_dir = os.getcwd()
+        os.chdir(dir_name)
+        # run lookup_geo2radar.py to copy lon/lat to radar coordiantes
+        script_name = 'lookup_geo2radar.py'
+        print('-' * 50)
+        cmd = f'{script_name} geometryGeo.h5'
+        print(cmd)
+        os.system(cmd)
+        os.chdir(this_dir)
+
     return inps.out_file
 
 #################################################################
