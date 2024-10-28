@@ -1,4 +1,3 @@
-################
 miaplpy.load.processor = gamma
 miaplpy.load.updateMode = auto   #if HDF5 files are complete
 miaplpy.load.compression = auto
@@ -16,10 +15,10 @@ miaplpy.load.azAngleFile = ../geometry/sim_*.hed
 ### *** CAUTION: currently subsetting gamma data is not supported.                 ***
 ### *** miaplpy.subset.yx parameters must be identical to the slc file dimensions. ***
 ### *** Check the .par file to find the values                                     ***
-### *** range_samples:                  2000                                       ***
-### *** azimuth_lines:                   400                                       ***
-miaplpy.subset.yx  = 0:400,0:2000    # must be from 0:azimuth_lines,0:range_samples.
-### miaplpy.subset.lalo              # *** currently subset.lalo not supported for gamma data ***
+### *** range_samples:                  2250                                       ***
+### *** azimuth_lines:                   500                                       ***
+miaplpy.subset.yx  = 0:500,0:2250    # must be from 0:line,0:pixels. Currently subsetting is not supported.
+### miaplpy.subset.lalo              # ***currently not supported for gamma data***
 
 
 # MiaplPy options
@@ -27,11 +26,10 @@ miaplpy.subset.yx  = 0:400,0:2000    # must be from 0:azimuth_lines,0:range_samp
 miaplpy.interferograms.type = single_reference
 
 ## ifg options
-miaplpy.load.unwFile        = auto
-miaplpy.load.corFile        = auto
-miaplpy.load.connCompFile   = auto
-miaplpy.load.intFile        = auto
-miaplpy.load.ionoFile       = auto
+miaplpy.load.unwFile        = inverted/interferograms_single_reference/*/filt_fine.unw  #[path2unw_file]
+miaplpy.load.corFile        = inverted/interferograms_single_reference/*/filt_fine.cor  #[path2cor_file]
+miaplpy.load.connCompFile   = inverted/interferograms_single_reference/*/filt_fine.unw.conncomp  #[path2conn_file], optional
+miaplpy.load.intFile        = auto  #[path2int_file], optional
 
 
 ## Mintpy options
@@ -39,4 +37,3 @@ mintpy.compute.cluster     = local  # if dask is not available, set this option 
 mintpy.compute.numWorker   = 8
 mintpy.reference.lalo     = auto
 mintpy.troposphericDelay.method = no
-
