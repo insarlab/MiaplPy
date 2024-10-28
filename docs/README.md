@@ -8,7 +8,7 @@
 
 An open source python package of InSAR processing with Non Linear phase inversion in full resolution. It reads a stack of coregistered SLCs and
 produces time series of surface deformation. This package depends on MintPy for time series corrections.
-It works with all data based on ISCE outputs format. The inversion is based on wrapped phase time series and it includes PTA, EMI and EVD techniques.
+It works with all data based on ISCE or GAMMA outputs format. The inversion is based on wrapped phase time series and it includes PTA, EMI and EVD techniques.
 It also supports sequential inversion.
 
 THIS IS RESEARCH CODE PROVIDED TO YOU "AS IS" WITH NO WARRANTIES OF CORRECTNESS. USE AT YOUR OWN RISK.
@@ -42,7 +42,9 @@ Use `miaplpyApp.py -h` for a help on the steps you need to run
 Inversion step may take long time depending on the number of pixels in the subset area you are processing and number of images. 
 
 
-**Example:** Here are examples of SAR stack pre-processed using ISCE:
+**Example:** 
+
+Here are examples of SAR stack pre-processed using **ISCE**:
 
 Area: Pichincha volcano, Ecuador\
 Dataset: Sentinel-1 Descending Track 142, 46 acquisitions, 2016.04.19 - 2017.12.28\
@@ -63,6 +65,18 @@ wget https://zenodo.org/record/7470050/files/Miami_Sentinel1_data.tar.xz
 tar -xvJf Miami_Sentinel1_data.tar.xz
 cd Miami_Sentinel1_data
 miaplpyApp.py Miami_Sentinel1_data.template --start phase_linking --dir ./miaplpy
+```
+
+Here are examples of SAR stack pre-processed using **GAMMA**:
+
+Area: Pichincha volcano, Ecuador\
+Dataset: Sentinel-1 Descending Track 142, 52 acquisitions, 2016.04.19 - 2017.12.28\
+Size: ~544 MB\
+```
+wget https://zenodo.org/records/14001005/files/PichinchaSenDT142_gamma.zip
+unzip PichinchaSenDT142_gamma.zip
+cd PichinchaSenDT142_gamma
+miaplpyApp.py gamma_parameters.txt --dir ./miaplpy
 ```
 
 #### Example tutorial in jupyter notebook [nbviewer](https://nbviewer.org/github/insarlab/MiaplPy_notebooks/blob/main/miaplpyApp.ipynb)
