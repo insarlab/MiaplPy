@@ -15,6 +15,8 @@ import mintpy.load_data as mld
 from miaplpy.objects.geometryStack import geometryDict
 import miaplpy.objects.utils as mut
 from miaplpy.objects.arg_parser import MiaplPyParser
+import h5py
+import numpy as np
 
 #################################################################
 datasetName2templateKey = {'slc': 'miaplpy.load.slcFile',
@@ -127,10 +129,55 @@ def main(iargs=None):
                               xstep=iDict['xstep'],
                               ystep=iDict['ystep'],
                               compression='lzf')
+    if iDict['processor'] == 'gamma':
+        add_lonlat_gamma(inps.out_file[2])
+        dir_name = os.path.dirname(inps.out_file[2])
+        this_dir = os.getcwd()
+        os.chdir(dir_name)
+        # run lookup_geo2radar.py to copy lon/lat to radar coordiantes
+        script_name = 'lookup_geo2radar.py'
+        print('-' * 50)
+        cmd = f'{script_name} geometryGeo.h5'
+        print(cmd)
+        os.system(cmd)
+        os.chdir(this_dir)
+
     return inps.out_file
 
 #################################################################
 
+
+def add_lonlat_gamma(h5file):
+    """
+    agg longitude/latitude to an existing geometry file
+    :param h5file:
+    """
+    f = h5py.File(h5file, 'a')
+    x_first = float(f.attrs['X_FIRST'])
+    x_step = float(f.attrs['X_STEP'])
+    y_first = float(f.attrs['Y_FIRST'])
+    y_step = float(f.attrs['Y_STEP'])
+    length = int(f.attrs['LENGTH'])
+    width = int(f.attrs['WIDTH'])
+    x_last = x_first+x_step*(width-1)
+    y_last = y_first+y_step*(length-1)
+    # x_last+x_step/100 to make sure the last element is not missing due to rounding
+    x = np.arange(x_first, x_last+x_step/100, x_step)
+    y = np.arange(y_first, y_last+y_step/100, y_step)
+    lon, lat = np.meshgrid(x, y)
+
+    compression = f['azimuthCoord'].compression
+    for data, dsname in zip([lon, lat], ['longitude', 'latitude']):
+        if dsname in f.keys():
+            # TODO: add update mode
+            raise Exception(f"name {dsname} already exists in {h5file}. Try deleting the file.")
+        f.create_dataset(dsname,
+                         data=data,
+                         dtype='float32',
+                         chunks=True,
+                         compression=compression)
+    f.close()
+#########
 
 def read_inps_dict2geometry_dict_object(inpsDict):
     # eliminate dsName by processor
@@ -139,9 +186,11 @@ def read_inps_dict2geometry_dict_object(inpsDict):
     if inpsDict['processor'] in ['isce', 'doris']:
         datasetName2templateKey.pop('azimuthCoord')
         datasetName2templateKey.pop('rangeCoord')
+        ending = '.xml'
     elif inpsDict['processor'] in ['roipac', 'gamma']:
         datasetName2templateKey.pop('latitude')
         datasetName2templateKey.pop('longitude')
+        ending = ''
     elif inpsDict['processor'] in ['snap']:
         # check again when there is a SNAP product in radar coordiantes
         pass
@@ -159,7 +208,7 @@ def read_inps_dict2geometry_dict_object(inpsDict):
                    if i in datasetName2templateKey.keys()]:
         key = datasetName2templateKey[dsName]
         if key in inpsDict.keys():
-            files = sorted(glob.glob(str(inpsDict[key]) + '.xml'))
+            files = sorted(glob.glob(str(inpsDict[key]) + ending))
             files = [item.split('.xml')[0] for item in files]
             if len(files) > 0:
                 if dsName == 'bperp':
@@ -201,12 +250,16 @@ def read_inps_dict2geometry_dict_object(inpsDict):
         if dsName == 'bperp':
             atr = readfile.read_attribute(next(iter(dsPathDict[dsName].values())))
         else:
-            atr = mut.read_attribute(dsPathDict[dsName].split('.xml')[0], metafile_ext='.xml')
+            if inpsDict['processor'] in ['gamma']:
+                atr = mut.read_attribute(dsPathDict[dsName], metafile_ext='.rsc')
+            else:
+                atr = mut.read_attribute(dsPathDict[dsName].split('.xml')[0], metafile_ext='.xml')
         if 'Y_FIRST' in atr.keys():
             dsGeoPathDict[dsName] = dsPathDict[dsName]
         else:
             dsRadarPathDict[dsName] = dsPathDict[dsName]
 
+    GeoMetadata = atr.copy()
     geomRadarObj = None
     geomGeoObj = None
 
@@ -217,7 +270,7 @@ def read_inps_dict2geometry_dict_object(inpsDict):
     if len(dsGeoPathDict) > 0:
         geomGeoObj = geometryDict(processor=inpsDict['processor'],
                                   datasetDict=dsGeoPathDict,
-                                  extraMetadata=None)
+                                  extraMetadata=GeoMetadata)
     return geomRadarObj, geomGeoObj
 
 

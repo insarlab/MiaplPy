@@ -53,7 +53,10 @@ class geometryDict(GDict):
             dsName = None
         else:
             dsName = family
-        self.file = self.datasetDict[family].split('.xml')[0]
+        if self.extraMetadata['PROCESSOR'] == 'gamma':
+            self.file = (self.datasetDict[family])
+        else:
+            self.file = self.datasetDict[family].split('.xml')[0]
         data, metadata = read_geo(self.file,
                                   datasetName=dsName,
                                  box=box)

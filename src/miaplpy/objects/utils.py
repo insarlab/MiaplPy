@@ -168,7 +168,10 @@ class coord_rev(coordinate):
         else:
             self.geocoded = False
             if self.lookup_file:
-                self.lut_metadata = read_attribute(self.lookup_file[0], metafile_ext='.xml')
+                if self.src_metadata['PROCESSOR'] == 'gamma':
+                    self.lut_metadata = read_attribute(self.lookup_file[0], metafile_ext='.rsc')
+                else:
+                    self.lut_metadata = read_attribute(self.lookup_file[0], metafile_ext='.xml')
 
     def read_lookup_table(self, print_msg=True):
 
@@ -403,12 +406,21 @@ def read_attribute(fname, datasetName=None, standardize=True, metafile_ext=None)
             atr['FILE_TYPE'] = fext
 
         # DATA_TYPE for ISCE products
-        dataTypeDict = {
-            'byte': 'int8',
-            'float': 'float32',
-            'double': 'float64',
-            'cfloat': 'complex64',
-        }
+        if atr['PROCESSOR'] == 'isce':
+            dataTypeDict = {
+                'byte': 'int8',
+                'float': 'float32',
+                'double': 'float64',
+                'cfloat': 'complex64',
+            }
+        elif atr['PROCESSOR'] == 'gamma':
+            dataTypeDict = {
+                'byte': 'int8',
+                'float': 'float32',
+                'double': 'float64',
+                'fcomplex': 'complex64',
+            }
+
         data_type = atr.get('DATA_TYPE', 'none').lower()
         if data_type != 'none' and data_type in dataTypeDict.keys():
             atr['DATA_TYPE'] = dataTypeDict[data_type]
@@ -571,7 +583,10 @@ def read(fname, box=None, datasetName=None, print_msg=True):
     if fext in ['.h5', '.he5']:
         data = read_hdf5_file(fname, datasetName=datasetName, box=box)
     else:
-        data, atr = read_binary_file(fname, datasetName=datasetName, box=box)
+        if atr['PROCESSOR'] == 'gamma':
+            data, atr = readfile.read_binary_file(fname, datasetName=datasetName, box=box, xstep=1, ystep=1)
+        elif atr['PROCESSOR'] == 'isce':
+            data, atr = read_binary_file(fname, datasetName=datasetName, box=box)
         #data, atr = readfile.read_binary_file(fname, datasetName=datasetName, box=box, xstep=1, ystep=1)
     return data, atr
 
@@ -652,13 +667,15 @@ def read_hdf5_file(fname, datasetName=None, box=None):
 
 
 #########################################################################
-def read_binary_file(fname, datasetName=None, box=None, attributes_only=False):
+def read_binary_file(fname, datasetName=None, box=None, attributes_only=False, processor="isce"):
 
     """Read data from binary file, such as .unw, .cor, etc.
     Parameters: fname : str, path/name of binary file
                 datasetName : str, dataset name for file with multiple bands of data
                     e.g.: incidenceAngle, azimuthAngle, rangeCoord, azimuthCoord, ...
                 box  : 4-tuple of int area to read, defined in (x0, y0, x1, y1) in pixel coordinate
+                attributes_only :
+                processor : str, processor name. isce and gamma supported. Default is isce.
     Returns:    data : 2D array in size of (length, width) in BYTE / int16 / float32 / complex64 / float64 etc.
                 atr  : dict, metadata of binary file
     """
@@ -667,7 +684,10 @@ def read_binary_file(fname, datasetName=None, box=None, attributes_only=False):
     fext = fext.lower()
 
     # metadata
-    atr = read_attribute(fname, metafile_ext='.xml')
+    if processor == "isce":
+        atr = read_attribute(fname, metafile_ext='.xml')
+    elif processor == "gamma":
+        atr = read_attribute(fname, metafile_ext='.rsc')
     processor = atr['PROCESSOR']
     length = int(atr['LENGTH'])
     width = int(atr['WIDTH'])
@@ -783,8 +803,12 @@ def read_binary_file(fname, datasetName=None, box=None, attributes_only=False):
             else:
                 cpx_band = 'real'
 
-        elif fext == '.slc':
-            data_type = 'complex32'
+        elif fext in ['.slc', '.rslc']:
+            imformat = atr['image_format']
+            if atr['image_format'] == 'SCOMPLEX':
+                data_type = 'complex32'
+            else:
+                data_type = 'complex64'
             cpx_band = 'magnitude'
 
         elif fext in ['.mli']:
@@ -807,7 +831,9 @@ def read_binary_file(fname, datasetName=None, box=None, attributes_only=False):
     
     if 'DATA_TYPE' not in atr:
         atr['DATA_TYPE'] = data_type
-    
+    if 'BYTE_ORDER' not in atr:
+        atr['BYTE_ORDER'] = byte_order
+
     if attributes_only:
         return atr
     else:
@@ -1111,9 +1137,13 @@ def read_subset_box(inpsDict):
     # Grab required info to read input geo_box into pix_box
 
     try:
-        lookupFile = [glob.glob(str(inpsDict['miaplpy.load.lookupYFile'] + '.xml'))[0],
-                      glob.glob(str(inpsDict['miaplpy.load.lookupXFile'] + '.xml'))[0]]
-        lookupFile = [x.split('.xml')[0] for x in lookupFile]
+        if inpsDict['processor'] == 'gamma':
+            lookupFile = [glob.glob(str(inpsDict['miaplpy.load.lookupYFile']))[0],
+                            glob.glob(str(inpsDict['miaplpy.load.lookupXFile']))[0]]
+        else:
+            lookupFile = [glob.glob(str(inpsDict['miaplpy.load.lookupYFile'] + '.xml'))[0],
+                          glob.glob(str(inpsDict['miaplpy.load.lookupXFile'] + '.xml'))[0]]
+            lookupFile = [x.split('.xml')[0] for x in lookupFile]
     except:
         lookupFile = None
 
@@ -1121,9 +1151,13 @@ def read_subset_box(inpsDict):
 
         pathKey = [i for i in datasetName2templateKey.values()
                    if i in inpsDict.keys()][0]
-
-        file = glob.glob(str(inpsDict[pathKey] + '.xml'))[0]
-        atr = read_attribute(file.split('.xml')[0], metafile_ext='.rsc')
+        processor = inpsDict['processor']
+        if processor in ['gamma', 'roipac', 'snap']:
+            file = glob.glob(str(inpsDict[pathKey]))[0]
+            atr = read_attribute(file, metafile_ext='.rsc')
+        else:
+            file = glob.glob(str(inpsDict[pathKey] + '.xml'))[0]
+            atr = read_attribute(file.split('.xml')[0], metafile_ext='.rsc')
     except:
         atr = dict()
     geocoded = None
@@ -1162,7 +1196,10 @@ def read_subset_box(inpsDict):
     # Get box for geocoded lookup table (for gamma/roipac)
     box4geo_lut = None
     if lookupFile is not None:
-        atrLut = read_attribute(lookupFile[0], metafile_ext='.xml')
+        if processor in ['gamma', 'roipac', 'snap']:
+            atrLut = read_attribute(lookupFile[0], metafile_ext='.rsc')
+        else:
+            atrLut = read_attribute(lookupFile[0], metafile_ext='.xml')
         if not geocoded and 'Y_FIRST' in atrLut.keys():
             geo_box = coord.bbox_radar2geo(pix_box)
             box4geo_lut = ut.coordinate(atrLut).bbox_geo2radar(geo_box)
@@ -1289,15 +1326,16 @@ def read_inps2dict(inps):
                                            work_dir=inps.work_dir,
                                            template=inpsDict)
 
-    reference_dir = os.path.dirname(inpsDict['miaplpy.load.metaFile'])
-    out_reference = inps.work_dir + '/inputs/reference'
-    if not os.path.exists(out_reference):
-        shutil.copytree(reference_dir, out_reference)
+    if inpsDict['processor'] in ['isce']:
+        reference_dir = os.path.dirname(inpsDict['miaplpy.load.metaFile'])
+        out_reference = inps.work_dir + '/inputs/reference'
+        if not os.path.exists(out_reference):
+            shutil.copytree(reference_dir, out_reference)
 
-    baseline_dir = os.path.abspath(inpsDict['miaplpy.load.baselineDir'])
-    out_baseline = inps.work_dir + '/inputs/baselines'
-    if not os.path.exists(out_baseline):
-        shutil.copytree(baseline_dir, out_baseline)
+        baseline_dir = os.path.abspath(inpsDict['miaplpy.load.baselineDir'])
+        out_baseline = inps.work_dir + '/inputs/baselines'
+        if not os.path.exists(out_baseline):
+            shutil.copytree(baseline_dir, out_baseline)
 
     return inpsDict
 
@@ -1309,11 +1347,12 @@ def prepare_metadata(inpsDict):
     print('-' * 50)
     print('prepare metadata files for {} products'.format(processor))
     if processor in ['gamma', 'roipac', 'snap']:
-        for key in [i for i in inpsDict.keys() if (i.startswith('miaplpy.load.') and i.endswith('File'))]:
-            if len(glob.glob(str(inpsDict[key]))) > 0:
-                cmd = '{} {}'.format(script_name, inpsDict[key])
-                print(cmd)
-                os.system(cmd)
+        slc_files = inpsDict['miaplpy.load.slcFile']
+        dem_file = inpsDict['miaplpy.load.demFile']
+        lookup_file = inpsDict['miaplpy.load.lookupXFile']
+        cmd = f'{script_name} -s {slc_files} -r {dem_file} -g {lookup_file}'
+        print(cmd)
+        os.system(cmd)
 
     elif processor == 'isce':
 
@@ -1424,6 +1463,7 @@ def read_inps_dict2slc_stack_dict_object(inpsDict):
     print('-' * 50)
     print('searching slcs info')
     print('input data files:')
+    processor = inpsDict['processor']
 
     from miaplpy.objects.slcStack import (slcDatasetNames,
                                          slcStackDict,
@@ -1435,7 +1475,10 @@ def read_inps_dict2slc_stack_dict_object(inpsDict):
                    if i in datasetName2templateKey.keys()]:
         key = datasetName2templateKey[dsName]
         if key in inpsDict.keys():
-            files = sorted(glob.glob(str(inpsDict[key] + '.xml')))
+            if processor in ['gamma', 'roipac', 'snap']:
+                files = sorted(glob.glob(str(inpsDict[key])))
+            else:
+                files = sorted(glob.glob(str(inpsDict[key] + '.xml')))
             if len(files) > 0:
                 dsPathDict[dsName] = files
                 print('{:<{width}}: {path}'.format(dsName,
@@ -1451,7 +1494,7 @@ def read_inps_dict2slc_stack_dict_object(inpsDict):
     # Check 2: data dimension for slc files
     dsPathDict = skip_files_with_inconsistent_size(dsPathDict,
                                                    pix_box=inpsDict['box'],
-                                                   dsName=dsName0)
+                                                   dsName=dsName0,processor=processor)
 
     # Check 3: number of files for all dataset types
     # dsPathDict --> dsNumDict
@@ -1481,8 +1524,15 @@ def read_inps_dict2slc_stack_dict_object(inpsDict):
     dsNameList = list(dsPathDict.keys())
     pairsDict = {}
 
+    bperp = {} # for gamma
     for dsPath in dsPathDict[dsName0]:
-        dates = ptime.yyyymmdd(read_attribute(dsPath.split('.xml')[0], metafile_ext='.rsc')['DATE'])
+        if processor in ['gamma', 'roipac', 'snap']:
+            dates = ptime.yyyymmdd(read_attribute(dsPath, metafile_ext='.rsc')['DATE'])
+            ### read baselines
+            baseline_file = glob.glob(os.path.join(inpsDict['miaplpy.load.baselineDir'], f'*{dates}*.base_perp'))[0]
+            bperp[dates] = read_gamma_bperp(baseline_file)
+        else:
+            dates = ptime.yyyymmdd(read_attribute(dsPath.split('.xml')[0], metafile_ext='.rsc')['DATE'])
         date_val = datetime.datetime.strptime(dates, '%Y%m%d')
         include_date = True
         if not start_date is None and start_date > date_val:
@@ -1516,13 +1566,35 @@ def read_inps_dict2slc_stack_dict_object(inpsDict):
         stackObj = slcStackDict(pairsDict=pairsDict)
     else:
         stackObj = None
+
+    if processor in ['gamma', 'roipac', 'snap']:
+        stackObj.bperp = bperp
+
     return stackObj
 
+def read_gamma_bperp(base_perp_file):
+    """
+    read gamma perpendicular baselines
+    """
+    bperp_list = []
 
+    f = open(base_perp_file)
+    lines = f.readlines()
+    f.close()
 
-def skip_files_with_inconsistent_size(dsPathDict, pix_box=None, dsName='slc'):
+    start_line_idx = [lines.index(i)+2 for i in lines if 'bpara       bperp       blen' in i][0]
+    for i in range(start_line_idx, len(lines)):
+        c = lines[i].strip().split()
+        if len(c) == 9:
+            bperp_list.append(float(c[7]))
+    return (bperp_list[0]+bperp_list[-1])/2
+
+def skip_files_with_inconsistent_size(dsPathDict, pix_box=None, dsName='slc',processor='isce'):
     """Skip files by removing the file path from the input dsPathDict."""
-    atr_list = [read_attribute(fname.split('.xml')[0], metafile_ext='.xml') for fname in dsPathDict[dsName]]
+    if processor in ['gamma', 'roipac', 'snap']:
+        atr_list = [read_attribute(fname, metafile_ext='.rsc') for fname in dsPathDict[dsName]]
+    else:
+        atr_list = [read_attribute(fname.split('.xml')[0], metafile_ext='.xml') for fname in dsPathDict[dsName]]
     length_list = [int(atr['LENGTH']) for atr in atr_list]
     width_list = [int(atr['WIDTH']) for atr in atr_list]
 
