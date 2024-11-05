@@ -23,7 +23,7 @@ conda activate miaplpy-env
 python -m pip install .
 ```
 
-#### 4. Install [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/) 
+#### 4. Install [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/)
 ```
 export TOOLS_DIR=~/tools
 cd ~/tools;
@@ -36,5 +36,6 @@ cd snaphu/src; make
 export PATH=${TOOLS_DIR}/snaphu/bin:${PATH}
 ```
 
-### Notes
-Please read notes on [PyAPS](https://github.com/insarlab/PyAPS) from [GitHub/MintPy](https://github.com/insarlab/MintPy/blob/main/docs/installation.md) 
+#### Notes
+
+Please read notes on the account setup for [PyAPS](https://github.com/insarlab/pyaps#2-account-setup-for-era5).

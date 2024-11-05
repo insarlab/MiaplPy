@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 ############################################################
-# Program is part of MiaplPy                                #
-# Author:  Sara Mirzaee, Zhang Yunjun, Heresh Fattahi                    #
+# Program is part of MiaplPy                               #
+# Author:  Sara Mirzaee, Zhang Yunjun, Heresh Fattahi      #
 ############################################################
 # Modified from prep4timeseries.py in ISCE-2.2.0/contrib/stack/topsStack
 
@@ -34,7 +34,7 @@ enablePrint()
 
 EXAMPLE = """example:
   prep_slc_isce.py -s ./merged/SLC -m ./reference/IW1.xml -b ./baselines -g ./merged/geom_reference  #for topsStack
-  prep_slc_isce.py -s ./merged/SLC -m .merged/SLC/20190510/referenceShelve/data.dat -b ./baselines -g ./merged/geom_reference  #for stripmapStack
+  prep_slc_isce.py -s ./merged/SLC -m ./merged/SLC/20190510/referenceShelve/data.dat -b ./baselines -g ./merged/geom_reference  #for stripmapStack
   """
 
 GEOMETRY_PREFIXS = ['hgt', 'lat', 'lon', 'los', 'shadowMask', 'waterMask', 'incLocal']
@@ -294,14 +294,14 @@ def prepare_geometry(geom_dir, geom_files=[], metadata=dict(), processor='tops',
 
 def prepare_stack(inputDir, filePattern, processor='tops', metadata=dict(), baseline_dict=dict(), update_mode=True):
 
-    if not os.path.exists(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern + '.xml'))[0]):
+    if len(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern))) == 0:
         filePattern = filePattern.split('.full')[0]
     print('preparing RSC file for ', filePattern)
 
     if processor in ['tops', 'stripmap']:
-        isce_files = sorted(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern + '.xml')))
+        isce_files = sorted(glob.glob(os.path.join(os.path.abspath(inputDir), '*', filePattern)))
     elif processor == 'alosStack':
-        isce_files = sorted(glob.glob(os.path.join(os.path.abspath(inputDir), filePattern + '.xml')))    # not sure
+        isce_files = sorted(glob.glob(os.path.join(os.path.abspath(inputDir), filePattern)))    # not sure
     else:
         raise ValueError('Un-recognized ISCE stack processor: {}'.format(processor))
 
@@ -312,11 +312,11 @@ def prepare_stack(inputDir, filePattern, processor='tops', metadata=dict(), base
     num_file = len(isce_files)
     slc_dates = np.sort(os.listdir(inputDir))
     prog_bar = ptime.progressBar(maxValue=num_file)
-    for i in range(num_file):
+    for i, isce_file in enumerate(isce_files):
         # prepare metadata for current file
-        isce_file = isce_files[i].split('.xml')[0]
         dates = [slc_dates[0], os.path.basename(os.path.dirname(isce_file))]
-        slc_metadata = read_attribute(isce_file, metafile_ext='.xml')
+        # use .vrt instead of .xml, because the latter does not exist in stripmapStack products
+        slc_metadata = read_attribute(isce_file, metafile_ext='.vrt')
         slc_metadata.update(metadata)
         slc_metadata = add_slc_metadata(slc_metadata, dates, baseline_dict)
 
