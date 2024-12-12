@@ -12,7 +12,7 @@ from matplotlib import pyplot as plt
 from mintpy.cli import timeseries2velocity as ts2vel
 import mintpy.cli.tsview as tsview
 from miaplpy.objects.invert_pixel import ks_lut_cy, get_shp_row_col_c, custom_cmap, gam_pta
-from mintpy.utils import arg_group, ptime, time_func, readfile, plot as pp
+from mintpy.utils import arg_utils, ptime, time_func, readfile, plot as pp
 from miaplpy.objects.slcStack import slcStack
 import miaplpy.lib.utils as iut
 
@@ -64,7 +64,7 @@ def create_parser():
                              '[!-- Preliminary feature alert! --!]\n'
                              '[!-- This feature is NOT throughly checked. Read the code before use. Interpret at your own risk! --!]')
 
-    parser = arg_group.add_timefunc_argument(parser)
+    parser = arg_utils.add_timefunc_argument(parser)
 
     # pixel of interest
     pixel = parser.add_argument_group('Pixel Input')
@@ -77,16 +77,16 @@ def create_parser():
     pixel.add_argument('--ew', '--edgewidth', dest='edge_width', type=float, default=1.0, help='Edge width for the error bar (default: %(default)s)')
 
     # other groups
-    parser = arg_group.add_data_disp_argument(parser)
-    parser = arg_group.add_dem_argument(parser)
-    parser = arg_group.add_figure_argument(parser)
-    parser = arg_group.add_gps_argument(parser)
-    parser = arg_group.add_mask_argument(parser)
-    parser = arg_group.add_map_argument(parser)
-    parser = arg_group.add_memory_argument(parser)
-    parser = arg_group.add_reference_argument(parser)
-    parser = arg_group.add_save_argument(parser)
-    parser = arg_group.add_subset_argument(parser)
+    parser = arg_utils.add_data_disp_argument(parser)
+    parser = arg_utils.add_dem_argument(parser)
+    parser = arg_utils.add_figure_argument(parser)
+    parser = arg_utils.add_gps_argument(parser)
+    parser = arg_utils.add_mask_argument(parser)
+    parser = arg_utils.add_map_argument(parser)
+    parser = arg_utils.add_memory_argument(parser)
+    parser = arg_utils.add_reference_argument(parser)
+    parser = arg_utils.add_save_argument(parser)
+    parser = arg_utils.add_subset_argument(parser)
 
     return parser
 
