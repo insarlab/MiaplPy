@@ -531,6 +531,7 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
         wavelength = self.metadata['WAVELENGTH']
         earth_radius = self.metadata['EARTH_RADIUS']
         height = self.metadata['HEIGHT']
+        nlooks = self.azimuth_look * self.range_look
 
         run_commands = []
         num_cpu = os.cpu_count()
@@ -555,13 +556,14 @@ class miaplpyTimeSeriesAnalysis(TimeSeriesAnalysis):
             scp_args = '--ifg {a1} --coherence {a2} --unwrapped_ifg {a3} '\
                        '--max_discontinuity {a4} --init_method {a5} --length {a6} ' \
                        '--width {a7} --height {a8} --num_tiles {a9} --earth_radius {a10} ' \
-                       ' --wavelength {a11}'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
+                       ' --wavelength {a11} --nlooks {a12}'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
                                                              a2=corr_file,
                                                              a3=os.path.join(out_dir, 'filt_fine.unw'),
                                                              a4=self.template['miaplpy.unwrap.snaphu.maxDiscontinuity'],
                                                              a5=self.template['miaplpy.unwrap.snaphu.initMethod'],
                                                              a6=length, a7=width, a8=height, a9=ntiles,
-                                                             a10=earth_radius, a11=wavelength)
+                                                             a10=earth_radius, a11=wavelength,
+                                                             a12=nlooks)
             if self.template['miaplpy.unwrap.mask']:
                 scp_args += ' -m {a12}'.format(a12=unwrap_mask)
             if float(self.template['miaplpy.interferograms.filterStrength']) > 0 and self.template['miaplpy.unwrap.removeFilter']:

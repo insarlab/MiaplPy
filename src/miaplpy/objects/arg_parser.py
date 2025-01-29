@@ -364,6 +364,8 @@ class MiaplPyParser:
                             help='Width of Reference .h5 file')
         parser.add_argument('-sl', '--length', dest='ref_length', type=int, default=None,
                             help='Length of .h5 file')
+        parser.add_argument('-n', '--nlooks', dest='nlooks', type=int, default=200,
+                            help='The equivalent number of independent looks.')
         parser.add_argument('-w', '--wavelength', dest='wavelength', type=str, default=None,
                             help='Wavelength')
         parser.add_argument('-ht', '--height', dest='height', type=str, default=None,
