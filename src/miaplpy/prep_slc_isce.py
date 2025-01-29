@@ -29,6 +29,8 @@ def enablePrint():
 blockPrint()
 from mintpy.utils import isce_utils, ptime, readfile, writefile, utils as ut
 from miaplpy.objects.utils import read_attribute, read
+import miaplpy.io.utils as meta_utils
+
 enablePrint()
 
 
@@ -77,13 +79,13 @@ def cmd_line_parse(iargs = None):
 
 
 #########################################################################
-def load_product(xmlname):
-    """Load the product using Product Manager."""
-    from iscesys.Component.ProductManager import ProductManager as PM
-    pm = PM()
-    pm.configure()
-    obj = pm.loadProduct(xmlname)
-    return obj
+# def load_product(xmlname):
+#     """Load the product using Product Manager."""
+#     from iscesys.Component.ProductManager import ProductManager as PM
+#     pm = PM()
+#     pm.configure()
+#     obj = pm.loadProduct(xmlname)
+#     return obj
 
 
 def extract_multilook_number(geom_dir, metadata=dict()):
@@ -117,20 +119,21 @@ def extract_isce_metadata(meta_file, geom_dir=None, rsc_file=None, update_mode=T
 
     # 1. extract metadata from XML / shelve file
     processor = isce_utils.get_processor(meta_file)
-
+    
+    # TODO The dependencies on isce is only removed for tops, others need to be worked on
     if processor == 'tops':
         print('extract metadata from ISCE/topsStack xml file:', meta_file)
-        metadata, frame = isce_utils.extract_tops_metadata(meta_file)
+        metadata, frame = meta_utils.extract_tops_metadata(meta_file)
         metadata['sensor_type'] = 'tops'
-
+    
     elif processor == 'alosStack':
         print('extract metadata from ISCE/alosStack xml file:', meta_file)
-        metadata, frame = isce_utils.extract_alosStack_metadata(meta_file)
+        metadata, frame = meta_utils.extract_alosStack_metadata(meta_file)
         metadata['sensor_type'] = 'alos2'
 
     elif processor == 'stripmap':
         print('extract metadata from ISCE/stripmapStack data file:', meta_file)
-        metadata, frame = isce_utils.extract_stripmap_metadata(meta_file)
+        metadata, frame = meta_utils.extract_stripmap_metadata(meta_file)
 
     else:
         raise ValueError("unrecognized ISCE metadata file: {}".format(meta_file))
