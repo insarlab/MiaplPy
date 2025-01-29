@@ -187,7 +187,7 @@ class slcStackDict:
         ###############################
         # 1D dataset containing dates of all images
         dsName = 'date'
-        dsDataType = np.string_
+        dsDataType = np.bytes_
         dsShape = (self.numSlc, 1)
         print('create dataset /{d:<{w}} of {t:<25} in size of {s}'.format(d=dsName,
                                                                           w=maxDigit,
@@ -482,7 +482,7 @@ class slcStack:
                     compression = rf['slc'].compression
             refobj.close(print_msg=False)
         data = np.array(data, dtype='c16')
-        dates = np.array(dates, dtype=np.string_)
+        dates = np.array(dates, dtype=np.bytes_)
         bperp = np.array(bperp, dtype=np.float32)
         metadata = dict(metadata)
         metadata['FILE_TYPE'] = 'timeseries' #self.name

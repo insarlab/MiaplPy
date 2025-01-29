@@ -247,7 +247,7 @@ cdef class CPhaseLink:
                 RSLC['temporalCoherence'][:, :, :] = -1
 
                 # 1D dataset containing dates of all images
-                data = np.array(self.all_date_list, dtype=np.string_)
+                data = np.array(self.all_date_list, dtype=np.bytes_)
                 RSLC.create_dataset('date', data=data)
 
                 # 1D dataset containing perpendicular baselines of all images

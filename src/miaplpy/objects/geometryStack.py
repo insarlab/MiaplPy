@@ -184,7 +184,7 @@ class geometryDict(GDict):
                 # Write 1D dataset date
                 dsName = 'date'
                 dsShape = (self.numDate,)
-                dsDataType = np.string_
+                dsDataType = np.bytes_
                 print(('create dataset /{d:<{w}} of {t:<25}'
                        ' in size of {s}').format(d=dsName,
                                                  w=maxDigit,

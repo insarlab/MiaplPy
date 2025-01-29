@@ -141,7 +141,7 @@ def add_complex_ctype(h5file: h5py.File):
         if "complex64" in hf["/"]:
             return
         ctype = h5py.h5t.py_create(np.complex64)
-        ctype.commit(hf["/"].id, np.string_("complex64"))
+        ctype.commit(hf["/"].id, np.bytes_("complex64"))
 
 
 def create_geo_dataset_3d(
@@ -386,7 +386,7 @@ class cropSLC:
         ###############################
         # 1D dataset containing dates of all images
         dsName = 'date'
-        dsDataType = np.string_
+        dsDataType = np.bytes_
         dsShape = (self.numSlc, 1)
         print('create dataset /{d:<{w}} of {t:<25} in size of {s}'.format(d=dsName,
                                                                           w=maxDigit,
