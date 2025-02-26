@@ -5,7 +5,7 @@ import os
 import glob
 import numpy as np
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 from scipy.spatial import Delaunay
 
 def cmd_line_parse(iargs=None):
@@ -257,15 +257,15 @@ def find_mini_stacks(date_list, baseline_dir, month=6):
     return pairs
 
 def find_one_year_interferograms(date_list):
-    dates = np.array([datetime.datetime.strptime(date, '%Y%m%d') for date in date_list])
+    dates = np.array([datetime.strptime(date, '%Y%m%d') for date in date_list])
 
     ifg_ind = []
     for i, date in enumerate(dates):
-        range_1 = date + datetime.timedelta(days=365) - datetime.timedelta(days=5)
-        range_2 = date + datetime.timedelta(days=365) + datetime.timedelta(days=5)
+        range_1 = date + timedelta(days=365) - timedelta(days=5)
+        range_2 = date + timedelta(days=365) + timedelta(days=5)
         index = np.where((dates >= range_1) * (dates <= range_2))[0]
         if len(index) >= 1:
-            date_diff = list(dates[index] - (date + datetime.timedelta(days=365)))
+            date_diff = list(dates[index] - (date + timedelta(days=365)))
             ind = date_diff.index(np.nanmin(date_diff))
             ind_date = index[ind]
             date2 = date_list[ind_date]
