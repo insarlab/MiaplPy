@@ -19,10 +19,10 @@ def enablePrint():
     sys.stdout = sys.__stdout__
 
 blockPrint()
-import isce
-import isceobj
-from isceobj.Util.ImageUtil import ImageLib as IML
-from contrib.UnwrapComp.unwrapComponents import UnwrapComponents
+# import isce
+# import isceobj
+# from isceobj.Util.ImageUtil import ImageLib as IML
+# from contrib.UnwrapComp.unwrapComponents import UnwrapComponents
 from miaplpy.objects.arg_parser import MiaplPyParser
 import numpy as np
 from osgeo import gdal
@@ -114,7 +114,8 @@ class Snaphu:
                          'earth_radius': inps.earth_radius,
                          'height': inps.height,
                          'azlooks': azlooks,
-                         'rglooks': rglooks}
+                         'rglooks': rglooks,
+                         'nlooks': inps.nlooks,}
 
         CONFIG_FILE = os.path.abspath(os.path.dirname(inps.work_dir) + '/../../conf.full')
         if not os.path.exists(CONFIG_FILE):
@@ -133,6 +134,7 @@ class Snaphu:
         self.config_default.append('LAMBDA   {}\n'.format(inps.wavelength))
         self.config_default.append('EARTHRADIUS   {}\n'.format(inps.earth_radius))
         self.config_default.append('INITMETHOD   {}\n'.format(inps.init_method))
+        self.config_default.append('NCORRLOOKS   {}\n'.format(inps.nlooks))
         if inps.copy_to_tmp:
             os.system('rm -rf /tmp/{}'.format(os.path.basename(inps.work_dir)))
             self.config_default.append('TILEDIR   /tmp/{}\n'.format(os.path.basename(inps.work_dir)))
@@ -207,7 +209,7 @@ class Snaphu:
     def unwrap_tile(self):
 
         cmd = 'snaphu -f {config_file} -d {wrapped_file} {line_length} -o ' \
-              '{unwrapped_file} --tile {ytile} {xtile} 500 500 ' \
+              '{unwrapped_file} --tile {ytile} {xtile} 400 400 ' \
               '--nproc {num_proc}'.format(config_file=self.config_file, wrapped_file=self.inp_wrapped,
                                           line_length=self.width, unwrapped_file=self.out_unwrapped, ytile=self.y_tile,
                                           xtile=self.x_tile, num_proc=self.num_tiles)
